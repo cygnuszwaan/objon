@@ -83,6 +83,9 @@ const PLANNED: Array[StringName] = [
 	&"enemies/grunt_bowled",          # a grunt knocked out by a surfer, thrown and spinning
 	&"enemies/grunt_windup",          # a grunt starting its windup (the telegraph, hammer rising), at the grunt
 	&"enemies/grunt_swing",           # a grunt's hammer coming down (start of the live swing), at the grunt
+	&"enemies/crawler_flip",          # a tread crawler flipped onto its back (a stomp or a kick), at the crawler
+	&"enemies/crawler_hit",           # a kick landing on a flipped tread crawler without destroying it, at the crawler
+	&"enemies/crawler_bowled",        # a tread crawler knocked out by a surfer, thrown and spinning
 	&"interactive/mirror_rotate",
 	&"interactive/laser_receiver_on",   # a laser receiver powering (the beam reached it), at the receiver
 	&"interactive/bullet_target_hit",    # a cannon bullet hitting a bullet target (every hit), at the target

@@ -15,9 +15,9 @@
 [ext_resource type="Texture2D" uid="uid://dpppunwx202yk" path="res://sprites/player/player_run.png" id="13_cnsyf"]
 [ext_resource type="Texture2D" uid="uid://b016arkicm6ui" path="res://sprites/player/player_swim.png" id="16_myrg7"]
 [ext_resource type="PackedScene" uid="uid://cs8lijae0vu07" path="res://scenes/ui/health_bar.tscn" id="99_healthbar"]
-[ext_resource type="Script" path="res://scenes/ui/points_display.gd" id="100_points"]
-[ext_resource type="Script" path="res://scenes/ui/gem_display.gd" id="101_gems"]
-[ext_resource type="Script" path="res://scenes/player/surf_board.gd" id="99_surfboard"]
+[ext_resource type="Script" uid="uid://cph4uyahuqlij" path="res://scenes/player/surf_board.gd" id="99_surfboard"]
+[ext_resource type="Script" uid="uid://c3ce8u6athd75" path="res://scenes/ui/points_display.gd" id="100_points"]
+[ext_resource type="Script" uid="uid://vl0rpxhmfyos" path="res://scenes/ui/gem_display.gd" id="101_gems"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_kvlxm"]
 atlas = ExtResource("3_myrg7")
@@ -717,7 +717,7 @@ animations = [{
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_7lgfd"]
 radius = 2.0
-height = 16.0
+height = 15.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_inyst"]
 size = Vector2(8, 6)
@@ -731,6 +731,7 @@ sprite_frames = SubResource("SpriteFrames_x7p2l")
 animation = &"idle"
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=351596483]
+position = Vector2(0, 0.5)
 shape = SubResource("CapsuleShape2D_7lgfd")
 
 [node name="Camera2D" type="Camera2D" parent="." unique_id=2009419776]
@@ -746,13 +747,13 @@ shape = SubResource("RectangleShape2D_inyst")
 
 [node name="HealthBar" parent="." unique_id=1873640215 instance=ExtResource("99_healthbar")]
 
-[node name="PointsDisplay" type="CanvasLayer" parent="."]
+[node name="PointsDisplay" type="CanvasLayer" parent="." unique_id=1597736202]
 script = ExtResource("100_points")
 
-[node name="GemDisplay" type="CanvasLayer" parent="."]
+[node name="GemDisplay" type="CanvasLayer" parent="." unique_id=1994343640]
 script = ExtResource("101_gems")
 
-[node name="SurfBoard" type="Node2D" parent="."]
+[node name="SurfBoard" type="Node2D" parent="." unique_id=1032328205]
 visible = false
 z_index = 1
 script = ExtResource("99_surfboard")

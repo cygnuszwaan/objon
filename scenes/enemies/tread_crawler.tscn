@@ -1,0 +1,39 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/tread_crawler.gd" id="1_crawler"]
+[ext_resource type="Script" path="res://scenes/enemies/tread_crawler_art.gd" id="2_art"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(14, 10)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_stomp"]
+size = Vector2(14, 7)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hazard"]
+size = Vector2(18, 8)
+
+[node name="TreadCrawler" type="CharacterBody2D"]
+collision_mask = 2
+script = ExtResource("1_crawler")
+
+[node name="TreadCrawlerArt" type="Node2D" parent="."]
+script = ExtResource("2_art")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="StompZone" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StompZone"]
+position = Vector2(0, -6.5)
+shape = SubResource("RectangleShape2D_stomp")
+
+[node name="Hazard" type="Area2D" parent="."]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Hazard"]
+position = Vector2(0, 1)
+shape = SubResource("RectangleShape2D_hazard")

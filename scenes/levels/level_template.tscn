@@ -1,0 +1,76 @@
+[gd_scene format=3 uid="uid://32ovn6pqn2ax"]
+
+[ext_resource type="Script" uid="uid://dm21v52x2lf35" path="res://scenes/levels/test_level.gd" id="1_j81xe"]
+[ext_resource type="PackedScene" path="res://scenes/levels/backdrop_layers.tscn" id="2_qvykx"]
+[ext_resource type="Texture2D" uid="uid://b8yefrcdq7oyg" path="res://sprites/backgrounds/volcano2.png" id="3_bujjw"]
+[ext_resource type="TileSet" uid="uid://bl7lwnh48lsww" path="res://resources/weathered-steel.tres" id="4_hq32h"]
+[ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="5_a381f"]
+[ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="6_g1ai2"]
+[ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_fwulr"]
+[ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_i403b"]
+
+[node name="TestLevel" type="Node2D" unique_id=1261410649]
+script = ExtResource("1_j81xe")
+
+[node name="Backdrop" parent="." unique_id=1154499917 instance=ExtResource("2_qvykx")]
+position = Vector2(469.63434, 589.30304)
+metadata/_edit_lock_ = true
+
+[node name="Color" parent="Backdrop/Sky" index="0"]
+color = Color(0.2957589, 0.14547312, 0.03643031, 1)
+metadata/_edit_lock_ = true
+
+[node name="Far" parent="Backdrop" index="1"]
+scroll_scale = Vector2(0.15, 0.15)
+metadata/_edit_lock_ = true
+
+[node name="Art" parent="Backdrop/Far" index="0"]
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("3_bujjw")
+metadata/_edit_lock_ = true
+
+[node name="Near" parent="Backdrop" index="2"]
+visible = false
+metadata/_edit_lock_ = true
+
+[node name="Art" parent="Backdrop/Near" index="0"]
+metadata/_edit_lock_ = true
+
+[node name="Tilemaps" type="Node" parent="." unique_id=1276069544]
+
+[node name="Ground" type="TileMapLayer" parent="Tilemaps" unique_id=918251972 groups=["ground", "world_tilemap"]]
+tile_map_data = PackedByteArray(0, 0, 29, 0, 40, 0, 0, 0, 2, 0, 3, 0, 0, 0, 28, 0, 40, 0, 0, 0, 1, 0, 3, 0, 0, 0, 27, 0, 40, 0, 0, 0, 1, 0, 3, 0, 0, 0, 26, 0, 40, 0, 0, 0, 0, 0, 3, 0, 0, 0)
+tile_set = ExtResource("4_hq32h")
+
+[node name="Ladders" type="TileMapLayer" parent="Tilemaps" unique_id=2114889966 groups=["ladder_tilemap"]]
+position = Vector2(-16, 0)
+tile_set = ExtResource("5_a381f")
+
+[node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_g1ai2")]
+
+[node name="WaterManager" type="Node2D" parent="." unique_id=1297838409 groups=["water_manager"]]
+script = ExtResource("7_fwulr")
+kill_y = 1024.0
+
+[node name="Player" parent="." unique_id=61703917 instance=ExtResource("8_i403b")]
+z_index = 1
+position = Vector2(428, 632)
+
+[node name="Collectibles" type="Node" parent="." unique_id=872633615]
+
+[node name="Enemies" type="Node" parent="." unique_id=1904710388]
+
+[node name="Sources" type="Node" parent="." unique_id=486040387]
+
+[node name="Traps" type="Node" parent="." unique_id=673943172]
+
+[node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
+
+[node name="Liquids" type="Node" parent="." unique_id=129700419]
+
+[node name="Dynamic" type="Node" parent="." unique_id=223122078]
+
+[node name="Blocks" type="Node" parent="." unique_id=1681336233]
+
+[editable path="Backdrop"]
+[editable path="Tilemaps/ConductorLayers"]
