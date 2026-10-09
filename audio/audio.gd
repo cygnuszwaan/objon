@@ -86,6 +86,11 @@ const PLANNED: Array[StringName] = [
 	&"enemies/crawler_flip",          # a tread crawler flipped onto its back (a stomp or a kick), at the crawler
 	&"enemies/crawler_hit",           # a kick landing on a flipped tread crawler without destroying it, at the crawler
 	&"enemies/crawler_bowled",        # a tread crawler knocked out by a surfer, thrown and spinning
+	&"enemies/mine_arm",              # a proximity mine arming (the fuse starts), at the mine
+	&"enemies/mine_explode",          # a proximity mine going off, at the mine
+	&"enemies/mine_kick",             # a proximity mine kicked, sliding off, at the mine
+	&"enemies/railbot_drip",          # a rail bot letting a spark drop, at the nozzle
+	&"enemies/railbot_hit",           # a rail bot taking a hit without being destroyed, at the bot
 	&"interactive/mirror_rotate",
 	&"interactive/laser_receiver_on",   # a laser receiver powering (the beam reached it), at the receiver
 	&"interactive/bullet_target_hit",    # a cannon bullet hitting a bullet target (every hit), at the target

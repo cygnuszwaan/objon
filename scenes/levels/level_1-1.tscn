@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://dm21v52x2lf35" path="res://scenes/levels/test_level.gd" id="1_8dks1"]
 [ext_resource type="PackedScene" path="res://scenes/levels/backdrop_layers.tscn" id="2_s474h"]
 [ext_resource type="Texture2D" uid="uid://b8yefrcdq7oyg" path="res://sprites/backgrounds/volcano2.png" id="3_g3uln"]
-[ext_resource type="TileSet" uid="uid://bl7lwnh48lsww" path="res://resources/weathered-steel.tres" id="4_7n46g"]
+[ext_resource type="TileSet" uid="uid://c8jgb1lbsw7b" path="res://resources/weathered-steel.tres" id="4_7n46g"]
 [ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="5_rljw2"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="6_yjlda"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_aghq8"]
@@ -12,6 +12,7 @@
 [ext_resource type="PackedScene" path="res://scenes/collectibles/gem_2.tscn" id="10_2ms0b"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="11_g3uln"]
 [ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="12_7n46g"]
+[ext_resource type="PackedScene" uid="uid://bmjkgbi1jd2s" path="res://scenes/enemies/drillbot.tscn" id="13_7n46g"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_8dks1")
@@ -113,6 +114,10 @@ next_level = "uid://2qfgst3v6ihu"
 [node name="Dynamic" type="Node" parent="." unique_id=223122078]
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
+
+[node name="Drillbot" parent="." unique_id=1754501852 instance=ExtResource("13_7n46g")]
+position = Vector2(568, 632)
+patrol_distance = 0.0
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

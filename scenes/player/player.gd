@@ -12,6 +12,7 @@ signal won  # emitted by start_dance()
 
 var state: State = State.IDLE
 var one_shot_action: OneShotAction = OneShotAction.NONE
+var _air_kick := false  # the current KICKING one-shot was started airborne: it keeps horizontal control and carried momentum (a ground kick roots you). Only meaningful while one_shot_action == KICKING
 
 var speed: float = 150.0
 
@@ -28,6 +29,7 @@ var speed: float = 150.0
 
 var jump_velocity: float = -240.0
 var gravity: float = 900.0
+var air_kick_halts_ascent := false  # an airborne kick cancels any upward speed (it never slows a fall), so kicking out of a jump ends the rise; false = the kick leaves vertical speed alone
 var coyote_time: float = 0.12
 var coyote_timer: float = 0.0
 var jump_buffer_time: float = 0.12
@@ -715,19 +717,25 @@ func _physics_process(delta: float) -> void:
 		coyote_timer = 0.0
 
 	# --- surf: kick while crouching on the floor mounts the board, kick while surfing dismounts ---
+	var kick_handled := false  # this press mounted or dismounted the board: it is not also a kick
 	if Input.is_action_just_pressed("kick"):
 		if is_surfing:
 			_end_surf(true)
+			kick_handled = true
 		elif is_crouching and is_on_floor() and one_shot_action == OneShotAction.NONE and not is_climbing and not is_hanging and not is_swimming:
 			_start_surf()
+			kick_handled = true
 
 	# --- kick ---
 	if Input.is_action_just_pressed("kick") and is_on_floor() and one_shot_action == OneShotAction.NONE and not is_crouching and not is_swimming:
 		one_shot_action = OneShotAction.KICKING
+		_air_kick = false
 		velocity.x = 0.0
 		sprite.play("kick")
 		Audio.play(&"player/kick")
 		kick_hitbox.monitoring = true
+	elif Input.is_action_just_pressed("kick") and not kick_handled and not is_on_floor() and one_shot_action == OneShotAction.NONE and not is_crouching and not is_climbing and not is_hanging and not is_swimming and not is_surfing:
+		_start_air_kick()
 	
 	hang_lockout_timer -= delta
 
@@ -771,7 +779,7 @@ func _physics_process(delta: float) -> void:
 	var slippery := is_on_floor() and not is_climbing and not is_hanging and not is_swimming and _floor_is_slippery()
 	if is_on_wall() and _slide_vx * get_wall_normal().x < 0.0:
 		_slide_vx = 0.0  # ran into a wall: don't keep "sliding" into it and then take ages to reverse
-	if _air_carry_active and (is_on_floor() or is_climbing or is_hanging or is_swimming or one_shot_action != OneShotAction.NONE):
+	if _air_carry_active and (is_on_floor() or is_climbing or is_hanging or is_swimming or (one_shot_action != OneShotAction.NONE and not (_air_kick and one_shot_action == OneShotAction.KICKING))):
 		if is_surfing and is_on_floor():
 			_surf_speed = _surf_landing_speed()  # landed on the board: the carried velocity becomes the ground surf speed again
 		_air_carry_active = false  # landed, grabbed something or got into a one-shot: normal control again
@@ -785,7 +793,7 @@ func _physics_process(delta: float) -> void:
 		if _air_carry_steers and input_dir != 0.0 and not (signf(input_dir) == signf(_air_carry_vx) and absf(_air_carry_vx) > speed):
 			_air_carry_vx = move_toward(_air_carry_vx, input_dir * speed, carry_air_accel * delta)
 		velocity.x = _air_carry_vx
-	elif is_crouching or one_shot_action == OneShotAction.UNCROUCHING or one_shot_action == OneShotAction.KICKING:
+	elif is_crouching or one_shot_action == OneShotAction.UNCROUCHING or (one_shot_action == OneShotAction.KICKING and not _air_kick):
 		velocity.x = move_toward(clampf(_slide_vx, -speed, speed), 0.0, ice_friction * delta) if slippery else 0.0
 	elif slippery:
 		var rate := ice_accel if input_dir != 0.0 else ice_friction
@@ -1172,6 +1180,20 @@ func _swim_passive_target() -> float:
 		if float_speed > 0.0:
 			return -float_speed
 	return swim_sink_speed
+
+## An airborne kick: the same one-shot, animation, sound and hitbox as the ground kick, but it does not root the player
+## (air control and any carried swing or dismount momentum carry on, see `_air_kick`), and with `air_kick_halts_ascent`
+## it cancels any upward speed so a kick out of a jump ends the rise. It only ever removes upward speed: kicking while
+## falling leaves the fall alone, so spamming it cannot hover. Ledge, catwalk and swing grabs are gated on
+## `one_shot_action == NONE`, so none can start until the kick animation ends.
+func _start_air_kick() -> void:
+	one_shot_action = OneShotAction.KICKING
+	_air_kick = true
+	if air_kick_halts_ascent:
+		velocity.y = maxf(velocity.y, 0.0)
+	sprite.play("kick")
+	Audio.play(&"player/kick")
+	kick_hitbox.monitoring = true
 
 # --- dealing damage (kick) -------------------------------------------------------------------
 # Mirrors the take_hit contract below but in the other direction. KickHitbox hits the target's

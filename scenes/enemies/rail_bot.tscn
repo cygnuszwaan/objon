@@ -1,0 +1,23 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/rail_bot.gd" id="1_railbot"]
+[ext_resource type="Script" path="res://scenes/enemies/rail_bot_art.gd" id="2_art"]
+[ext_resource type="Script" uid="uid://debsvssvqq504" path="res://scenes/interactive/power_target.gd" id="3_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(12, 8)
+
+[node name="RailBot" type="AnimatableBody2D"]
+collision_mask = 0
+sync_to_physics = true
+script = ExtResource("1_railbot")
+
+[node name="RailBotArt" type="Node2D" parent="."]
+script = ExtResource("2_art")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, 8)
+shape = SubResource("RectangleShape2D_body")
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("3_pwrtgt")
