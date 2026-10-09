@@ -1,0 +1,24 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/seesaw.gd" id="1_seesaw"]
+[ext_resource type="Script" path="res://scenes/interactive/seesaw_plank_art.gd" id="2_plank"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="3_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_plank"]
+size = Vector2(32, 8)
+
+[node name="Seesaw" type="AnimatableBody2D"]
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("1_seesaw")
+
+[node name="PlankArt" type="Node2D" parent="."]
+script = ExtResource("2_plank")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_plank")
+
+[node name="Fulcrum" type="Marker2D" parent="."]
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("3_pwrtgt")

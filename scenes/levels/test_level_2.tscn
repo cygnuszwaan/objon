@@ -1,0 +1,64 @@
+[gd_scene format=4 uid="uid://2qfgst3v6ihu"]
+
+[ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="1_player"]
+[ext_resource type="Script" uid="uid://dm21v52x2lf35" path="res://scenes/levels/test_level.gd" id="2_script"]
+[ext_resource type="PackedScene" path="res://scenes/levels/backdrop_layers.tscn" id="3_backdrop"]
+[ext_resource type="Texture2D" uid="uid://b8yefrcdq7oyg" path="res://sprites/backgrounds/volcano2.png" id="4_volcano"]
+[ext_resource type="TileSet" uid="uid://csy3hkukur4y7" path="res://resources/ground_tileset.tres" id="5_ground"]
+[ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="6_ladder"]
+[ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_water"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="8_checkpoint"]
+[ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="9_gem"]
+[ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="10_finish"]
+
+[node name="TestLevel2" type="Node2D" unique_id=246747903]
+script = ExtResource("2_script")
+
+[node name="Backdrop" parent="." unique_id=1081967735 instance=ExtResource("3_backdrop")]
+position = Vector2(560, 589)
+
+[node name="Color" parent="Backdrop/Sky" index="0"]
+color = Color(0.0627451, 0.14509805, 0.2509804, 1)
+
+[node name="Far" parent="Backdrop" index="1"]
+scroll_scale = Vector2(0.15, 0.15)
+
+[node name="Art" parent="Backdrop/Far" index="0"]
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("4_volcano")
+
+[node name="Near" parent="Backdrop" index="2"]
+visible = false
+
+[node name="Tilemaps" type="Node" parent="." unique_id=612006041]
+
+[node name="Ground" type="TileMapLayer" parent="Tilemaps" unique_id=560271058 groups=["ground", "world_tilemap"]]
+tile_map_data = PackedByteArray("AAAUACgAAgABAAEAAAAVACgAAgABAAEAAAAWACgAAgABAAEAAAAXACgAAgABAAEAAAAYACgAAgABAAEAAAAZACgAAgABAAEAAAAaACgAAgABAAEAAAAbACgAAgABAAEAAAAcACgAAgABAAEAAAAdACgAAgABAAEAAAAeACgAAgABAAEAAAAfACgAAgABAAEAAAAgACgAAgABAAEAAAAhACgAAgABAAEAAAAiACgAAgABAAEAAAAjACgAAgABAAEAAAAkACgAAgABAAEAAAAlACgAAgABAAEAAAAmACgAAgABAAEAAAAnACgAAgABAAEAAAAoACgAAgABAAEAAAApACgAAgABAAEAAAAqACgAAgABAAEAAAArACgAAgABAAEAAAAsACgAAgABAAEAAAAtACgAAgABAAEAAAAuACgAAgABAAEAAAAvACgAAgABAAEAAAAwACgAAgABAAEAAAAxACgAAgABAAEAAAAyACgAAgABAAEAAAAUACIAAgABAAEAAAAyACIAAgABAAEAAAAUACMAAgABAAEAAAAyACMAAgABAAEAAAAUACQAAgABAAEAAAAyACQAAgABAAEAAAAUACUAAgABAAEAAAAyACUAAgABAAEAAAAUACYAAgABAAEAAAAyACYAAgABAAEAAAAUACcAAgABAAEAAAAyACcAAgABAAEAAAAhACcAAwAAAAAAAAA=")
+tile_set = ExtResource("5_ground")
+
+[node name="Ladders" type="TileMapLayer" parent="Tilemaps" unique_id=646928034 groups=["ladder_tilemap"]]
+position = Vector2(-16, 0)
+tile_set = ExtResource("6_ladder")
+
+[node name="WaterManager" type="Node2D" parent="." unique_id=1746142478 groups=["water_manager"]]
+script = ExtResource("7_water")
+kill_y = 1024.0
+
+[node name="Checkpoint" parent="." unique_id=869839486 instance=ExtResource("8_checkpoint")]
+position = Vector2(560, 632)
+order = 1
+
+[node name="Gem1" parent="." unique_id=1490452709 instance=ExtResource("9_gem")]
+position = Vector2(480, 624)
+
+[node name="Gem2" parent="." unique_id=1130170925 instance=ExtResource("9_gem")]
+position = Vector2(640, 624)
+
+[node name="Finish" parent="." unique_id=24017344 instance=ExtResource("10_finish")]
+position = Vector2(768, 640)
+
+[node name="Player" parent="." unique_id=711403675 instance=ExtResource("1_player")]
+z_index = 1
+position = Vector2(400, 632)
+
+[editable path="Backdrop"]

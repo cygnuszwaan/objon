@@ -1,0 +1,101 @@
+[gd_scene format=3 uid="uid://bmjkgbi1jd2s"]
+
+[ext_resource type="Script" uid="uid://c0y70yixxsw5s" path="res://scenes/enemies/drillbot.gd" id="1_563hv"]
+[ext_resource type="Texture2D" uid="uid://cq350x4p7e1ca" path="res://sprites/enemies/drillbot_travel.png" id="2_2h2pb"]
+[ext_resource type="Texture2D" uid="uid://fbh4834mxof8" path="res://sprites/enemies/drillbot_idle.png" id="2_3vjjx"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_8sxf7"]
+atlas = ExtResource("2_3vjjx")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_44ftv"]
+atlas = ExtResource("2_3vjjx")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_jb4q1"]
+atlas = ExtResource("2_3vjjx")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_0gn42"]
+atlas = ExtResource("2_3vjjx")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_3vjjx"]
+atlas = ExtResource("2_2h2pb")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_goqqw"]
+atlas = ExtResource("2_2h2pb")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_pc8cj"]
+atlas = ExtResource("2_2h2pb")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_b0qer"]
+atlas = ExtResource("2_2h2pb")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_0w3yt"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_8sxf7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_44ftv")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_jb4q1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_0gn42")
+}],
+"loop": 1,
+"name": &"idle",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_3vjjx")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_goqqw")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_pc8cj")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_b0qer")
+}],
+"loop": 1,
+"name": &"move",
+"speed": 10.0
+}]
+
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_563hv"]
+points = PackedVector2Array(-4, -7, -3, -8, 0, -8, 4, -4, 4, 4, 1, 7, -1, 7, -4, 4)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_1m13c"]
+size = Vector2(6, 5)
+
+[node name="Drillbot" type="CharacterBody2D" unique_id=1754501852]
+collision_mask = 2
+script = ExtResource("1_563hv")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1481186365]
+position = Vector2(-8, -8)
+sprite_frames = SubResource("SpriteFrames_0w3yt")
+animation = &"idle"
+centered = false
+offset = Vector2(-3, 0)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=580885203]
+position = Vector2(0, 1)
+shape = SubResource("ConvexPolygonShape2D_563hv")
+
+[node name="DrillHazard" type="Area2D" parent="." unique_id=1031271227]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="DrillHazard" unique_id=858556130]
+position = Vector2(-7, -3.5)
+shape = SubResource("RectangleShape2D_1m13c")

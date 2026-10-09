@@ -1,0 +1,31 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scenes/enemies/grunt.gd" id="1_grunt"]
+[ext_resource type="Script" path="res://scenes/enemies/grunt_art.gd" id="2_art"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(6, 16)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_hammer"]
+size = Vector2(4, 16)
+
+[node name="Grunt" type="CharacterBody2D"]
+collision_mask = 2
+script = ExtResource("1_grunt")
+
+[node name="GruntArt" type="Node2D" parent="."]
+script = ExtResource("2_art")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="HammerPivot" type="Node2D" parent="."]
+position = Vector2(0, -4)
+
+[node name="Hammer" type="Area2D" parent="HammerPivot"]
+collision_layer = 0
+collision_mask = 1
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="HammerPivot/Hammer"]
+position = Vector2(0, -8)
+shape = SubResource("RectangleShape2D_hammer")

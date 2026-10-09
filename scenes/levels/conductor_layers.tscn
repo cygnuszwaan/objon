@@ -1,0 +1,30 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/levels/conductor_layer.gd" id="1_layer"]
+[ext_resource type="TileSet" path="res://resources/conductor_tileset.tres" id="2_tileset"]
+
+[node name="ConductorLayers" type="Node2D"]
+
+[node name="Red" type="TileMapLayer" parent="."]
+tile_set = ExtResource("2_tileset")
+collision_enabled = false
+navigation_enabled = false
+script = ExtResource("1_layer")
+
+[node name="Yellow" type="TileMapLayer" parent="."]
+tile_set = ExtResource("2_tileset")
+collision_enabled = false
+navigation_enabled = false
+script = ExtResource("1_layer")
+
+[node name="Green" type="TileMapLayer" parent="."]
+tile_set = ExtResource("2_tileset")
+collision_enabled = false
+navigation_enabled = false
+script = ExtResource("1_layer")
+
+[node name="Blue" type="TileMapLayer" parent="."]
+tile_set = ExtResource("2_tileset")
+collision_enabled = false
+navigation_enabled = false
+script = ExtResource("1_layer")

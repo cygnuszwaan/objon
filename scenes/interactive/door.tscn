@@ -1,0 +1,23 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/door.gd" id="1_door"]
+[ext_resource type="Texture2D" uid="uid://dw147uxnq6tx4" path="res://sprites/interactive/door1.png" id="2_art"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="3_target"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_door"]
+size = Vector2(8, 16)
+
+[node name="Door" type="AnimatableBody2D" groups=["ground", "water_solid"]]
+collision_layer = 2
+collision_mask = 0
+script = ExtResource("1_door")
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("2_art")
+vframes = 9
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_door")
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("3_target")

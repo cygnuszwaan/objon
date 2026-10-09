@@ -1,0 +1,36 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/levels/backdrop_layer.gd" id="1_layer"]
+[ext_resource type="Texture2D" path="res://sprites/backgrounds/bg_far.png" id="2_far"]
+[ext_resource type="Texture2D" path="res://sprites/backgrounds/bg_near.png" id="3_near"]
+
+[node name="Backdrop" type="Node2D"]
+
+[node name="Sky" type="CanvasLayer" parent="."]
+layer = -100
+
+[node name="Color" type="ColorRect" parent="Sky"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.1, 0.13, 0.21, 1)
+
+[node name="Far" type="Node2D" parent="."]
+z_index = -102
+script = ExtResource("1_layer")
+scroll_scale = Vector2(0.15, 0.1)
+
+[node name="Art" type="Sprite2D" parent="Far"]
+texture = ExtResource("2_far")
+
+[node name="Near" type="Node2D" parent="."]
+z_index = -101
+script = ExtResource("1_layer")
+scroll_scale = Vector2(0.4, 0.3)
+
+[node name="Art" type="Sprite2D" parent="Near"]
+texture = ExtResource("3_near")

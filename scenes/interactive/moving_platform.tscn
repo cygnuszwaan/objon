@@ -1,0 +1,38 @@
+[gd_scene format=3 uid="uid://cetwqtvi2mmy8"]
+[ext_resource type="Script" uid="uid://b7ar2548bftrq" path="res://scenes/interactive/moving_platform.gd" id="1_q3cgi"]
+[ext_resource type="Texture2D" uid="uid://yo8vg33b02ik" path="res://sprites/interactive/platform_moving.png" id="1_vttc7"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="9_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0w3yt"]
+size = Vector2(16, 4)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_inyst"]
+size = Vector2(1, 4)
+
+[node name="moving_platform" type="AnimatableBody2D" unique_id=323917709]
+collision_layer = 2
+script = ExtResource("1_q3cgi")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=1568828850]
+texture = ExtResource("1_vttc7")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=575374070]
+position = Vector2(0, -6)
+shape = SubResource("RectangleShape2D_0w3yt")
+one_way_collision = true
+
+[node name="CollisionShape2D2" type="CollisionShape2D" parent="." unique_id=1994553761]
+position = Vector2(-7.5, -6)
+shape = SubResource("RectangleShape2D_inyst")
+one_way_collision = true
+one_way_collision_direction = Vector2(1, 0)
+
+[node name="CollisionShape2D3" type="CollisionShape2D" parent="." unique_id=699168846]
+position = Vector2(7.5, -6)
+shape = SubResource("RectangleShape2D_inyst")
+one_way_collision = true
+one_way_collision_direction = Vector2(-1, 0)
+
+[node name="PowerTarget" type="Node2D" parent="."]
+position = Vector2(0, 0)
+script = ExtResource("9_pwrtgt")

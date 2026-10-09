@@ -1,0 +1,51 @@
+[gd_scene format=3 uid="uid://ds0jy48xh6cqf"]
+[ext_resource type="Texture2D" uid="uid://4ahm6ut3pkxd" path="res://sprites/traps/sawwheel.png" id="1_wbk6p"]
+[ext_resource type="Script" uid="uid://cn5pjq1g07acu" path="res://scenes/traps/sawwheel.gd" id="2_2741s"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="9_pwrtgt"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ahyqp"]
+atlas = ExtResource("1_wbk6p")
+region = Rect2(0, 0, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_whshx"]
+atlas = ExtResource("1_wbk6p")
+region = Rect2(0, 32, 32, 32)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_uajdb"]
+atlas = ExtResource("1_wbk6p")
+region = Rect2(0, 64, 32, 32)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_0w3yt"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ahyqp")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_whshx")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_uajdb")
+}],
+"loop": 1,
+"name": &"idle",
+"speed": 10.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_0w3yt"]
+
+[node name="Sawwheel" type="Area2D" unique_id=607576034]
+script = ExtResource("2_2741s")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1956186023]
+sprite_frames = SubResource("SpriteFrames_0w3yt")
+animation = &"idle"
+frame_progress = 0.31687635
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1549338283]
+scale = Vector2(1.5, 1.5)
+shape = SubResource("CircleShape2D_0w3yt")
+
+[node name="PowerTarget" type="Node2D" parent="."]
+position = Vector2(-8, -8)
+script = ExtResource("9_pwrtgt")

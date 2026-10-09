@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/breakable_barrier.gd" id="1_barrier"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_barrier"]
+size = Vector2(16, 48)
+
+[node name="BreakableBarrier" type="StaticBody2D" groups=["water_solid"]]
+collision_layer = 3
+collision_mask = 0
+script = ExtResource("1_barrier")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(8, 24)
+shape = SubResource("RectangleShape2D_barrier")

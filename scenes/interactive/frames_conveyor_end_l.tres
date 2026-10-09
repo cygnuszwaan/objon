@@ -1,0 +1,73 @@
+[gd_resource type="SpriteFrames" format=3 uid="uid://bl1c7dr6jq6cx"]
+
+[ext_resource type="Texture2D" uid="uid://bkkxohoscyeb" path="res://sprites/interactive/conveyor_l_end_l.png" id="1_ppko3"]
+[ext_resource type="Texture2D" uid="uid://bikrw8b481dho" path="res://sprites/interactive/conveyor_r_end_l.png" id="2_hghym"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7sbdb"]
+atlas = ExtResource("1_ppko3")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_y5xej"]
+atlas = ExtResource("1_ppko3")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_dscb8"]
+atlas = ExtResource("1_ppko3")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_733e0"]
+atlas = ExtResource("1_ppko3")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_s4lh5"]
+atlas = ExtResource("2_hghym")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xyguq"]
+atlas = ExtResource("2_hghym")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_1eopj"]
+atlas = ExtResource("2_hghym")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2aug1"]
+atlas = ExtResource("2_hghym")
+region = Rect2(0, 48, 16, 16)
+
+[resource]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7sbdb")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_y5xej")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_dscb8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_733e0")
+}],
+"loop": 1,
+"name": &"left",
+"speed": 5.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_s4lh5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xyguq")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_1eopj")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_2aug1")
+}],
+"loop": 1,
+"name": &"right",
+"speed": 5.0
+}]

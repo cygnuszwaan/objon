@@ -1,0 +1,31 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/swing.gd" id="1_swing"]
+[ext_resource type="Script" path="res://scenes/interactive/swing_art.gd" id="2_art"]
+
+[node name="Swing" type="AnimatableBody2D"]
+collision_layer = 0
+collision_mask = 0
+script = ExtResource("1_swing")
+inertia = 120.0
+damping = 0.2
+friction_torque = 1.5
+restoring_torque = 0.0
+min_angle_degrees = -80.0
+max_angle_degrees = 80.0
+liquid_weight_scale = 0.0
+grip_idle_riders = false
+creak_sound = &"interactive/swing_creak"
+stop_sound = &"interactive/swing_thud"
+creak_full_speed = 3.0
+creak_min_speed = 0.3
+stop_full_speed = 4.0
+stop_min_speed = 1.0
+
+[node name="SwingArt" type="Node2D" parent="."]
+script = ExtResource("2_art")
+
+[node name="Fulcrum" type="Marker2D" parent="."]
+
+[node name="Grip" type="Marker2D" parent="."]
+position = Vector2(0, 64)

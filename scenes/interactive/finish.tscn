@@ -1,0 +1,22 @@
+[gd_scene format=3 uid="uid://cbnfs6a3gb0mj"]
+
+[ext_resource type="Script" uid="uid://b3lhax02af8sx" path="res://scenes/interactive/finish.gd" id="1_finish"]
+[ext_resource type="Script" uid="uid://debsvssvqq504" path="res://scenes/interactive/power_target.gd" id="2_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_finish"]
+size = Vector2(12, 24)
+
+[node name="Finish" type="Area2D" unique_id=938688993]
+z_index = -1
+collision_layer = 0
+script = ExtResource("1_finish")
+shrink_time = 4.0
+complete_delay = 1.5
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1150449892]
+position = Vector2(0, -12)
+shape = SubResource("RectangleShape2D_finish")
+
+[node name="PowerTarget" type="Node2D" parent="." unique_id=444517801]
+position = Vector2(-8, -8)
+script = ExtResource("2_pwrtgt")

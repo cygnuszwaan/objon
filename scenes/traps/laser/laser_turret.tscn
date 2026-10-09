@@ -1,0 +1,66 @@
+[gd_scene format=3 uid="uid://cc8lsru56yplm"]
+
+[ext_resource type="Script" uid="uid://br7w3msiruu2a" path="res://scenes/traps/laser/laser_turret.gd" id="1_turret"]
+[ext_resource type="Texture2D" uid="uid://ditnpgk0vj0e7" path="res://sprites/traps/laser.png" id="2_82fpc"]
+[ext_resource type="Texture2D" uid="uid://c8ngtrmtuj8ux" path="res://sprites/traps/laserturret.png" id="2_skhif"]
+[ext_resource type="Texture2D" uid="uid://b0lg3l16jk2f6" path="res://sprites/traps/laserhit.png" id="3_v44ay"]
+[ext_resource type="Script" uid="uid://debsvssvqq504" path="res://scenes/interactive/power_target.gd" id="9_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_vk10c"]
+atlas = ExtResource("2_skhif")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_ng5nt"]
+atlas = ExtResource("2_skhif")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_82fpc"]
+atlas = ExtResource("2_skhif")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_v44ay"]
+atlas = ExtResource("2_skhif")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_0w3yt"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_vk10c")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_ng5nt")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_82fpc")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_v44ay")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 5.0
+}]
+
+[node name="LaserTurret" type="Node2D" unique_id=81752479]
+script = ExtResource("1_turret")
+beam_texture = ExtResource("2_82fpc")
+hit_texture = ExtResource("3_v44ay")
+
+[node name="Body" type="StaticBody2D" parent="." unique_id=1706250860]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Body" unique_id=933270683]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Muzzle" type="Marker2D" parent="." unique_id=228468518]
+position = Vector2(8, 0)
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1268455583]
+sprite_frames = SubResource("SpriteFrames_0w3yt")
+
+[node name="PowerTarget" type="Node2D" parent="." unique_id=342400265]
+script = ExtResource("9_pwrtgt")

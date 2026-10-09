@@ -1,0 +1,78 @@
+[gd_scene format=3 uid="uid://cacf5l6tfg5f0"]
+[ext_resource type="Texture2D" uid="uid://lk00hpde6m72" path="res://sprites/traps/cannon.png" id="1_k1hvx"]
+[ext_resource type="Script" uid="uid://njab1uv2sgnb" path="res://scenes/traps/cannon/cannon.gd" id="2_bac2w"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="9_pwrtgt"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_01t2t"]
+atlas = ExtResource("1_k1hvx")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_lt8w3"]
+atlas = ExtResource("1_k1hvx")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_uciic"]
+atlas = ExtResource("1_k1hvx")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_xgex7"]
+atlas = ExtResource("1_k1hvx")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_15xyi"]
+atlas = ExtResource("1_k1hvx")
+region = Rect2(0, 64, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_rnumf"]
+atlas = ExtResource("1_k1hvx")
+region = Rect2(0, 80, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_0w3yt"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_01t2t")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_lt8w3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_uciic")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_xgex7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_15xyi")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_rnumf")
+}],
+"loop": 0,
+"name": &"default",
+"speed": 15.0
+}]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0w3yt"]
+size = Vector2(14, 15)
+
+[node name="Cannon" type="AnimatedSprite2D" unique_id=862311145]
+sprite_frames = SubResource("SpriteFrames_0w3yt")
+frame_progress = 0.63792837
+script = ExtResource("2_bac2w")
+
+[node name="StaticBody2D" type="StaticBody2D" parent="." unique_id=131849832]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StaticBody2D" unique_id=1794627074]
+position = Vector2(0, 0.5)
+shape = SubResource("RectangleShape2D_0w3yt")
+
+[node name="Muzzle" type="Marker2D" parent="." unique_id=1584251079]
+position = Vector2(5, -4)
+
+[node name="Timer" type="Timer" parent="." unique_id=100573795]
+
+[node name="PowerTarget" type="Node2D" parent="."]
+position = Vector2(0, 0)
+script = ExtResource("9_pwrtgt")

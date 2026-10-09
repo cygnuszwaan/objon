@@ -1,0 +1,43 @@
+[gd_scene format=3 uid="uid://cs8lijae0vu07"]
+
+[ext_resource type="Script" uid="uid://4ol2b8w6cswq" path="res://scenes/ui/health_bar.gd" id="1_hb"]
+[ext_resource type="Texture2D" uid="uid://bvex74javjk6p" path="res://sprites/ui/healthbar1_back.png" id="2_back"]
+[ext_resource type="Texture2D" uid="uid://cwahetejvhnoh" path="res://sprites/ui/healthbar1_outline.png" id="4_outline"]
+
+[node name="HealthBar" type="CanvasLayer" unique_id=969733216]
+script = ExtResource("1_hb")
+
+[node name="Root" type="Control" parent="." unique_id=1678516360]
+texture_filter = 1
+layout_mode = 3
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -528.0
+offset_top = 16.0
+offset_right = -400.0
+offset_bottom = 32.0
+grow_horizontal = 0
+scale = Vector2(4, 4)
+mouse_filter = 2
+
+[node name="Back" type="TextureRect" parent="Root" unique_id=177940695]
+clip_children = 2
+layout_mode = 0
+offset_right = 128.0
+offset_bottom = 16.0
+mouse_filter = 2
+texture = ExtResource("2_back")
+
+[node name="Segments" type="Control" parent="Root/Back" unique_id=920300605]
+anchors_preset = 0
+offset_right = 128.0
+offset_bottom = 16.0
+mouse_filter = 2
+
+[node name="Outline" type="TextureRect" parent="Root" unique_id=1145619037]
+layout_mode = 0
+offset_right = 128.0
+offset_bottom = 16.0
+mouse_filter = 2
+texture = ExtResource("4_outline")

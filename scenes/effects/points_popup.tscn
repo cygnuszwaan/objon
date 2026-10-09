@@ -1,0 +1,239 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/effects/points_popup.gd" id="1_popup"]
+[ext_resource type="Texture2D" path="res://sprites/effects/5points.png" id="2_p5"]
+[ext_resource type="Texture2D" path="res://sprites/effects/10points.png" id="3_p10"]
+[ext_resource type="Texture2D" path="res://sprites/effects/50points.png" id="4_p50"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_0"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_1"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_2"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_3"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_4"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 64, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_5"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 80, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_6"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 96, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_7"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 112, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_8"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 128, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p5_9"]
+atlas = ExtResource("2_p5")
+region = Rect2(0, 144, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_0"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_1"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_2"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_3"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_4"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 64, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_5"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 80, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_6"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 96, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_7"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 112, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_8"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 128, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p10_9"]
+atlas = ExtResource("3_p10")
+region = Rect2(0, 144, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_0"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_1"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_2"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_3"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_4"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 64, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_5"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 80, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_6"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 96, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_7"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 112, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_8"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 128, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p50_9"]
+atlas = ExtResource("4_p50")
+region = Rect2(0, 144, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_popup"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p5_9")
+}],
+"loop": false,
+"name": &"p5",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p10_9")
+}],
+"loop": false,
+"name": &"p10",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p50_9")
+}],
+"loop": false,
+"name": &"p50",
+"speed": 10.0
+}]
+
+[node name="PointsPopup" type="AnimatedSprite2D"]
+sprite_frames = SubResource("SpriteFrames_popup")
+animation = &"p5"
+script = ExtResource("1_popup")

@@ -1,0 +1,30 @@
+[gd_scene format=3 uid="uid://d0m0wfan2iqfp"]
+
+[ext_resource type="Script" uid="uid://cslyorc514nr8" path="res://scenes/interactive/drop_platform.gd" id="1_l4gu0"]
+[ext_resource type="Texture2D" uid="uid://bs517obf5eft3" path="res://sprites/interactive/platform_drop.png" id="1_mmvi6"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_0w3yt"]
+size = Vector2(14, 5)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_inyst"]
+size = Vector2(18, 3)
+
+[node name="drop_platform" type="AnimatableBody2D" unique_id=663954068]
+collision_layer = 2
+script = ExtResource("1_l4gu0")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=2135468750]
+texture = ExtResource("1_mmvi6")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1803471578]
+position = Vector2(0, 2.5)
+shape = SubResource("RectangleShape2D_0w3yt")
+
+[node name="LandingSensor" type="Area2D" parent="." unique_id=334707413]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LandingSensor" unique_id=284907895]
+position = Vector2(0, -0.5)
+shape = SubResource("RectangleShape2D_inyst")
+
+[node name="RespawnNotifier" type="VisibleOnScreenNotifier2D" parent="." unique_id=575612089]
+rect = Rect2(-7, 0, 14, 5)

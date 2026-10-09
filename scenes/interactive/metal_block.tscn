@@ -1,0 +1,21 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/metal_block.gd" id="1_metal"]
+
+[sub_resource type="ConvexPolygonShape2D" id="ConvexPolygonShape2D_metal"]
+resource_local_to_scene = true
+points = PackedVector2Array(-7, -8, 7, -8, 8, -7, 8, 7, 7, 8, -7, 8, -8, 7, -8, -7)
+
+[node name="MetalBlock" type="RigidBody2D"]
+collision_layer = 3
+collision_mask = 3
+mass = 4.0
+script = ExtResource("1_metal")
+melt_time = 3.0
+slag_melt_time = 8.0
+cool_rate = 0.4
+shunt_speed = 50.0
+float_depth_fraction = 0.6
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("ConvexPolygonShape2D_metal")

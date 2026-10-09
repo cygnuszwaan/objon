@@ -1,0 +1,114 @@
+[gd_scene format=3 uid="uid://cck01we6lxi11"]
+
+[ext_resource type="Script" uid="uid://d3i8hd73g725y" path="res://scenes/enemies/stingbot.gd" id="1_odrli"]
+[ext_resource type="Texture2D" uid="uid://dbgn8h3tyqj23" path="res://sprites/enemies/stingbot_fly.png" id="1_rwh6w"]
+[ext_resource type="Texture2D" uid="uid://cn1mjqtcvsuhq" path="res://sprites/enemies/stingbot_recharge.png" id="2_odrli"]
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_db6gr"]
+atlas = ExtResource("1_rwh6w")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_n1m24"]
+atlas = ExtResource("1_rwh6w")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_2uayc"]
+atlas = ExtResource("1_rwh6w")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_c58ta"]
+atlas = ExtResource("1_rwh6w")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_4imcv"]
+atlas = ExtResource("2_odrli")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_43vcw"]
+atlas = ExtResource("2_odrli")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_s3y2d"]
+atlas = ExtResource("2_odrli")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_7g22x"]
+atlas = ExtResource("2_odrli")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_qm3eu"]
+atlas = ExtResource("2_odrli")
+region = Rect2(0, 64, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_0w3yt"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_db6gr")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_n1m24")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_2uayc")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_c58ta")
+}],
+"loop": 1,
+"name": &"fly",
+"speed": 15.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_4imcv")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_43vcw")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_s3y2d")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_7g22x")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_qm3eu")
+}],
+"loop": 1,
+"name": &"recharge",
+"speed": 10.0
+}]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_3w56k"]
+radius = 7.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_nax7y"]
+size = Vector2(2, 2)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_04fdg"]
+size = Vector2(2, 2)
+
+[node name="Stingbot" type="CharacterBody2D" unique_id=138829219]
+collision_mask = 2
+script = ExtResource("1_odrli")
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1463621354]
+sprite_frames = SubResource("SpriteFrames_0w3yt")
+animation = &"recharge"
+frame_progress = 0.07579078
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=480610233]
+shape = SubResource("CircleShape2D_3w56k")
+
+[node name="StingerLeft" type="Area2D" parent="." unique_id=902327652]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StingerLeft" unique_id=1504259402]
+position = Vector2(-5, 7)
+shape = SubResource("RectangleShape2D_nax7y")
+
+[node name="StingerRight" type="Area2D" parent="." unique_id=718340400]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="StingerRight" unique_id=1164978231]
+position = Vector2(5, 7)
+shape = SubResource("RectangleShape2D_04fdg")
