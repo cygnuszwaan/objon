@@ -91,6 +91,7 @@ const PLANNED: Array[StringName] = [
 	&"enemies/mine_kick",             # a proximity mine kicked, sliding off, at the mine
 	&"enemies/railbot_drip",          # a rail bot letting a spark drop, at the nozzle
 	&"enemies/railbot_hit",           # a rail bot taking a hit without being destroyed, at the bot
+	&"interactive/basin_zap",         # a spark reaching a basin's water and electrifying it, at the surface
 	&"interactive/mirror_rotate",
 	&"interactive/laser_receiver_on",   # a laser receiver powering (the beam reached it), at the receiver
 	&"interactive/bullet_target_hit",    # a cannon bullet hitting a bullet target (every hit), at the target

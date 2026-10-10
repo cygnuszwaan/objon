@@ -2,9 +2,10 @@ extends RigidBody2D
 ## A spark dripped by a Rail bot: a small glowing ball. It falls, rolls down slopes, is carried by conveyor belts, and
 ## despawns once it has been stationary for a moment (it does not creep off flat floors). It hurts the player on touch.
 ##
-## Deliberately inert towards everything else: it does not hurt or arm enemies and mines, triggers no bullet, laser or
-## power contract, and reacts with no liquid or tile system, so level designers can run sparks over anything without
-## side effects. It sits on physics layer 0 (nothing queries it: kicks, bowling, mine blasts, laser rays, bullets, button
+## Deliberately inert towards everything else: it does not hurt or arm enemies and mines and triggers no bullet, laser or
+## power contract. The one system it touches is a basin's settled water: reaching the surface electrifies the pool and
+## spends the spark (see `_poll_water()`); flowing particles, steam, slag and crusted basins ignore it as before, so
+## level designers can still run sparks over anything else without side effects. It sits on physics layer 0 (nothing queries it: kicks, bowling, mine blasts, laser rays, bullets, button
 ## and plate sensors, the see-saw's load scan all miss it) and masks only layer 2, so it collides with the world (tiles,
 ## platforms, doors, belts, blocks) and never with actors, the player included.
 ##
@@ -57,6 +58,8 @@ var _rest_time := 0.0  # seconds spent within REST_DISTANCE of _rest_anchor
 var _rest_anchor := Vector2.ZERO
 var _fade := -1.0  # seconds left of the fade-out; negative = not fading
 var _hitbox: Area2D
+var _manager: Node  # the level's WaterManager, looked up once (null if the level has none)
+var _manager_searched := false
 
 func _ready() -> void:
 	_hitbox = $Hitbox
@@ -85,7 +88,24 @@ func _physics_process(delta: float) -> void:
 		return
 	modulate.a = 0.75 + 0.25 * sin(_age * TAU * FLICKER_HZ)
 	_poll_player()
+	if is_queued_for_deletion():
+		return  # the player took it this frame
+	_poll_water()
 	queue_redraw()
+
+## Reaching a basin's settled water surface electrifies the pool (WaterBasin.try_electrify_at(), which decides whether
+## this basin conducts) and spends the spark. A basin that refuses (slag, a crust, `conducts_sparks` off) leaves the
+## spark falling through as before. Asked each frame with the ball's lowest point; the manager is found once.
+func _poll_water() -> void:
+	if not _manager_searched:
+		_manager_searched = true
+		_manager = get_tree().get_first_node_in_group("water_manager")
+	if _manager == null:
+		return
+	var low := global_position + Vector2(0.0, RADIUS)
+	var basin: WaterBasin = _manager.find_basin_at_point(low)
+	if basin != null and basin.try_electrify_at(low):
+		queue_free()
 
 func _begin_fade() -> void:
 	_fade = FADE_TIME

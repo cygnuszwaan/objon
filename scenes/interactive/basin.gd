@@ -187,6 +187,13 @@ const WIDTH_AUTO := -1
 	# _detect_width_by_wall_scan() and width_tiles' own comment). -1 is never a valid width (the
 	# minimum is 2, the two wall columns), same reasoning OVERRIDE_NONE uses above.
 
+const ELECTRIC_REACH := 1.0  # px: a spark whose lowest point is within this of the surface (or below it) has touched it
+const ELECTRIC_SPLASH_VELOCITY := -90.0  # px/s: the cosmetic ripple kick at the strike (negative = a dip, as a diving swimmer's)
+const ELECTRIC_FADE_TIME := 0.25  # s: the flash tapers off over the last of the electrified time
+const ELECTRIC_FLICKER_HZ := 24.0
+const ELECTRIC_TINT_DEPTH_TILES := 6.0  # the tint covers at most this far below the surface, so a deep pool does not turn solid cyan
+const ELECTRIC_CORE := Color(0.85, 1.0, 1.0)
+const ELECTRIC_GLOW := Color(0.35, 0.8, 1.0)
 const BODY_COLOR_BY_TYPE := {
 	# Phase 5.1's settled-liquid color, one flat/opaque value per LiquidType — generalized from a
 	# single BODY_COLOR now that a second liquid exists. Each is a flatter, more opaque version of
@@ -328,6 +335,14 @@ const CRUST_COLOR := Color(0.35, 0.32, 0.3, 1.0)
 ## no volume loss, 1 is nominal, above 1 exaggerates it. Steam output does not depend on it. At nominal a pool is a
 ## finite supply; a faucet refilling it settles where the beam meets the surface.
 @export_range(0.0, 10.0, 0.05, "or_greater") var boil_volume_scale: float = 1.0
+## Electrified water (on by default): a Spark (see rail_bot.gd) that reaches this basin's settled WATER surface
+## electrifies the whole pool for `electrified_time` seconds. While electrified the liquid hurts the player like slag
+## does (every frame submerged, paced by take_hit()'s i-frames) and a surfer can't skim it. Turn this off for a pool
+## sparks should pass over untouched (they then fall through it as before). Authored only: runtime code reads it.
+@export var conducts_sparks: bool = true
+## How long one spark's zap keeps the pool electrified, in seconds. A later spark restarts the countdown rather than
+## adding to it. Placeholder pending tuning against a rail bot's `drip_interval` (1.6 s by default).
+@export_range(0.1, 5.0, 0.05, "or_greater") var electrified_time: float = 1.0
 @export var debug_check_body: bool = false  ## Runtime diagnostic: warns whenever the old polygon form of the liquid body would have failed to triangulate (see _draw_settled_body()). Off = no cost.
 @export var debug_draw_bounds: bool = true:
 	set(value):
@@ -564,6 +579,9 @@ var _ripple_live: bool = false  # true while any ripple exists; _process runs wh
 var _ripple_moving: bool = false
 var _ripple_accum: float = 0.0
 var _ripple_wet_frame: int = -1
+var _electrified_left: float = 0.0  # seconds of electrification remaining; runtime only, never saved (a restore comes back calm)
+var _zap_x: float = 0.0  # world x of the most recent spark strike, where the arc is drawn brightest
+var _zap_age: float = 0.0  # seconds since that strike
 
 func _ready() -> void:
 	if _world_tilemap == null and world_tilemap_path != NodePath():
@@ -971,6 +989,40 @@ func get_liquid_surface_velocity_y() -> float:
 	_surface_prev_y = y
 	_surface_vy_frame = frame
 	return _surface_vy
+
+## True while a spark's zap keeps this pool electrified (see `try_electrify_at()`).
+func is_electrified() -> bool:
+	return _electrified_left > 0.0
+
+## Whether this basin's settled liquid hurts a body in it right now: a hazardous liquid (slag) always, or any liquid
+## while electrified. The one question the player's swim check and the surf's skim lookup ask, so a new transient
+## hazard is added here and nowhere else.
+func is_hazardous_now() -> bool:
+	return _electrified_left > 0.0 or LiquidConstants.profile(liquid_type).is_hazardous
+
+## A spark at `world_point` (the lowest point of the ball) reports where it is; if that touches this basin's settled
+## water surface the pool is electrified for `electrified_time` and true is returned (the spark is spent). Refused,
+## so the spark carries on as it always did, when: `conducts_sparks` is off; the liquid is hazardous already (slag);
+## the basin holds no liquid over that column; a crust seals the liquid (the spark lands on the crust, a solid); or the
+## point is still above the surface. A strike while already electrified restarts the countdown.
+func try_electrify_at(world_point: Vector2) -> bool:
+	if Engine.is_editor_hint() or not conducts_sparks or has_crust or _world_tilemap == null:
+		return false
+	if LiquidConstants.profile(liquid_type).is_hazardous:
+		return false
+	var col := _world_tilemap.local_to_map(_world_tilemap.to_local(world_point)).x
+	if not has_liquid_at_column(col):
+		return false
+	if world_point.y < get_liquid_surface_world_y() - ELECTRIC_REACH:
+		return false
+	_electrified_left = maxf(_electrified_left, electrified_time)
+	_zap_x = world_point.x
+	_zap_age = 0.0
+	disturb(world_point.x, ELECTRIC_SPLASH_VELOCITY, 10.0)
+	Audio.play_at(&"interactive/basin_zap", Vector2(world_point.x, get_liquid_surface_world_y()))
+	set_process(true)
+	queue_redraw()
+	return true
 
 func get_surface_row() -> float:
 	# The basin's OUTER surface as a fractional tilemap row — the line a particle has to reach to be
@@ -1526,6 +1578,10 @@ func _process(delta: float) -> void:
 				redraw = true
 			else:
 				_clear_ripple()
+	if _electrified_left > 0.0:
+		_electrified_left = maxf(0.0, _electrified_left - delta)
+		_zap_age += delta
+		redraw = true  # the flash flickers every frame, and one more redraw clears it when the time runs out
 	if _advance_skin(delta):
 		redraw = true
 	if redraw:
@@ -1747,7 +1803,7 @@ func _needs_process() -> bool:
 	# What keeps _process running: a live ripple, a crust still cooling, or a skinned liquid that is visible.
 	if Engine.is_editor_hint():
 		return false
-	if _ripple_live:
+	if _ripple_live or _electrified_left > 0.0:
 		return true
 	if has_crust and _crust_cool_t < CRUST_COOL_TIME and _crust_skin_art() != null:
 		return true
@@ -1876,6 +1932,50 @@ func _draw_editor_debug_bounds() -> void:
 		draw_line(Vector2(left_x, fill_y - 3), Vector2(left_x, fill_y + 3), waterline_color, 2.0)
 		draw_line(Vector2(right_x, fill_y - 3), Vector2(right_x, fill_y + 3), waterline_color, 2.0)
 
+func _draw_electric() -> void:
+	# Placeholder look for an electrified pool (cosmetic only, nothing here is read by gameplay): a flickering tint over
+	# the liquid, a bright line along its surface, short zigzag arcs jumping up from it, and a brighter bolt at the strike
+	# point for the first moments. Everything follows the rippled surface: it is drawn from the same per-strip tops as
+	# the liquid body (_collect_runs() / _run_strips()), so a ripple from the strike or a swimmer bends the line with
+	# the water instead of leaving a straight line across it. The flicker step comes from the time since the strike, so
+	# no randomness is stored and a pause freezes it.
+	if _liquid_hidden_by_crust():
+		return
+	var fade := clampf(_electrified_left / ELECTRIC_FADE_TIME, 0.0, 1.0)
+	var step := int(_zap_age * ELECTRIC_FLICKER_HZ)
+	var on := step % 2 == 0
+	var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
+	var tint := Color(ELECTRIC_GLOW.r, ELECTRIC_GLOW.g, ELECTRIC_GLOW.b, (0.30 if on else 0.14) * fade)
+	var line_color := Color(ELECTRIC_CORE.r, ELECTRIC_CORE.g, ELECTRIC_CORE.b, (1.0 if on else 0.55) * fade)
+	var top_y := get_liquid_surface_world_y()
+	var tops: Array[Vector2] = []  # (x of the strip's left edge, its rippled top y)
+	var bolt := clampf(1.0 - _zap_age / 0.2, 0.0, 1.0)
+	var bolt_top := Vector2.INF
+	for run_variant in _collect_runs(top_y, INF):
+		var run_cols: Array[int] = run_variant
+		for strip in _run_strips(run_cols, top_y, INF, true):
+			var depth := minf(strip.z - strip.y, ELECTRIC_TINT_DEPTH_TILES * _tile_size.y)
+			if depth <= 0.0:
+				continue
+			draw_rect(Rect2(to_local(Vector2(strip.x, strip.y)), Vector2(spacing, depth)), tint)
+			draw_rect(Rect2(to_local(Vector2(strip.x, strip.y)), Vector2(spacing, 1.0)), line_color)
+			tops.append(Vector2(strip.x, strip.y))
+			if _zap_x >= strip.x and _zap_x < strip.x + spacing:
+				bolt_top = Vector2(_zap_x, strip.y)
+	# Arcs: a few zigzags above the surface, their positions changing each flicker step.
+	if not tops.is_empty():
+		for a in range(maxi(2, tops.size() / 4)):
+			var h := absi(hash(Vector3i(step, a, int(global_position.x))))
+			var base: Vector2 = tops[h % tops.size()]
+			var height := 2.0 + float((h >> 10) % 5)
+			var p0 := base + Vector2(spacing * 0.5, 0.0)
+			var p1 := p0 + Vector2(float((h >> 3) % 5) - 2.0, -height * 0.5)
+			var p2 := p1 + Vector2(float((h >> 6) % 5) - 2.0, -height * 0.5)
+			draw_polyline(PackedVector2Array([to_local(p0), to_local(p1), to_local(p2)]), line_color, 1.0)
+	# The strike: a short vertical bolt at the spark's x that dies over the first 0.2 s, standing on the surface there.
+	if bolt > 0.0 and bolt_top != Vector2.INF:
+		draw_line(to_local(bolt_top + Vector2(0.0, -10.0 * bolt)), to_local(bolt_top + Vector2(0.0, 3.0)), Color(1, 1, 1, bolt), 2.0)
+
 func _draw_settled_body() -> void:
 	# Phase 5.1 (shape updated by 10.3): the actual gameplay-visible settled water — NOT the editor
 	# debug overlay above (that one is explicitly scoped as an editor-time-only dev tool per "Debug
@@ -1931,6 +2031,8 @@ func _draw_settled_body() -> void:
 			draw_colored_polygon(local_points, liquid_color)
 	if skin != null and not _liquid_hidden_by_crust():
 		_draw_skin_strips(skin, _skin_frame, get_liquid_surface_world_y(), INF, true)
+	if _electrified_left > 0.0:
+		_draw_electric()
 
 	# Crust draws the same way, over the same _draw() callback, after the liquid so it is never occluded by
 	# it (see the note on the liquid's void above). Its two faces are stored geometry: after a drain the

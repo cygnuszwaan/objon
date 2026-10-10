@@ -153,6 +153,9 @@ const POINTS_POPUP: PackedScene = preload("res://scenes/effects/points_popup.tsc
 @export var points_popup_offset: Vector2 = Vector2(0, -20)
 	# where the "+N" feedback spawns, relative to the player's origin (above the head; the art then rises on its own).
 
+const ELECTRIC_CONTACT_DAMAGE := 1
+	# The same, for water a spark has electrified (WaterBasin.is_electrified()). Untuned placeholder.
+
 const SLAG_CONTACT_DAMAGE := 1
 	# Passed to take_hit() every physics frame the player is submerged in a hazardous-LiquidType
 	# basin (see _update_swim_state()'s hazard branch below) — take_hit()'s own hurt_invincibility_timer
@@ -1127,12 +1130,12 @@ func _update_swim_state() -> void:
 	# Slag damage applies in every held state (a ledge or ladder dipping into a slag basin isn't a safe
 	# spot), so the hazard check runs before the climb/hang gate below.
 	var basin := _water_probe_basin()
-	if basin != null and LiquidConstants.profile(basin.liquid_type).is_hazardous:
-		# A hazardous settled liquid (slag) is swimmable too (buoyant, see _swim_passive_target()) so the
+	if basin != null and basin.is_hazardous_now():
+		# A hazardous settled liquid (slag, or water a spark has electrified: WaterBasin.is_hazardous_now()) is swimmable too (buoyant, see _swim_passive_target()) so the
 		# player has a chance to climb out, but every frame of submersion calls take_hit(), whose own
 		# i-frames pace the damage. from_position is the player's own position (no single point to be
 		# knocked away from), which take_hit()'s on-top fallback handles.
-		if _water_surface_depth() >= swim_enter_depth and take_hit(SLAG_CONTACT_DAMAGE, global_position):
+		if _water_surface_depth() >= swim_enter_depth and take_hit(SLAG_CONTACT_DAMAGE if LiquidConstants.profile(basin.liquid_type).is_hazardous else ELECTRIC_CONTACT_DAMAGE, global_position):
 			return  # take_hit() already dropped swim state (via _interrupt_current_action()); the
 				# normal entry below re-enters it once the hurt animation ends, if still submerged.
 	if is_climbing or is_hanging:

@@ -431,6 +431,14 @@ func get_basin_for_column(map_col: int, world_y: float, rim_margin: float = 0.0)
 			return basin
 	return null
 
+func find_basin_at_point(world_point: Vector2) -> WaterBasin:
+	# The basin (if any) whose interior contains a world point: the column from the world tilemap, then the same
+	# get_basin_for_column() the player's swim probe uses. A spark asks this each frame to know whether it is over a pool.
+	if _world_tilemap == null:
+		return null
+	var col := _world_tilemap.local_to_map(_world_tilemap.to_local(world_point)).x
+	return get_basin_for_column(col, world_point.y)
+
 func get_basin_count() -> int:
 	return _basins.size()
 
@@ -815,8 +823,8 @@ func _update_steam_lift_debug(delta: float) -> void:
 	_debug_steam_label.text = "steam lift  raw %.2f  smoothed %.2f" % [raw, _debug_steam_lift]
 
 func find_skim_basin(world_x: float, feet_y: float, catch_depth: float) -> WaterBasin:
-	# The basin whose settled liquid a surfer at (world_x, feet_y) can skim: in that column, holding non-hazardous
-	# liquid with no crust over it, with its surface at or below the feet (or up to catch_depth px above them), and
+	# The basin whose settled liquid a surfer at (world_x, feet_y) can skim: in that column, holding liquid that is not
+	# hazardous right now (slag, or water a spark has electrified) with no crust over it, with its surface at or below the feet (or up to catch_depth px above them), and
 	# the feet not below its seabed. With basins stacked in one column the nearest surface below wins. Null if none.
 	if _world_tilemap == null:
 		return null
@@ -829,7 +837,7 @@ func find_skim_basin(world_x: float, feet_y: float, catch_depth: float) -> Water
 		var basin: WaterBasin = _basins[basin_id]
 		if basin.has_crust or not basin.has_liquid_at_column(col):
 			continue
-		if LiquidConstants.profile(basin.liquid_type).is_hazardous:
+		if basin.is_hazardous_now():
 			continue
 		if feet_y > basin.get_column_seabed_world_y(col):
 			continue
