@@ -7,7 +7,6 @@
 [ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="5_rljw2"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="6_yjlda"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_aghq8"]
-[ext_resource type="PackedScene" path="res://scenes/enemies/rail_bot.tscn" id="7_rljw2"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_y0ep0"]
 [ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="9_ujeiy"]
 [ext_resource type="PackedScene" path="res://scenes/collectibles/gem_2.tscn" id="10_2ms0b"]
@@ -16,12 +15,7 @@
 [ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="12_7n46g"]
 [ext_resource type="PackedScene" uid="uid://bmjkgbi1jd2s" path="res://scenes/enemies/drillbot.tscn" id="13_7n46g"]
 [ext_resource type="PackedScene" uid="uid://cpe7wi8c5xsb" path="res://scenes/interactive/basin.tscn" id="16_aghq8"]
-
-[sub_resource type="Curve2D" id="Curve2D_aghq8"]
-_data = {
-"points": PackedVector2Array(0, 0, 0, 0, 948, 532)
-}
-point_count = 1
+[ext_resource type="PackedScene" path="res://scenes/traps/arc/arc_turret.tscn" id="16_y0ep0"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_8dks1")
@@ -69,10 +63,6 @@ kill_y = 1024.0
 [node name="Player" parent="." unique_id=61703917 instance=ExtResource("8_y0ep0")]
 z_index = 1
 position = Vector2(948, 568)
-
-[node name="RailBot" parent="." unique_id=1764584960 instance=ExtResource("7_rljw2")]
-position = Vector2(1052, 556)
-drip_interval = 5.0
 
 [node name="ConveyorBelt" parent="." unique_id=1339758374 instance=ExtResource("10_yjlda")]
 position = Vector2(460, 596)
@@ -151,8 +141,8 @@ floor_rows = Array[float]([36.1875, 38.1875, 40.1875, 40.1875, 40.1875, 40.1875,
 seabed_floor_rows = Array[float]([36.1875, 38.1875, 40.1875, 40.1875, 40.1875, 40.1875, 40.1875, 40.1875, 36.0])
 spill_column = 0
 
-[node name="Path2D" type="Path2D" parent="." unique_id=362254661]
-curve = SubResource("Curve2D_aghq8")
+[node name="ArcTurret" parent="." unique_id=542150005 instance=ExtResource("16_y0ep0")]
+position = Vector2(808, 584)
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

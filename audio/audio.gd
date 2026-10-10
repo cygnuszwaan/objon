@@ -66,6 +66,9 @@ const PLANNED: Array[StringName] = [
 	&"traps/crusher_retract",
 	&"traps/crusher_jam",             # a metal block stalling a crusher: the jam latching (once per latch), at the spike
 	&"traps/laser_boil",              # a laser starting to boil a pool (once per start of contact, per turret), at the turret
+	&"traps/arc_fire",               # an arc turret firing an arc, at the muzzle
+	&"traps/arc_reflect",            # an arc bouncing off a mirror, at the mirror
+	&"traps/arc_fizzle",             # an arc spent on a wall or the player, at the point
 	&"traps/cannon_fire",
 	&"interactive/drop_platform_warning",  # start of the 3-flash tell
 	&"interactive/drop_platform_fall",

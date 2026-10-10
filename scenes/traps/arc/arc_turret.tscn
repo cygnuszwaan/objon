@@ -1,0 +1,22 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/traps/arc/arc_turret.gd" id="1_arcturret"]
+[ext_resource type="Script" uid="uid://debsvssvqq504" path="res://scenes/interactive/power_target.gd" id="2_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(16, 16)
+
+[node name="ArcTurret" type="Node2D"]
+script = ExtResource("1_arcturret")
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Body"]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Muzzle" type="Marker2D" parent="."]
+position = Vector2(8, 0)
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("2_pwrtgt")
