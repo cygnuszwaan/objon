@@ -1,11 +1,11 @@
 # Water system — reference
 
 This file is the detailed reference for the water system: full data model, public API, every
-tuning constant, and what's still open. `objon.md`'s "Water system" and "Swim" bullets have the
-short version — read those first. This file exists on its own, rather than folded into `objon.md`
+tuning constant, and what's still open. `liquid-system.md` (the "Liquid system" bullet) and the "Swim" bullet in `player.md`
+have the short version — read those first. This file exists on its own, rather than folded into `liquid-system.md`
 directly, because the system is large enough (particle simulation, basin authoring/query API, player
 push, swim state, two spawn sources, non-tilemap collision) that inlining all of it would make
-`objon.md` itself front-load every session with detail most sessions won't need. Same maintenance
+`liquid-system.md` itself front-load every session with detail most sessions won't need. Same maintenance
 rule as `objon.md` applies here: this describes the system as it currently stands, not how it got
 there — no changelog, no bug-fix narration, no roadmap checkboxes. If a fresh read of the code
 contradicts something below, fix the claim here rather than leaving both versions in.
@@ -268,7 +268,7 @@ matter which `ACTIVE_PRESET` is active; only the granularity changes.
 
 ## Player swim state (`player.gd`)
 
-See `objon.md`'s "Swim" bullet for the full behavioral summary. Reference values: `swim_probe_offset_y
+See the "Swim" bullet in `player.md` for the full behavioral summary. Reference values: `swim_probe_offset_y
 = -4.0`, `swim_enter_depth = 0.0`, `swim_exit_depth = -4.0`, `swim_speed = 120.0`,
 `swim_up_speed = 80.0`, `swim_sink_speed = 30.0`, `swim_gravity = 150.0` (an approach *rate* toward
 `swim_sink_speed` via `move_toward()`, not a target itself). `_water_surface_depth()` probes at
@@ -283,7 +283,7 @@ the actual liquid counts. Without crust this is just the plain surface.
 
 ## Surfing (`water_manager.gd`, `basin.gd`, `player.gd`)
 
-See `objon.md`'s Surf bullet (Water) for the behaviour. Both queries are pulled by the player only while it surfs.
+See the Surf bullet (Water) in `player-surf.md` for the behaviour. Both queries are pulled by the player only while it surfs.
 
 - **`WaterManager.get_floor_wetness(feet, half_width) -> float`**: 0..1 coverage of the footprint (`2 * half_width` wide) by liquid particles in the band from `WET_BAND_ABOVE` (8 px) above `feet.y` to `WET_BAND_BELOW` (2 px) below it, within the footprint plus half a particle. A particle counts only if it is a non-gas, non-hazardous type (slag never wets), speed is at least `WET_MIN_SPEED` (8 px/s) and its vertical speed is at most `WET_MAX_VERTICAL_SPEED` (60 px/s), so settled, falling and bouncing particles are ignored. Coverage is summed `PARTICLE_PIXEL_SIZE` per particle over the width, so `ACTIVE_PRESET` doesn't change it, and `WET_FULL_COVERAGE` (0.5) of the width is a full reading. It is an O(particles) loop with no state; the player smooths it (instant rise, decay over `surf_wet_decay_time`).
 - **`WaterManager.find_skim_basin(world_x, feet_y, catch_depth) -> WaterBasin`**: resolves the column under `world_x` and returns the basin there that has liquid over that column (`has_liquid_at_column()`), no crust, a non-hazardous liquid, the feet not below the column's seabed, and a liquid surface no more than `catch_depth` px above the feet (surface at or below the feet preferred; with stacked basins the smallest gap wins). Null otherwise. The lookup doesn't go through `get_basin_for_column()` because that needs a point at or below the rim, and a surfer arrives from above it.
@@ -515,3 +515,5 @@ particle meeting mid-air/mid-flow, not via a basin) is out of scope for now — 
 involved, no clear design for what it should do beyond "maybe they cancel out with a puff of steam,"
 and nothing currently checks for it. Revisit once the basin-level reaction has actually been played
 with.
+
+Reads with: `liquid-system.md` (the short version), `player.md` (the swim state), `player-surf.md` (the surf water rules).
