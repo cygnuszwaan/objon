@@ -77,12 +77,10 @@ const SLOPE_TILES := {
 	"r2_lo": Vector2i(2, 7), "r2_hi": Vector2i(3, 7),
 	"l2_hi": Vector2i(4, 7), "l2_lo": Vector2i(5, 7),
 }
-## Autotiling treats a slope cell, and a cell of another terrain, as empty, so ground
-## beside or under one gets trimmed edges. After everything is placed, a sweep picks
-## the right tile again for just those cells, counting slopes and other terrains as
-## filled. true = every one of the eight neighbours must really be filled to count
-## as enclosed; false = a diagonal gap between filled sides is ignored (so the air
-## above a previous 2x1 step doesn't leave a notch).
+## When re-picking trimmed tiles beside slopes (and terrain borders): true = every
+## one of the eight neighbours must really be filled for a corner to count as filled;
+## false = a corner between two filled sides counts as filled (so the air above a
+## previous 2x1 step doesn't leave a notch).
 const INTERIOR_NEEDS_CORNERS := false
 
 # ---- Extras ------------------------------------------------------------------
@@ -292,36 +290,49 @@ static func _terrain_info(tile_set: TileSet, terrain_set: int, terrain: int) -> 
 	return {}
 
 
-## Sweep after everything is placed. Autotiling counts slope cells and cells of other
-## terrains as empty, so ground touching them gets trimmed edges. For exactly those
-## cells, pick the tile again with slopes and every terrain counted as filled, from
-## the cell's own terrain, and overwrite it if that tile differs. Returns the count.
+## Sweep after everything is placed, fixing the trim autotiling leaves where it can't
+## see what is really there. Two cases, and only these cells are touched:
+##  - Each slope tile connects to the ground on two sides: the bottom, and the side it
+##    climbs towards ("/" the right, "\\" the left). The ground tile on each of those
+##    sides is re-picked with the side facing the slope counted as filled and everything
+##    else as it really is, so e.g. a tile trimmed on three sides can become one trimmed
+##    on two, minus the connected side. The slope's other sides stay open.
+##  - Cells touching another terrain's cells (autotiling treats those as empty too) are
+##    re-picked with the other terrain counted as filled.
+## Re-picking chooses, from the cell's own terrain, the tile whose peering bits best
+## match, and overwrites the cell if that differs. Returns how many cells changed.
 static func _fix_edge_tiles(layer: TileMapLayer, terrains: Array[Dictionary], patch: Dictionary,
 		solid_cells: Array[Vector2i], slopes: Array) -> int:
 	var solid := {}
 	for cell in solid_cells:
 		solid[cell] = true
-	var slope_cells := {}
+	# cell -> bit mask (indices into _PEER_OFFSETS) of sides that touch a slope
+	var forced := {}
 	for sl: Dictionary in slopes:
-		slope_cells[sl["cell"]] = true
-	var checked := {}
-	var changed := 0
+		var sc: Vector2i = sl["cell"]
+		var climb := 1 if (sl["kind"] as String).begins_with("r") else -1
+		for d: Vector2i in [Vector2i(0, 1), Vector2i(climb, 0)]:
+			var n := sc + d
+			if solid.has(n):
+				forced[n] = forced.get(n, 0) | (1 << _PEER_OFFSETS.find(-d))
+	# Cells to re-pick: the slope neighbours plus those next to another terrain.
+	var todo := forced.keys()
 	for cell: Vector2i in solid_cells:
-		# Only cells touching a slope or another terrain are re-picked.
-		var touches := false
+		if forced.has(cell):
+			continue
 		for d in _PEER_OFFSETS:
 			var n: Vector2i = cell + d
-			if slope_cells.has(n) or (solid.has(n) and patch[n] != patch[cell]):
-				touches = true
+			if solid.has(n) and patch[n] != patch[cell]:
+				todo.append(cell)
 				break
-		if not touches:
-			continue
+	var changed := 0
+	for cell: Vector2i in todo:
 		var info: Dictionary = terrains[patch[cell]]
+		var mask: int = forced.get(cell, 0)
 		# Desired peering bits: this terrain where filled, -1 (empty) elsewhere.
 		var filled: Array[bool] = []
-		for d in _PEER_OFFSETS:
-			var n: Vector2i = cell + d
-			filled.append(solid.has(n) or slope_cells.has(n))
+		for k in 8:
+			filled.append(solid.has(cell + _PEER_OFFSETS[k]) or (mask & (1 << k)) != 0)
 		if not INTERIOR_NEEDS_CORNERS:
 			for k in [1, 3, 5, 7]:   # corners: filled if both adjacent sides are
 				if filled[(k + 7) % 8] and filled[(k + 1) % 8]:
