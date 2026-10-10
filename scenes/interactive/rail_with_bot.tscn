@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/rail.gd" id="1_rail"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/rail_bot.tscn" id="2_bot"]
+
+[node name="RailWithBot" type="Path2D"]
+script = ExtResource("1_rail")
+
+[node name="Point1" type="Marker2D" parent="."]
+
+[node name="Point2" type="Marker2D" parent="."]
+position = Vector2(96, 0)
+
+[node name="RailBot" parent="." instance=ExtResource("2_bot")]

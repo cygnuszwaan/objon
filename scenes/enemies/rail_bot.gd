@@ -26,6 +26,8 @@ extends AnimatableBody2D
 ## the glow goes out; powered again, it carries on. A PowerTarget child is in the scene: with nothing wired to it the bot
 ## runs forever. `invert` is read by that child.
 ##
+## Contact: touching the body hurts the player and knocks them off a rail hang (see _poll_contact()).
+##
 ## Contracts other objects rely on:
 ##   take_damage(amount) -> int   the kick / laser / mine-blast contract (group "enemy"): costs `health` points, and at 0 it
 ##                                explodes. The default is 1, so one hit does it
@@ -46,8 +48,13 @@ enum Mode { PING_PONG, LOOP }
 			_snap_to_start()
 			update_configuration_warnings()
 @export var mode: Mode = Mode.PING_PONG
+## Lets the player hang from this bot's rail (brachiate along it, or slide down it if it slopes). The rail joins group
+## "grab_rail" at run time; a rail with no bot can be made grabbable by putting its Path2D in that group by hand.
+@export var rail_grabbable: bool = true
 ## Hits it takes to destroy (a kick, a laser pulse, a mine's blast).
 @export_range(1, 5) var health: int = 1
+## Damage the bot does to the player on contact (`take_hit()`, which also knocks the player off a rail or out of any held state).
+@export var contact_damage: int = 1
 ## Flips the power state (read by the PowerTarget child).
 @export var invert: bool = false
 
@@ -93,6 +100,7 @@ var _hit_flash_tween: Tween
 
 @onready var art: Node2D = $RailBotArt
 @onready var body_shape: CollisionShape2D = $CollisionShape2D
+@onready var hitbox: Area2D = $Hitbox
 
 func _ready() -> void:
 	_health = health
@@ -102,6 +110,7 @@ func _ready() -> void:
 		return
 	add_to_group("enemy")
 	add_to_group("saveable")
+	add_to_group("rail_bot")  # the player's rail hang treats it as an obstacle
 	_drip_clock = phase_offset * drip_interval
 	_apply_pose()
 
@@ -119,7 +128,10 @@ func _get_configuration_warnings() -> PackedStringArray:
 	return warnings
 
 func _physics_process(delta: float) -> void:
-	if Engine.is_editor_hint() or _dead or not _powered:
+	if Engine.is_editor_hint() or _dead:
+		return
+	_poll_contact()  # before the powered check: a stopped bot still hurts
+	if not _powered:
 		return
 	_advance(delta)
 	_drip_clock += delta
@@ -127,6 +139,13 @@ func _physics_process(delta: float) -> void:
 		_drip_clock -= drip_interval
 		_drip()
 	_apply_pose()
+
+## Contact damage: the Hitbox (Area2D, layer 0, mask 1, a little bigger than the body) is polled every physics frame, not
+## signalled once, so a player whose i-frames ran out while touching is hit again (same as Sawwheel and Crusher).
+func _poll_contact() -> void:
+	for body in hitbox.get_overlapping_bodies():
+		if body != self and body.has_method("take_hit"):
+			body.take_hit(contact_damage, global_position + Vector2(0.0, EXPLOSION_OFFSET.y))
 
 # --- the rail --------------------------------------------------------------------------------
 
@@ -177,8 +196,12 @@ func _rebuild_rail() -> void:
 	var path := _rail_path()
 	if path == null or path.curve == null:
 		return
-	if not path.curve.changed.is_connected(_rebuild_rail):
-		path.curve.changed.connect(_rebuild_rail)
+	if not path.curve.changed.is_connected(_on_rail_curve_changed):
+		path.curve.changed.connect(_on_rail_curve_changed)
+	if rail_grabbable and not Engine.is_editor_hint():
+		path.add_to_group(&"grab_rail")  # see player.gd's rail hang
+	if path.has_method(&"draws_own_line"):
+		return  # a Rail node draws itself
 	var line := path.get_node_or_null(RAIL_NODE_NAME) as Line2D
 	if line == null:
 		line = Line2D.new()
@@ -187,6 +210,13 @@ func _rebuild_rail() -> void:
 		line.default_color = RAIL_COLOR
 		path.add_child(line)  # unowned on purpose: rebuilt here every load and never saved
 	line.points = path.curve.get_baked_points()
+
+## The rail's curve was edited (in the editor a dragged Rail marker or Path2D point): redraw it and put the bot back
+## on its start.
+func _on_rail_curve_changed() -> void:
+	_rebuild_rail()
+	if Engine.is_editor_hint():
+		_snap_to_start()
 
 # --- sparks ----------------------------------------------------------------------------------
 
@@ -272,7 +302,9 @@ func _die() -> void:
 	set_physics_process(false)
 	remove_from_group("enemy")
 	remove_from_group("saveable")
+	remove_from_group("rail_bot")
 	body_shape.set_deferred("disabled", true)
+	hitbox.set_deferred("monitoring", false)
 	if _hit_flash_tween and _hit_flash_tween.is_valid():
 		_hit_flash_tween.kill()
 	var explosion: AnimatedSprite2D = EXPLOSION_SCENE.instantiate()

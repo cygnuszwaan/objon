@@ -252,7 +252,7 @@ var _debug_hang_corner: Vector2 = Vector2.ZERO
 # hang_style below is how the rest of the hang code (mantle, letting go) tells the two apart while
 # sharing everything else (is_hanging, move_and_slide skip, moving-platform follow, kick-hitbox
 # facing, the hurt/interrupt teardown) unchanged.
-enum HangStyle { LEDGE, CATWALK_UNDER, SWING }
+enum HangStyle { LEDGE, CATWALK_UNDER, SWING, RAIL }
 var hang_style: HangStyle = HangStyle.LEDGE  # which kind of hang is_hanging currently refers to; only read while is_hanging
 
 # --- swing / trapeze (see swing.gd) ---
@@ -331,6 +331,20 @@ var _surf_steam_loop_base_db: float = 0.0
 var _skim_basin: WaterBasin = null  # the basin whose skim floor is up for this surfer, or null
 var _skim_was_on: bool = false  # on the skim floor last frame (the splash fires on the edge)
 var surf_board: Node2D  # the separate board sprite (SurfBoard in player.tscn); stage 2 tilts it
+# --- rail hang (HangStyle.RAIL): hanging from a Path2D in group "grab_rail" (see Rail hang in docs/player.md) ---
+@export var rail_grab_radius: float = 6.0  # px: the hand catches a rail within this distance (widened by the frame's fall step so a fast fall can't tunnel past)
+@export var rail_flat_degrees: float = 10.0  # a rail flatter than this is brachiated along (left/right travel); steeper is slid down with the hang sprite
+@export var rail_max_grab_degrees: float = 80.0  # a rail steeper than this (a wall) is not grabbable
+@export var rail_slide_gravity_scale: float = 0.6  # multiplies gravity along the rail's tangent while sliding
+@export var rail_slide_max_speed: float = 220.0  # px/s cap on the slide
+@export var rail_flat_friction: float = 600.0  # px/s^2 that slide speed decays by on a flat stretch (so sliding off a slope onto the flat coasts to a stop)
+@export var rail_catch_momentum: float = 0.5  # fraction of the speed along the tangent kept when catching a sloped rail
+@export var rail_grip_drop: float = 0.0  # px the hand sits below the rail's centre line
+var hang_rail: Path2D  # the rail a RAIL hang is on; only meaningful while is_hanging and hang_style == RAIL
+var _rail_offset: float = 0.0  # distance along hang_rail's baked curve, px
+var _rail_speed: float = 0.0  # signed px/s along the curve (toward increasing offset is positive); slide and flat-coast speed
+var _rail_jumped_off: bool = false  # jumped (or was thrown) off a rail: no catch until the fall begins, so the rise cannot re-grab
+
 @export var catwalk_hang_probe_range: float = 8.0
 	# how far above the hand the straight-up probe reaches looking for a catwalk's underside.
 	# Raycasts ignore one_way_collision (that flag only affects body-vs-body resolution), so this
@@ -616,6 +630,8 @@ func _physics_process(delta: float) -> void:
 		if is_hanging and one_shot_action == OneShotAction.NONE:  # is_hanging: the follow above may have just force-released it
 			if hang_style == HangStyle.SWING:
 				_update_swing_hang(input_dir)  # push with left/right, crouch drops off, jump jumps off; up does nothing
+			elif hang_style == HangStyle.RAIL:
+				_update_rail_hang(input_dir, delta)  # brachiate (flat) or slide (sloped); crouch drops, jump jumps and can re-catch on the way down
 			elif hang_style == HangStyle.CATWALK_UNDER and _hang_crust_blocked():
 				is_hanging = false  # liquid rose into the space under the crust (roadmap 6.1): let go and fall
 				hang_lockout_timer = hang_regrab_lockout
@@ -903,6 +919,11 @@ func _physics_process(delta: float) -> void:
 	# velocity condition, so a jump can catch the bar on the way up too.
 	if not is_climbing and not is_hanging and not is_swimming and one_shot_action == OneShotAction.NONE and hang_lockout_timer <= 0.0 and not is_on_floor() and time_since_airborne >= hang_min_airborne_time:
 		_try_grab_swing()
+
+	# --- rail grab: airborne, hand within reach of a grabbable rail. Catches on the way up too (a jump can reach a rail),
+	# except right after jumping off one (_rail_jumped_off), when it waits for the fall.
+	if not is_climbing and not is_hanging and not is_swimming and not is_surfing and one_shot_action == OneShotAction.NONE and hang_lockout_timer <= 0.0 and not is_on_floor():
+		_try_grab_rail()
 
 	_update_hang_debug_probes()
 	_log_if_stuck(delta)
@@ -1423,6 +1444,8 @@ func _interrupt_current_action() -> void:
 	fall_anim_delay_timer = 0.0
 	hang_platform = null
 	_detach_swing()
+	_detach_rail()
+	_rail_jumped_off = false
 	_end_surf(false)  # a hit ends the surf (a jump pad doesn't come through here while surfing, see launch())
 	_air_carry_active = false  # a hit or a launch replaces whatever momentum the swing gave
 
@@ -2129,6 +2152,7 @@ func _force_release_hang() -> void:
 	is_hanging = false
 	hang_platform = null
 	_detach_swing()
+	_detach_rail()
 	hang_lockout_timer = hang_regrab_lockout
 
 # --- surf ---------------------------------------------------------------------------------------------------------
@@ -2644,6 +2668,186 @@ func _detach_swing() -> void:
 	if hang_swing != null and is_instance_valid(hang_swing):
 		hang_swing.detach_rider(self)
 	hang_swing = null
+
+# --- rail hang ------------------------------------------------------------------------------------------------------
+# A held hang (is_hanging, hang_style RAIL, no move_and_slide()) from a Path2D in group "grab_rail" (RailBot adds its rail).
+# The hand is pinned to the curve at _rail_offset every frame. Where the rail is flatter than rail_flat_degrees the player
+# brachiates along it (the "brachiate" animation, left/right); steeper, the "hang" sprite slides down it under
+# rail_slide_gravity_scale of gravity. Jump leaves the rail upward and it can be caught again on the way down; crouch lets go.
+
+## The rail's unit tangent in world space at `offset`, pointing toward increasing offset.
+func _rail_tangent_at(path: Path2D, offset: float) -> Vector2:
+	var curve := path.curve
+	var a := curve.sample_baked(maxf(offset - 1.0, 0.0))
+	var b := curve.sample_baked(minf(offset + 1.0, curve.get_baked_length()))
+	var t := path.global_transform.basis_xform(b - a)
+	return t.normalized() if t.length_squared() > 0.0001 else Vector2.RIGHT
+
+func _rail_point_at(path: Path2D, offset: float) -> Vector2:
+	return path.to_global(path.curve.sample_baked(offset))
+
+func _try_grab_rail() -> void:
+	if _rail_jumped_off:
+		if velocity.y < 0.0:
+			return
+		_rail_jumped_off = false
+	var hand := global_position + Vector2(0.0, hang_hand_local_offset.y)
+	var reach := maxf(rail_grab_radius, velocity.y * get_physics_process_delta_time())
+	var max_slope_y := sin(deg_to_rad(rail_max_grab_degrees))
+	var best: Path2D = null
+	var best_offset := 0.0
+	var best_distance := INF
+	for node in get_tree().get_nodes_in_group(&"grab_rail"):
+		var path := node as Path2D
+		if path == null or path.curve == null or path.curve.point_count < 2 or path.curve.get_baked_length() <= 0.0:
+			continue
+		var offset := path.curve.get_closest_offset(path.to_local(hand))
+		var distance := hand.distance_to(_rail_point_at(path, offset))
+		if distance > reach or distance >= best_distance:
+			continue
+		if absf(_rail_tangent_at(path, offset).y) > max_slope_y:
+			continue  # a wall, not a rail
+		best = path
+		best_offset = offset
+		best_distance = distance
+	if best == null:
+		return
+	var anchor := _rail_point_at(best, best_offset) + Vector2(0.0, rail_grip_drop)
+	if _rail_pose_hits_bot(anchor - Vector2(0.0, hang_hand_local_offset.y)):
+		return  # the hanging body would sit inside a rail bot: fall past it instead
+	_start_rail_hang(best, best_offset)
+
+func _start_rail_hang(path: Path2D, offset: float) -> void:
+	var tangent := _rail_tangent_at(path, offset)
+	var sloped := absf(tangent.y) > sin(deg_to_rad(rail_flat_degrees))
+	is_hanging = true
+	hang_style = HangStyle.RAIL  # every hang start sets this explicitly (see _start_hang())
+	hang_facing = -1.0 if sprite.flip_h else 1.0
+	hang_platform = null
+	hang_rail = path
+	_rail_offset = offset
+	# Momentum along the rail is kept only on a slope; on a flat rail a fall's sideways speed would just be a short skid.
+	_rail_speed = clampf(tangent.dot(velocity) * rail_catch_momentum, -rail_slide_max_speed, rail_slide_max_speed) if sloped else 0.0
+	_rail_jumped_off = false
+	_end_surf(false)
+	velocity = Vector2.ZERO
+	_air_carry_active = false
+	_pin_to_rail()
+	_reset_teleport_interpolation()  # a hard snap of the hand onto the rail, same reasoning as _start_hang()
+	_set_rail_pose(sloped, false)
+	Audio.play(&"player/hang")
+
+## Puts the hand on the rail at _rail_offset (the rail may have moved, so this runs every frame).
+func _pin_to_rail() -> void:
+	hang_anchor = _rail_point_at(hang_rail, _rail_offset) + Vector2(0.0, rail_grip_drop)
+	global_position = hang_anchor - Vector2(0.0, hang_hand_local_offset.y)
+
+func _update_rail_hang(input_dir: float, delta: float) -> void:
+	if hang_rail == null or not is_instance_valid(hang_rail) or hang_rail.curve == null or hang_rail.curve.get_baked_length() <= 0.0:
+		_detach_rail()  # the rail is gone: just fall
+		is_hanging = false
+		hang_lockout_timer = hang_regrab_lockout
+		return
+	var length := hang_rail.curve.get_baked_length()
+	_rail_offset = clampf(_rail_offset, 0.0, length)
+	var tangent := _rail_tangent_at(hang_rail, _rail_offset)
+	var sloped := absf(tangent.y) > sin(deg_to_rad(rail_flat_degrees))
+
+	if Input.is_action_just_pressed("crouch"):
+		_release_rail(false, tangent)
+		return
+	if Input.is_action_just_pressed("jump"):
+		_release_rail(true, tangent)
+		return
+
+	# Speed along the curve: gravity's component along the tangent on a slope (tangent.y is positive going downhill),
+	# friction on the flat; on the flat, left/right add hand-over-hand travel on top.
+	if sloped:
+		_rail_speed = clampf(_rail_speed + gravity * rail_slide_gravity_scale * tangent.y * delta, -rail_slide_max_speed, rail_slide_max_speed)
+	else:
+		_rail_speed = move_toward(_rail_speed, 0.0, rail_flat_friction * delta)
+	var travel := _rail_speed
+	if not sloped and input_dir != 0.0:
+		travel += input_dir * signf(tangent.x) * catwalk_brachiate_speed
+	var new_offset := _rail_offset + travel * delta
+	if new_offset < 0.0 or new_offset > length:
+		if sloped:
+			_release_rail(false, tangent)  # slid off the end: carry on through the air
+			return
+		new_offset = clampf(new_offset, 0.0, length)  # brachiating to the end: stop there
+		_rail_speed = 0.0
+
+	var moved := absf(new_offset - _rail_offset) > 0.001
+	var step := new_offset - _rail_offset
+	_rail_offset = new_offset
+	_pin_to_rail()
+
+	# Facing follows the way the body is actually going along the screen.
+	var screen_dx := step * tangent.x
+	if moved and absf(screen_dx) > 0.0001:
+		hang_facing = signf(screen_dx)
+		sprite.flip_h = hang_facing < 0.0
+		_update_kick_hitbox_facing()
+	_set_rail_pose(sloped, moved)
+
+func _set_rail_pose(sloped: bool, moved: bool) -> void:
+	if sloped:
+		if sprite.animation != &"hang":
+			sprite.play("hang")
+		return
+	if not sprite.sprite_frames.has_animation(&"brachiate"):
+		if sprite.animation != &"hang":
+			sprite.play("hang")
+		return
+	if sprite.animation != &"brachiate":
+		sprite.play("brachiate")
+		sprite.frame = 0
+		sprite.pause()
+	if moved:
+		if not sprite.is_playing():
+			sprite.play("brachiate")
+	else:
+		sprite.pause()
+
+## Lets go of the rail. `jump` leaves upward and the rail can be caught again once the fall starts; otherwise it is a drop
+## with the usual re-grab lockout. On a slope the slide's velocity is carried through the air.
+func _release_rail(jump: bool, tangent: Vector2) -> void:
+	var carried := tangent * _rail_speed
+	var carry_x := carried.x
+	var was_sloped := absf(tangent.y) > sin(deg_to_rad(rail_flat_degrees))
+	_detach_rail()
+	is_hanging = false
+	velocity = carried if was_sloped else Vector2.ZERO
+	if jump:
+		velocity.y = jump_velocity
+		_rail_jumped_off = true
+		hang_lockout_timer = 0.0  # no lockout: _rail_jumped_off already holds the catch until the fall begins
+		_skip_buffered_jump = true  # this press was the jump: the buffered-jump consume later this frame must not fire again
+		Audio.play(&"player/jump")
+	else:
+		hang_lockout_timer = hang_regrab_lockout
+	if was_sloped:
+		_begin_air_carry(carry_x, true)
+
+func _detach_rail() -> void:
+	hang_rail = null
+	_rail_speed = 0.0
+
+## Would the standing collider, with the body origin at `pos`, overlap a rail bot? Only the grab asks: touching a bot hurts
+## (see Contact in the rail bot), so a grab that would put the body inside one is refused rather than taken and hit. (Rail bots join group "rail_bot".)
+func _rail_pose_hits_bot(pos: Vector2) -> bool:
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = collision_shape.shape
+	var xf := collision_shape.global_transform
+	xf.origin += pos - global_position
+	query.transform = xf
+	query.collision_mask = 1
+	query.exclude = [get_rid()]
+	for hit in get_world_2d().direct_space_state.intersect_shape(query, 8):
+		var body: Object = hit.get("collider")
+		if body is Node and (body as Node).is_in_group(&"rail_bot"):
+			return true
+	return false
 
 func _begin_mantle() -> void:
 	one_shot_action = OneShotAction.MANTLING
