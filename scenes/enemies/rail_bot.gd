@@ -16,9 +16,10 @@ extends AnimatableBody2D
 ##
 ## Sparks: a `drip_interval` timer, with the last `TELEGRAPH` seconds before each drip shown as a growing glow at the
 ## nozzle (the warning). Fully deterministic, no randomness; `phase_offset` staggers several bots, like Crusher's.
-## A spark falls straight down from the nozzle (it does NOT inherit the bot's sideways speed: that keeps its path readable),
-## hurts the player on contact and is gone on touching anything solid. It touches nothing else: no liquid, no tiles of any
-## kind react to it, deliberately (see spark.gd). They are added next to the bot (or beside the Path2D if it is a child
+## A spark is a small physical ball. It drops from the nozzle (it does NOT inherit the bot's sideways speed: that keeps its
+## path readable), rolls down slopes, rides conveyor belts, hurts the player on touch and despawns once it comes to rest.
+## It collides with the world only and is invisible to everything else: no liquid, no enemy, mine, laser, bullet or sensor
+## reacts to it, deliberately (see spark.gd). They are added next to the bot (or beside the Path2D if it is a child
 ## of one), are not saved, and vanish with the level on a respawn.
 ##
 ## Power contract (see power_target.gd): powered = running. Unpowered, the bot stops where it is and stops dripping,
@@ -197,9 +198,9 @@ func _drip() -> void:
 		return
 	var spark := SPARK_SCENE.instantiate()
 	spark.set("damage", spark_damage)
-	spark.set("emitter", self)
 	host.add_child(spark)
 	spark.global_position = global_position + NOZZLE
+	spark.reset_physics_interpolation()  # a body added mid-run would otherwise be drawn sliding in from the origin
 	Audio.play_at(&"enemies/railbot_drip", spark.global_position, 2.0)
 
 func _apply_pose() -> void:

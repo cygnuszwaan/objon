@@ -7,9 +7,11 @@
 [ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="5_rljw2"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="6_yjlda"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_aghq8"]
+[ext_resource type="PackedScene" path="res://scenes/enemies/rail_bot.tscn" id="7_rljw2"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_y0ep0"]
 [ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="9_ujeiy"]
 [ext_resource type="PackedScene" path="res://scenes/collectibles/gem_2.tscn" id="10_2ms0b"]
+[ext_resource type="PackedScene" uid="uid://clpqocev1ktyi" path="res://scenes/interactive/conveyor_belt.tscn" id="10_yjlda"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="11_g3uln"]
 [ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="12_7n46g"]
 [ext_resource type="PackedScene" uid="uid://bmjkgbi1jd2s" path="res://scenes/enemies/drillbot.tscn" id="13_7n46g"]
@@ -60,6 +62,16 @@ kill_y = 1024.0
 [node name="Player" parent="." unique_id=61703917 instance=ExtResource("8_y0ep0")]
 z_index = 1
 position = Vector2(428, 632)
+
+[node name="RailBot" parent="." unique_id=1764584960 instance=ExtResource("7_rljw2")]
+position = Vector2(504, 548)
+
+[node name="ConveyorBelt" parent="." unique_id=1339758374 instance=ExtResource("10_yjlda")]
+position = Vector2(460, 596)
+
+[node name="ConveyorBelt2" parent="." unique_id=1278134112 instance=ExtResource("10_yjlda")]
+position = Vector2(472, 568)
+direction = 0
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 
