@@ -99,6 +99,8 @@ const PLANNED: Array[StringName] = [
 	&"interactive/laser_receiver_on",   # a laser receiver powering (the beam reached it), at the receiver
 	&"interactive/bullet_target_hit",    # a cannon bullet hitting a bullet target (every hit), at the target
 	&"interactive/laser_receiver_off",  # a laser receiver losing power (after its hold time), at the receiver
+	&"interactive/arc_receiver_on",       # an arc receiver powering (an arc struck it), at the receiver
+	&"interactive/arc_receiver_off",      # an arc receiver losing power (its hold time ran out after the last arc), at the receiver
 	&"interactive/button_press",       # button turning on (also each press of a toggle button)
 	&"interactive/button_release",     # button turning off
 	&"interactive/weight_plate_press",   # a weight plate powering (the weight reached its threshold), at the plate

@@ -14,6 +14,8 @@ extends Node2D
 ## actors unharmed and is not stopped by them; catwalks and glass pass it as they pass a laser. It also ends at
 ## `max_distance` of travel.
 ##
+## Contract: a body that ends the arc and has `on_arc_hit(point, direction)` is told once (`ArcReceiver`).
+##
 ## Hazard: the player is tested with an immediate circle `intersect_shape()` (mask 1, group "player") at every
 ## `SAMPLE_STEP` px of the frame's travel, so a fast arc cannot step over a thin collider. A hit calls
 ## `take_hit(damage, position)` and spends the arc whether or not the hit landed (i-frames), as a Spark does.
@@ -61,10 +63,13 @@ func _ready() -> void:
 	heading = heading.normalized()
 	_hit_shape = CircleShape2D.new()
 	_hit_shape.radius = HIT_RADIUS
-	_trail.append(global_position)
+	# The trail is seeded on the first physics frame, not here: the turret sets `global_position` after `add_child()`,
+	# so at `_ready()` the arc is still at the world origin and a trail started there draws a line from the origin.
 
 func _physics_process(delta: float) -> void:
 	_age += delta
+	if _trail.is_empty():
+		_trail.append(global_position)
 	if _fade >= 0.0:
 		_fade -= delta
 		if _fade <= 0.0:
@@ -96,6 +101,7 @@ func _physics_process(delta: float) -> void:
 	if reflected:
 		Audio.play_at(&"traps/arc_reflect", global_position, -4.0)
 	if reached_end:
+		_dispatch_hit(result)
 		_end(true)
 	elif _traveled >= max_distance:
 		_end(false)
@@ -141,6 +147,15 @@ func _walk(result: LaserBeam.Result, budget: float) -> Dictionary:
 		pts[i + 1] = placed  # the next segment now starts where the arc is
 		dir = next_dir
 	return {"path": path, "length": length, "heading": dir, "reached_end": true, "reflected": reflected}
+
+## Tells whatever stopped the arc that it was struck: the optional duck-typed contract
+## `on_arc_hit(point, direction)` (the Laser turret's `on_laser_hit()` for a discrete shot; `ArcReceiver` implements
+## it). Called once, on the frame the arc ends on the body. A body without the method (a wall, a door, a mirror's
+## back or edge) is simply an obstacle.
+func _dispatch_hit(result: LaserBeam.Result) -> void:
+	var target := result.end_collider
+	if target != null and is_instance_valid(target) and target.has_method(&"on_arc_hit"):
+		target.call(&"on_arc_hit", result.end_point, result.end_direction)
 
 ## Player and water at the sample points along `path`. True when the arc was spent (it frees itself or fades).
 func _sweep(space: PhysicsDirectSpaceState2D, path: PackedVector2Array) -> bool:

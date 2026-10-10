@@ -16,6 +16,8 @@
 [ext_resource type="PackedScene" uid="uid://bmjkgbi1jd2s" path="res://scenes/enemies/drillbot.tscn" id="13_7n46g"]
 [ext_resource type="PackedScene" uid="uid://cpe7wi8c5xsb" path="res://scenes/interactive/basin.tscn" id="16_aghq8"]
 [ext_resource type="PackedScene" path="res://scenes/traps/arc/arc_turret.tscn" id="16_y0ep0"]
+[ext_resource type="PackedScene" uid="uid://divuey832521a" path="res://scenes/interactive/mirror.tscn" id="17_y0ep0"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/ice_block.tscn" id="18_ujeiy"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_8dks1")
@@ -131,7 +133,7 @@ patrol_distance = 0.0
 
 [node name="WaterBasin" parent="." unique_id=1689376223 instance=ExtResource("16_aghq8")]
 z_index = -1
-position = Vector2(944, 588)
+position = Vector2(944, 576)
 world_tilemap_path = NodePath("../Tilemaps/Ground")
 floor_row_override_enabled = Array[bool]([false, false, false, false, false, false, false, false, false])
 floor_row_overrides = Array[int]([0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -142,7 +144,15 @@ seabed_floor_rows = Array[float]([36.1875, 38.1875, 40.1875, 40.1875, 40.1875, 4
 spill_column = 0
 
 [node name="ArcTurret" parent="." unique_id=542150005 instance=ExtResource("16_y0ep0")]
-position = Vector2(808, 584)
+position = Vector2(952, 504)
+fire_interval = 4.0
+
+[node name="Mirror" parent="." unique_id=1989718227 instance=ExtResource("17_y0ep0")]
+position = Vector2(980, 504)
+rotation = -1.5713527
+
+[node name="IceBlock" parent="." unique_id=621311001 instance=ExtResource("18_ujeiy")]
+position = Vector2(1044, 564)
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]
