@@ -395,6 +395,10 @@ var _rail_jumped_off: bool = false  # jumped (or was thrown) off a rail: no catc
 	# Deliberately its own export rather than reusing `speed`: this is an overhead traverse, not
 	# ground movement, and the two will likely want to be tuned independently once there's an
 	# actual catwalk long enough to try it on.
+@export var catwalk_brachiate_floor_tolerance: float = 1.0
+	# px the feet are raised for the brachiate's floor test (_brachiate_blocked_at()), so a hang whose feet rest exactly on
+	# a flat floor or seabed is not read as overlapping it. A slope rising into the body still blocks, 1 px later per px.
+var _brachiate_clearance_shape := RectangleShape2D.new()  # reused by _brachiate_blocked_at(); resized per call
 var _debug_catwalk_probe: Dictionary = {}  # cached each physics frame for _draw(); empty until first computed
 
 # --- audio (see scripts/audio.gd) ---
@@ -584,6 +588,15 @@ func _physics_process(delta: float) -> void:
 		global_position.x = ladder_tilemap.to_global(ladder_tilemap.map_to_local(snap_cell)).x
 		if can_mount_from_above:
 			global_position.y += ladder_mount_sink  # see ladder_mount_sink: lets the collider pass down through a one-way surface
+		elif is_on_floor():
+			# Mounting upward from a floor. A tile whose collider top sits below its cell top (the trim-depth
+			# look) leaves the feet inside the floor's cell, which _ascending_landing_y() reads as "just
+			# climbed up onto this floor" and ends the climb on the next frame. Lift the feet to just above
+			# the surface, where that landing would have put them, so the climb starts clear of it.
+			var floor_top := _ascending_landing_y()
+			if floor_top != INF:
+				var feet := collision_shape.global_position.y + _shape_height(collision_shape.shape) * 0.5
+				global_position.y += (floor_top - 0.5) - feet
 		_reset_teleport_interpolation()  # same reasoning as the hang-grab teleport below: a hard
 			# position snap, not continuous motion — a couple of pixels, easy to miss, but the same
 			# one-frame interpolation flash is possible if Physics Interpolation is on
@@ -1776,15 +1789,15 @@ func _update_brachiate(input_dir: float, delta: float) -> void:
 	var moved := false
 	if input_dir != 0.0:
 		var target_x := global_position.x + input_dir * catwalk_brachiate_speed * delta
-		if _compute_catwalk_probe_at(target_x).is_catwalk:
+		if _compute_catwalk_probe_at(target_x).is_catwalk and not _brachiate_blocked_into(target_x):
 			hang_facing = input_dir
 			sprite.flip_h = input_dir < 0.0
 			_update_kick_hitbox_facing()
 			global_position.x = target_x
 			hang_anchor.x = target_x
 			moved = true
-		# else: the catwalk ends here — just block further travel that direction, same as walking
-		# into a wall. No teleport/edge-snap needed since the probe already tests the exact spot
+		# else: the catwalk ends here, or terrain is in the way (see _brachiate_blocked_into()) — just block further
+		# travel that direction, same as walking into a wall. No teleport/edge-snap needed since the probe already tests the exact spot
 		# the player is about to move to, so global_position simply never reaches past the edge.
 
 	# Animation only actually plays while the player is displacing — held-but-blocked (stuck at the
@@ -1795,6 +1808,55 @@ func _update_brachiate(input_dir: float, delta: float) -> void:
 			sprite.play("brachiate")
 	else:
 		sprite.pause()
+
+func _brachiate_blocked_into(x: float) -> bool:
+	# Whether the brachiate may NOT move to `x`: the body there would overlap terrain, and it does not already overlap
+	# some here (a hang that starts embedded can still move, rather than being pinned). A hang skips move_and_slide(), so
+	# without this a hang under a crust or catwalk runs on into a floor that rises to meet the underside.
+	return _brachiate_blocked_at(x) and not _brachiate_blocked_at(global_position.x)
+
+func _brachiate_blocked_at(x: float) -> bool:
+	# Whether the hanging body, centred on x, would overlap solid terrain BELOW the grip surface. Only the region under
+	# the underside is tested, not the whole collider: a crust hang embeds the head crust_hang_lift + grip px inside the
+	# crust and a catwalk hang puts it against the tile, and neither is a blocker. Not blockers: the crust (any basin's)
+	# and the platform hung from, anything in group "catwalk" (one-way, never stops sideways travel), and actors and
+	# blocks (CharacterBody2D) that move themselves. Tiles of the world tilemap block unless every tile the region
+	# touches is a catwalk, since one body covers a whole tilemap and a shape query cannot say which tile it hit.
+	var underside := hang_anchor.y - catwalk_hang_grip_drop + _crust_hang_lift_for(hang_platform)
+	var top := underside + 1.0  # a hair below the underside, so the crust or catwalk itself is never in the region
+	var feet_y := collision_shape.global_position.y + _shape_height(collision_shape.shape) * 0.5 - catwalk_brachiate_floor_tolerance
+	if feet_y <= top:
+		return false
+	var width := _shape_width(collision_shape.shape)
+	var center := Vector2(collision_shape.global_position.x + (x - global_position.x), (top + feet_y) * 0.5)
+	_brachiate_clearance_shape.size = Vector2(width, feet_y - top)
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = _brachiate_clearance_shape
+	query.transform = Transform2D(0.0, center)
+	query.collision_mask = collision_mask
+	query.exclude = [get_rid()]
+	var region := Rect2(center - _brachiate_clearance_shape.size * 0.5, _brachiate_clearance_shape.size)
+	for hit in get_world_2d().direct_space_state.intersect_shape(query, 16):
+		var collider: Object = hit.collider
+		if collider == null or collider == hang_platform or collider is CharacterBody2D or _crust_basin_of(collider) != null:
+			continue
+		if collider is Node and (collider as Node).is_in_group("catwalk"):
+			continue
+		if collider is TileMapLayer and not _region_has_non_catwalk_tile(collider as TileMapLayer, region):
+			continue
+		return true
+	return false
+
+func _region_has_non_catwalk_tile(layer: TileMapLayer, region: Rect2) -> bool:
+	# Whether any cell of `layer` that `region` (world space) touches holds a tile that is not a catwalk.
+	var from_cell := layer.local_to_map(layer.to_local(region.position))
+	var to_cell := layer.local_to_map(layer.to_local(region.end))
+	for cx in range(from_cell.x, to_cell.x + 1):
+		for cy in range(from_cell.y, to_cell.y + 1):
+			var cell := Vector2i(cx, cy)
+			if layer.get_cell_source_id(cell) != -1 and not SurfaceTypes.is_catwalk(SurfaceTypes.surface_at_cell(layer, cell)):
+				return true
+	return false
 
 func _log_if_stuck(delta: float) -> void:
 	# Diagnostic (debug_log_stuck): while not on the floor and barely moving, print once a second everything that could hold
