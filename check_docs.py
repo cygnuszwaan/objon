@@ -9,7 +9,9 @@ Fails (exit 1) when:
   - a docs/ file does not end with a "Reads with:" line, or that line names a .md file that does not exist;
   - any `x.md` named in backticks in objon.md or docs/ does not exist (a stale cross-reference).
 Warns (exit code unaffected) when objon.md, the core every session reads, is over about 10k tokens
-(characters / 4), or a topic file is over about 12k.
+(characters / 4), a topic file is over about 12k, or a scene under scenes/interactive, traps, enemies or
+collectibles is never named in docs/level-design.md (so a new object type nobody added to the designer's
+reference shows up here). The check is a normalised substring match, so it is a nudge, not proof.
 """
 import re, sys, pathlib
 
@@ -58,6 +60,24 @@ for p in [core] + topic_files:
         base = n.split('/')[-1]
         if base not in known:
             errors.append('%s names %s, which does not exist' % (p.relative_to(root), n))
+
+# nudge: every placeable scene should be named in the designer's reference (docs/level-design.md)
+DESIGN_REF = docs / 'level-design.md'
+# scene file stem -> the word the reference uses; stems in SKIP are helpers a designer never places
+DESIGN_ALIASES = {'gem_1': 'gem', 'gem_2': 'bonus gem', 'rail_with_bot': 'rail', 'conveyor_belt': 'conveyor'}
+DESIGN_SKIP = {'bullet', 'arc', 'spark'}  # spawned by a turret, cannon or rail bot; covered under those entries
+def _norm(t):
+    return re.sub(r'[^a-z0-9]', '', t.lower())
+if DESIGN_REF.is_file():
+    ref_text = _norm(DESIGN_REF.read_text(encoding='utf-8'))
+    for sub in ('interactive', 'traps', 'enemies', 'collectibles'):
+        for scene in sorted((root / 'scenes' / sub).rglob('*.tscn')):
+            stem = scene.stem
+            if stem in DESIGN_SKIP:
+                continue
+            if _norm(DESIGN_ALIASES.get(stem, stem)) not in ref_text:
+                warnings.append('scenes/%s/%s is not named in docs/level-design.md: add its catalogue entry' %
+                                (sub, scene.name))
 
 if len(text) / 4 > CORE_BUDGET_TOKENS:
     warnings.append('objon.md is about %dk tokens (budget %dk): move something into a topic file' %
