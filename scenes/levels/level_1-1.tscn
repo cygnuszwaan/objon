@@ -5,9 +5,47 @@
 [ext_resource type="Texture2D" uid="uid://b8yefrcdq7oyg" path="res://sprites/backgrounds/volcano2.png" id="3_g3uln"]
 [ext_resource type="TileSet" uid="uid://dv3wyo6js8o2y" path="res://resources/meadow-1.tres" id="4_2ms0b"]
 [ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="5_rljw2"]
+[ext_resource type="Texture2D" uid="uid://cn55xxm03e6ja" path="res://sprites/tiles/catwalks.png" id="6_dyh2t"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="6_yjlda"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_aghq8"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_y0ep0"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8dks1"]
+texture = ExtResource("6_dyh2t")
+separation = Vector2i(2, 0)
+0:0/0 = 0
+0:0/0/terrain_set = 0
+0:0/0/terrain = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, -4, -8, -4)
+0:0/0/custom_data_0 = "catwalk"
+1:0/0 = 0
+1:0/0/terrain_set = 0
+1:0/0/terrain = 0
+1:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, -4, -8, -4)
+1:0/0/terrains_peering_bit/right_side = 0
+1:0/0/custom_data_0 = "catwalk"
+2:0/0 = 0
+2:0/0/terrain_set = 0
+2:0/0/terrain = 0
+2:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, -4, -8, -4)
+2:0/0/terrains_peering_bit/right_side = 0
+2:0/0/terrains_peering_bit/left_side = 0
+2:0/0/custom_data_0 = "catwalk"
+3:0/0 = 0
+3:0/0/terrain_set = 0
+3:0/0/terrain = 0
+3:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, -4, -8, -4)
+3:0/0/terrains_peering_bit/left_side = 0
+3:0/0/custom_data_0 = "catwalk"
+
+[sub_resource type="TileSet" id="TileSet_0w3yt"]
+physics_layer_0/collision_layer = 2
+terrain_set_0/mode = 0
+terrain_set_0/terrain_0/name = "Catwalk 0"
+terrain_set_0/terrain_0/color = Color(0.5, 0.34375, 0.25, 1)
+custom_data_layer_0/name = "surface_type"
+custom_data_layer_0/type = 4
+sources/0 = SubResource("TileSetAtlasSource_8dks1")
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_8dks1")
@@ -46,6 +84,10 @@ tile_set = ExtResource("4_2ms0b")
 position = Vector2(-16, 0)
 tile_set = ExtResource("5_rljw2")
 
+[node name="Catwalks" type="TileMapLayer" parent="Tilemaps" unique_id=639006999]
+tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAA=")
+tile_set = SubResource("TileSet_0w3yt")
+
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
 
 [node name="WaterManager" type="Node2D" parent="." unique_id=1297838409 groups=["water_manager"]]
@@ -54,7 +96,7 @@ kill_y = 1024.0
 
 [node name="Player" parent="." unique_id=61703917 instance=ExtResource("8_y0ep0")]
 z_index = 1
-position = Vector2(616, 468)
+position = Vector2(616, 472)
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 

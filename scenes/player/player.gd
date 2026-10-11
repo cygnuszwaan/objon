@@ -198,7 +198,8 @@ var hang_lockout_timer: float = 0.0
 const UNEMBED_CLEARANCE := 0.5  # px of gap left between a crust's underside and the head when _unembed_from_crust() moves the body out
 var _stuck_log_timer: float = 0.0
 var _stuck_log_pos: Vector2 = Vector2.INF
-var _skip_buffered_jump := false  # set when a jump off a crust hang is turned into a drop, so the same frame's buffered-jump consume is skipped
+var _skip_buffered_jump := false  # set when a hang's own jump (rail, catwalk or crust underside) was this press, so the same frame's buffered-jump consume is skipped
+var _crust_pass_body: PhysicsBody2D = null  # the crust body the player is jumping up through (a collision exception while set); see _update_crust_pass()
 var hang_regrab_lockout: float = 0.3  # prevents an instant re-grab right after dropping/jumping off
 var time_since_airborne: float = 0.0  # seconds since is_on_floor() last true; reset to 0 while grounded
 var fall_anim_delay_timer: float = 0.0  # see _finish_mantle / post_mantle_fall_anim_delay
@@ -508,6 +509,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_update_hurt_invincibility(delta)
 	_update_surf_shove_exceptions(delta)  # runs in every state: the surf may have ended while a shoved block still overlaps
+	_update_crust_pass()  # runs in every state: a hit mid-pass must still clear the exception once the body is out of the crust
 
 	# Hurt, dead, and dance all get the same minimal branch instead of being threaded through the
 	# normal flow: everything below (jump buffer, crouch, climb...) runs on raw input every
@@ -638,20 +640,15 @@ func _physics_process(delta: float) -> void:
 				is_hanging = false  # let go, drop into a fall
 				hang_lockout_timer = hang_regrab_lockout
 			elif Input.is_action_just_pressed("jump"):
-				is_hanging = false  # let go: LEDGE jumps away from the wall; CATWALK_UNDER just drops
-				hang_lockout_timer = hang_regrab_lockout
+				is_hanging = false
 				if hang_style == HangStyle.LEDGE:
+					# a ledge jump pushes away from the wall
+					hang_lockout_timer = hang_regrab_lockout
 					velocity.y = jump_velocity
 					velocity.x = -hang_facing * speed
 					Audio.play(&"player/jump")
 				else:
-					# An underside hang (catwalk or crust) has no wall to push off and nothing to jump into: a jump
-					# there is the same plain let-go as crouch, with no upward velocity (crust is solid and the head is
-					# inside it, see _unembed_from_crust()). The buffered jump later this frame is skipped, since a
-					# coyote timer kept full by the stale is_on_floor() of a crouch+jump entry would re-apply one.
-					velocity.y = 0.0
-					velocity.x = 0.0
-					_skip_buffered_jump = true
+					_jump_up_through_underside()  # catwalk or crust: jump up through it, as a rail hang's jump leaves the rail
 			elif Input.is_action_just_pressed("climb_up") or (hang_style == HangStyle.LEDGE and Input.is_action_just_pressed("move_right" if hang_facing > 0.0 else "move_left")):
 				_begin_mantle()  # a ledge hang also mantles on a fresh press toward the wall; holding it through the grab does not
 			elif hang_style == HangStyle.CATWALK_UNDER:
@@ -1342,6 +1339,7 @@ func load_state(d: Dictionary) -> void:
 
 ## Called by Game after the snapshot has been applied: a hard teleport onto the checkpoint at full health.
 func respawn_at(pos: Vector2) -> void:
+	_end_crust_pass()
 	global_position = pos
 	velocity = Vector2.ZERO
 	health = max_health
@@ -1927,18 +1925,63 @@ func _unembed_from_crust() -> void:
 		var basin := _crust_basin_of(hit.collider)
 		if basin == null:
 			continue
-		var half_w := _shape_width(collision_shape.shape) * 0.5
-		var underside := -INF  # the lowest crust bottom across the collider's width: neighbouring columns can differ
-		for dx in [-half_w, 0.0, half_w]:
-			var y := basin.get_crust_underside_world_y_at(global_position.x + dx)
-			if y != INF:
-				underside = maxf(underside, y)
+		if hit.collider == _crust_pass_body:
+			continue  # the body is jumping up through this crust on purpose (see _update_crust_pass())
+		var underside := _crust_underside_under_body(basin)
 		if underside == -INF or collision_shape.global_position.y <= underside or top_y >= underside:
 			continue
 		shift = maxf(shift, underside - top_y + UNEMBED_CLEARANCE)
 	if shift > 0.0:
 		global_position.y += shift
 		_reset_teleport_interpolation()
+
+func _crust_underside_under_body(basin: WaterBasin) -> float:
+	# The lowest crust bottom across the collider's width (neighbouring columns can differ), or -INF where the basin has no
+	# crust under the body at all.
+	var half_w := _shape_width(collision_shape.shape) * 0.5
+	var underside := -INF
+	for dx in [-half_w, 0.0, half_w]:
+		var y := basin.get_crust_underside_world_y_at(global_position.x + dx)
+		if y != INF:
+			underside = maxf(underside, y)
+	return underside
+
+func _jump_up_through_underside() -> void:
+	# A jump from a catwalk or crust underside hang goes UP through it, the way a rail hang's jump leaves the rail (the
+	# ledge jump pushes off its wall and is separate). No lockout: the underside grab only takes a body that is falling
+	# (catwalk_hang_min_fall_speed), so the rise cannot re-catch, and a jump that falls short (a low ceiling above)
+	# catches the underside again on the way down. A catwalk is one-way, so the body rises through it by itself. Crust is
+	# solid, so the body gets a collision exception with that crust until it is clear (see _update_crust_pass()).
+	velocity = Vector2(0.0, jump_velocity)
+	hang_lockout_timer = 0.0
+	_skip_buffered_jump = true  # this press was the jump: the buffered-jump consume later this frame must not fire again
+	if _crust_basin_of(hang_platform) != null:
+		_crust_pass_body = hang_platform
+		add_collision_exception_with(_crust_pass_body)
+	Audio.play(&"player/jump")
+
+func _update_crust_pass() -> void:
+	# Ends the collision exception _jump_up_through_underside() set once the body no longer needs it: its feet are above the
+	# crust's collision top (the crust is solid again, so a landing on it works), or its head is below the crust's underside
+	# (a short jump fell back out of it; the catwalk grab then re-catches the underside on the way down), or it has gone
+	# somewhere the crust is not at all (sideways out of the basin, a hang, a ladder, the water). Until then it stays on, even
+	# through a hit, so a body knocked about inside the crust is never left embedded in a solid it collides with.
+	if _crust_pass_body == null:
+		return
+	var basin := _crust_basin_of(_crust_pass_body) if is_instance_valid(_crust_pass_body) else null
+	var done := basin == null or is_hanging or is_climbing or is_swimming
+	if not done:
+		var top_y := collision_shape.global_position.y - _shape_height(collision_shape.shape) * 0.5
+		var feet_y := top_y + _shape_height(collision_shape.shape)
+		var underside := _crust_underside_under_body(basin)
+		done = feet_y <= basin.get_crust_collision_top_world_y() or underside == -INF or top_y >= underside
+	if done:
+		_end_crust_pass()
+
+func _end_crust_pass() -> void:
+	if _crust_pass_body != null and is_instance_valid(_crust_pass_body):
+		remove_collision_exception_with(_crust_pass_body)
+	_crust_pass_body = null
 
 func _overlapping_bodies() -> Array[Dictionary]:
 	# Everything the current collider overlaps right now (up to 8 hits), regardless of one-way flags.
