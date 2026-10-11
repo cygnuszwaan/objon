@@ -38,9 +38,9 @@ const FALLBACK_TERRAIN := 0
 # ---- World -------------------------------------------------------------------
 const SEED := 0                 # 0 = new random world every run
 const ORIGIN := Vector2i(0, 0)  # top-left cell of the world
-const WIDTH := 160              # tiles
-const HEIGHT := 60              # tiles (the level's kill plane is at row 64)
-const BORDER := 2               # thickness of the wall on the sides and the floor
+const WIDTH := 200              # tiles
+const HEIGHT := 100             # tiles (the level's kill plane is at row 64)
+const BORDER := 20              # thickness of the wall on the sides and the floor
 const CLOSED_TOP := false       # also wall off the top edge
 
 # ---- Shape: floating masses --------------------------------------------------
