@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cvak0iwb4slwv"
-path="res://.godot/imported/weathered-steel-var1-rust.png-3d195ae0e5ca4a174c7c06bf337a4f41.ctex"
+uid="uid://boox2j2g633hh"
+path="res://.godot/imported/meadow-1.png-d03c96e53fcc50a6297a0260fe402083.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://sprites/tiles/weathered-steel-var1-rust.png"
-dest_files=["res://.godot/imported/weathered-steel-var1-rust.png-3d195ae0e5ca4a174c7c06bf337a4f41.ctex"]
+source_file="res://sprites/tiles/meadow-1.png"
+dest_files=["res://.godot/imported/meadow-1.png-d03c96e53fcc50a6297a0260fe402083.ctex"]
 
 [params]
 

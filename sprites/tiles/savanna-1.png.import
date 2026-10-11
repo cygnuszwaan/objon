@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cpbri5uernp0g"
-path="res://.godot/imported/volcanic-rock-2.png-7c6dbd9faa03d37b2fb1c06a6acd9349.ctex"
+uid="uid://fuct7uxq4nxx"
+path="res://.godot/imported/savanna-1.png-b50171f6a4604dea05d38abff969390d.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://sprites/tiles/volcanic-rock-2.png"
-dest_files=["res://.godot/imported/volcanic-rock-2.png-7c6dbd9faa03d37b2fb1c06a6acd9349.ctex"]
+source_file="res://sprites/tiles/savanna-1.png"
+dest_files=["res://.godot/imported/savanna-1.png-b50171f6a4604dea05d38abff969390d.ctex"]
 
 [params]
 

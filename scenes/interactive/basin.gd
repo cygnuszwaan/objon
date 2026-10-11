@@ -343,6 +343,8 @@ const CRUST_COLOR := Color(0.35, 0.32, 0.3, 1.0)
 ## How long one spark's zap keeps the pool electrified, in seconds. A later spark restarts the countdown rather than
 ## adding to it. Placeholder pending tuning against a rail bot's `drip_interval` (1.6 s by default).
 @export_range(0.1, 5.0, 0.05, "or_greater") var electrified_time: float = 1.0
+## How far, in px, the drawn liquid and crust extend behind each wall column (rounded down to whole 4px strips, capped at one tile). Lets a wall sprite keep transparent padding on its open face without a gap showing between it and the settled liquid. Drawing only: collision, queries and the polygon shape queries are unchanged.
+@export_range(0.0, 16.0, 1.0) var wall_overlap_px: float = 8.0
 @export var debug_check_body: bool = false  ## Runtime diagnostic: warns whenever the old polygon form of the liquid body would have failed to triangulate (see _draw_settled_body()). Off = no cost.
 @export var debug_draw_bounds: bool = true:
 	set(value):
@@ -1138,7 +1140,7 @@ func get_crust_polygon_world() -> Array[PackedVector2Array]:
 		return []
 	return _build_column_runs(get_crust_top_world_y(), get_crust_bottom_world_y())
 
-func _build_column_runs(top_y: float, bottom_cap_y: float, rippled: bool = false) -> Array[PackedVector2Array]:
+func _build_column_runs(top_y: float, bottom_cap_y: float, rippled: bool = false, with_walls: bool = false) -> Array[PackedVector2Array]:
 	# rippled: bend each run's flat top edge along the live surface ripple (see "Surface ripple"); only the
 	# drawn liquid body asks for it, never the crust or any shape query.
 	# Shared by get_body_polygon_world() (liquid) and get_crust_polygon_world() (solidified liquid) —
@@ -1150,7 +1152,7 @@ func _build_column_runs(top_y: float, bottom_cap_y: float, rippled: bool = false
 	var polygons: Array[PackedVector2Array] = []
 	for run_variant in _collect_runs(top_y, bottom_cap_y):
 		var run_cols: Array[int] = run_variant
-		polygons.append(_build_run_polygon(run_cols, top_y, bottom_cap_y, rippled))
+		polygons.append(_build_run_polygon(run_cols, top_y, bottom_cap_y, rippled, with_walls))
 	return polygons
 
 func _collect_runs(top_y: float, bottom_cap_y: float) -> Array:
@@ -1173,7 +1175,7 @@ func _collect_runs(top_y: float, bottom_cap_y: float) -> Array:
 		runs.append(run_cols)
 	return runs
 
-func _build_run_polygon(run_cols: Array[int], top_y: float, bottom_cap_y: float, rippled: bool = false) -> PackedVector2Array:
+func _build_run_polygon(run_cols: Array[int], top_y: float, bottom_cap_y: float, rippled: bool = false, with_walls: bool = false) -> PackedVector2Array:
 	# One contiguous run of actually-wet/crusted columns (see _build_column_runs() above) -> one
 	# closed, well-formed polygon: flat top at top_y spanning the run's own left..right extent, stepped
 	# bottom tracing each column's real (capped at bottom_cap_y, same as the run-finding check above —
@@ -1182,18 +1184,32 @@ func _build_run_polygon(run_cols: Array[int], top_y: float, bottom_cap_y: float,
 	var left_x := global_position.x + run_cols[0] * _tile_size.x
 	var right_x := global_position.x + (run_cols[run_cols.size() - 1] + 1) * _tile_size.x
 	var points := PackedVector2Array()
+	var strips_padded := false  # the skinned top below already carries the wall pad
 	if rippled and _liquid_skin() != null:
 		# Skinned liquid: the top is a staircase of whole-pixel steps, one per ripple strip, exactly where the
 		# skin's strips are drawn, so the body never pokes above or falls short of the art.
 		var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
-		for strip in _run_strips(run_cols, top_y, bottom_cap_y, true):
+		for strip in _run_strips(run_cols, top_y, bottom_cap_y, true, with_walls):
 			points.append(Vector2(strip.x, strip.y))
 			points.append(Vector2(strip.x + spacing, strip.y))
+		strips_padded = with_walls
 	elif rippled and _ripple_live:
 		_append_rippled_top(points, run_cols, left_x, top_y, bottom_cap_y)
 	else:
 		points.append(Vector2(left_x, top_y))
 		points.append(Vector2(right_x, top_y))
+	# Wall pad (drawing only): the run's edge columns continue into the wall columns at the same top and floor.
+	var pad := _wall_pad_px() if with_walls else 0.0
+	var pad_left := pad > 0.0 and _run_touches_left_wall(run_cols)
+	var pad_right := pad > 0.0 and _run_touches_right_wall(run_cols)
+	if strips_padded:
+		pad_left = false
+		pad_right = false
+	if pad_left:
+		points.insert(0, Vector2(left_x - pad, points[0].y))
+	if pad_right:
+		points.append(Vector2(right_x + pad, points[points.size() - 1].y))
+	var first_col_y := 0.0
 	for i in range(run_cols.size() - 1, -1, -1):  # right to left
 		var local_col: int = run_cols[i]
 		var col_left_x := global_position.x + local_col * _tile_size.x
@@ -1201,8 +1217,14 @@ func _build_run_polygon(run_cols: Array[int], top_y: float, bottom_cap_y: float,
 		var col_y := minf(
 			global_position.y + (seabed_floor_rows[local_col] - _origin_cell.y) * _tile_size.y,
 			bottom_cap_y)
+		if i == run_cols.size() - 1:
+			if pad_right:
+				points.append(Vector2(right_x + pad, col_y))
+		first_col_y = col_y
 		points.append(Vector2(col_right_x, col_y))
 		points.append(Vector2(col_left_x, col_y))
+	if pad_left:
+		points.append(Vector2(left_x - pad, first_col_y))
 	return points
 
 func is_column_in_range(map_col: int) -> bool:
@@ -1662,7 +1684,18 @@ func _ripple_step(dt: float) -> bool:
 			moving = true
 	return moving
 
-func _run_strips(run_cols: Array[int], top_y: float, bottom_cap_y: float, rippled: bool) -> PackedVector3Array:
+func _wall_pad_px() -> float:
+	# The drawn overlap into each wall column, whole strips only, never more than one tile.
+	var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
+	return floorf(clampf(wall_overlap_px, 0.0, _tile_size.x) / spacing) * spacing
+
+func _run_touches_left_wall(run_cols: Array[int]) -> bool:
+	return run_cols[0] == 1
+
+func _run_touches_right_wall(run_cols: Array[int]) -> bool:
+	return run_cols[run_cols.size() - 1] == resolved_width_tiles - 2
+
+func _run_strips(run_cols: Array[int], top_y: float, bottom_cap_y: float, rippled: bool, with_walls: bool = false) -> PackedVector3Array:
 	# One entry per ripple-sample strip (RIPPLE_SUBDIVISIONS per column) of a run: x = the strip's left edge, y = the
 	# top of the skin there, z = the bottom of what the strip may draw (its column's seabed, capped). Tops are
 	# whole world pixels, so the art stays pixel-crisp as the fill level and ripple move continuously. A live
@@ -1684,6 +1717,25 @@ func _run_strips(run_cols: Array[int], top_y: float, bottom_cap_y: float, ripple
 				y = minf(top_y - 0.5 * (_ripple_h[j] + _ripple_h[j + 1]), maxf(col_y - 0.5, top_y))
 			y = minf(roundf(y), col_y - 0.5)
 			strips.append(Vector3(col_left + k * spacing, y, col_y))
+	if with_walls:
+		# Pad strips behind the wall columns: each copies the height and floor of the edge strip it continues, so
+		# the extension is a flat continuation hidden behind the wall tile.
+		var pad := _wall_pad_px()
+		var pad_count := roundi(pad / spacing)
+		if pad_count > 0:
+			var left_pad := PackedVector3Array()
+			if _run_touches_left_wall(run_cols):
+				var edge := strips[0]
+				for n in range(pad_count, 0, -1):
+					left_pad.append(Vector3(edge.x - n * spacing, edge.y, edge.z))
+			var right_pad := PackedVector3Array()
+			if _run_touches_right_wall(run_cols):
+				var edge := strips[strips.size() - 1]
+				for n in range(1, pad_count + 1):
+					right_pad.append(Vector3(edge.x + n * spacing, edge.y, edge.z))
+			left_pad.append_array(strips)
+			left_pad.append_array(right_pad)
+			strips = left_pad
 	return strips
 
 func _draw_body_strips(color: Color, top_y: float) -> void:
@@ -1693,7 +1745,7 @@ func _draw_body_strips(color: Color, top_y: float) -> void:
 	var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
 	for run_variant in _collect_runs(top_y, INF):
 		var run_cols: Array[int] = run_variant
-		for strip in _run_strips(run_cols, top_y, INF, true):
+		for strip in _run_strips(run_cols, top_y, INF, true, true):
 			var height := strip.z - strip.y
 			if height <= 0.0:
 				continue
@@ -1717,7 +1769,7 @@ func _draw_skin_strips(skin: LiquidSkin, frame: int, top_y: float, bottom_cap_y:
 	var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
 	for run_variant in _collect_runs(top_y, bottom_cap_y):
 		var run_cols: Array[int] = run_variant
-		for strip in _run_strips(run_cols, top_y, bottom_cap_y, rippled):
+		for strip in _run_strips(run_cols, top_y, bottom_cap_y, rippled, true):
 			var rows := mini(skin.visible_rows, floori(strip.z - strip.y))
 			if rows <= 0:
 				continue
@@ -1734,21 +1786,20 @@ func _draw_crust_strips(skin: LiquidSkin, frame: int, top_y: float, bottom_y: fl
 	# neutral pixel) is transparent, so the crust is exactly as thick as its neutral pixels and never filled down to the face.
 	# A column the seabed clips short of the crust's bottom face is the exception: it rests on the floor, so a transparent
 	# underside there would show a gap above the floor tile, and that strip gets a neutral rect down to the seabed first.
-	var sub := LiquidConstants.RIPPLE_SUBDIVISIONS
-	var spacing := _tile_size.x / float(sub)
+	var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
 	var texture: Texture2D = skin.backed_texture if over_void else skin.texture
 	var backing := skin.neutral_color(frame)
 	for run_variant in _collect_runs(top_y, bottom_y):
 		var run_cols: Array[int] = run_variant
-		var strips := _run_strips(run_cols, top_y, bottom_y, false)
+		var strips := _run_strips(run_cols, top_y, bottom_y, false, true)
 		for i in range(strips.size()):
 			var strip := strips[i]
 			var rows := mini(skin.visible_rows, floori(strip.z - strip.y))
 			if rows <= 0:
 				continue
 			var left := to_local(Vector2(strip.x, strip.y))
-			@warning_ignore("integer_division")
-			var column: int = run_cols[i / sub]
+			# The strip's own column, clamped to the interior so a pad strip behind a wall reads its neighbour's floor.
+			var column := clampi(floori((strip.x - global_position.x) / _tile_size.x), 1, resolved_width_tiles - 2)
 			if over_void and _seabed_world_y(column) <= bottom_y + CRUST_SEAT_TOLERANCE:
 				draw_rect(Rect2(left, Vector2(spacing, strip.z - strip.y)), backing)
 			var src_x := fposmod(strip.x - global_position.x, float(LiquidSkin.TILE))
@@ -1838,7 +1889,7 @@ func _get_drawn_body_polygons(top_y: float = INF) -> Array[PackedVector2Array]:
 		return []
 	if is_inf(top_y):
 		top_y = get_liquid_surface_world_y()  # the default: the liquid's own surface
-	return _build_column_runs(top_y, INF, true)
+	return _build_column_runs(top_y, INF, true, true)
 
 func _append_rippled_top(points: PackedVector2Array, run_cols: Array[int], left_x: float, top_y: float, bottom_cap_y: float) -> void:
 	# Left-to-right top edge of one run, one vertex per ripple sample. Each vertex is clamped to stay above
@@ -2044,7 +2095,7 @@ func _draw_settled_body() -> void:
 	if not has_crust:
 		return
 	if crust_skin == null:
-		for world_points in get_crust_polygon_world():
+		for world_points in _build_column_runs(get_crust_top_world_y(), get_crust_bottom_world_y(), false, true):
 			var local_points := PackedVector2Array()
 			local_points.resize(world_points.size())
 			for i in range(world_points.size()):

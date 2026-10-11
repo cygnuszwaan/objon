@@ -165,6 +165,8 @@ as a staircase. Drawn behind the tilemap (lower z-index than ground tiles) so an
 the flat-per-column approximation and a sloped tile's real geometry is hidden under the opaque tile
 art rather than visible.
 
+**Wall overlap** (drawing only): the settled liquid, its surface art and the crust extend `wall_overlap_px` (export, default 8, rounded down to whole 4px strips, capped at one tile) behind each wall column, so a wall sprite with transparent padding on its open face shows liquid behind it instead of a gap. Only a run that touches an interior edge column gets a pad on that side; each pad strip copies the height and floor of the edge strip it continues. It is applied by `_run_strips(..., with_walls)` and `_build_column_runs(..., with_walls)`, which only the drawing paths pass; `get_body_polygon_world()`, `get_crust_polygon_world()`, collision and every query stay interior-only. A wall whose outer face is also transparent will show the overlap there, so lower the export for thin walls.
+
 **Skins** (`res://scripts/liquid_skin.gd`, `class_name LiquidSkin`; runtime only): a liquid type can have a
 top-of-liquid art strip (16px frames stacked vertically, one tile tall, tileable sideways only). `SKIN_BY_TYPE` maps each liquid type to
 its art file and loop `fps`: `SLAG` uses `spsh_molten_steel.png` at 4 fps and `WATER` uses `spsh_water.png` at 6 fps

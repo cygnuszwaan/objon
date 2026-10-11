@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://d1f41wtx1plef"
-path="res://.godot/imported/objon_terrain_sheet_1.png-dd71b61c372c9a898c1681adb82d1473.ctex"
+uid="uid://dowvinssf3tgm"
+path="res://.godot/imported/weathered-steel-1.png-da8453b16c689871bcfae0e5a55ada1e.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://sprites/tiles/objon_terrain_sheet_1.png"
-dest_files=["res://.godot/imported/objon_terrain_sheet_1.png-dd71b61c372c9a898c1681adb82d1473.ctex"]
+source_file="res://sprites/tiles/weathered-steel-1.png"
+dest_files=["res://.godot/imported/weathered-steel-1.png-da8453b16c689871bcfae0e5a55ada1e.ctex"]
 
 [params]
 
