@@ -127,14 +127,6 @@ One line each; the detail and the reason are in the file named. These are what k
 9. **Level-editor habits** (see Level editor seams): derive-from-level steps as named methods called from `_ready()`, configuration warnings as plain methods, authoring overlays behind a flag.
 10. **Document it**: a bullet in the matching topic file describing the object as it stands, its name in the docs index, a `## Status` line there if it is not yet confirmed in-editor, then `python3 check_docs.py`.
 
-## Roadmap: before level design and level loading
-
-No required or deferred steps remain before level design and the loading entry point (see Level editor seams). The items below are unplanned; when one is taken up it follows these rules: one editor-confirmable step per turn, fold the result into the Player or World sections and delete its bullet here, update `export-audit.md`, add sound ids to `Audio.PLANNED`.
-
-**Noted, no plan**
-- Side-dependent mirror rotation (`kicked()` could carry the direction).
-- Weight for riders other than the player and `MeltableBlock`s (enemies are weightless).
-
 ## Current status
 
 Everything described above is built and confirmed in-editor. No project-wide caveats are open.
