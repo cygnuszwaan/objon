@@ -1,6 +1,6 @@
-[gd_resource type="TileSet" load_steps=3 format=3]
+[gd_resource type="TileSet" format=3 uid="uid://bdpxtqllvvr7o"]
 
-[ext_resource type="Texture2D" path="res://sprites/tiles/mossy-iron-1.png" id="1_blobtex"]
+[ext_resource type="Texture2D" uid="uid://undgqy3qx1um" path="res://sprites/tiles/mossy-iron-1.png" id="1_blobtex"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_newmaterial"]
 texture = ExtResource("1_blobtex")
@@ -511,7 +511,6 @@ separation = Vector2i(2, 2)
 4:11/0/custom_data_0 = "ground"
 
 [resource]
-tile_size = Vector2i(16, 16)
 physics_layer_0/collision_layer = 1
 terrain_set_0/mode = 0
 terrain_set_0/terrain_0/name = "Ground"
