@@ -9,6 +9,7 @@ signal gem_collected(count: int, total: int)  # total = gems in the level at loa
 signal gems_counted(total: int)  # the level's gem total was just counted at load (not emitted when a restore supplied it); the GemDisplay redraws on it
 signal points_changed(total: int, delta: int)  # the PointsDisplay (a child of this scene) listens
 signal won  # emitted by start_dance()
+signal cue_ended(source: Object)  # a camera cue finished, was replaced by another, or was cut short; `source` is the `source` the cue was shown with (null if none): a CameraCue starts its cooldown on it
 
 var state: State = State.IDLE
 var one_shot_action: OneShotAction = OneShotAction.NONE
@@ -455,6 +456,18 @@ const KICK_DAMAGE: int = 1  # dealt to anything with take_damage(amount) -> int 
 # x = 0" idea used for the Drillbot's DrillHazard.
 var _base_kick_hitbox_x: float
 @onready var camera: Camera2D = $Camera2D
+enum CuePhase { NONE, PAN, HOLD, RETURN }
+var _lead_offset: Vector2 = Vector2.ZERO  # the eased camera lead and look-down; camera.offset follows it unless a cue plays
+var _cue_phase: CuePhase = CuePhase.NONE
+var _cue_time: float = 0.0  # seconds into the current phase
+var _cue_target: Variant = null  # Vector2 or Node2D
+var _cue_point_last: Vector2 = Vector2.ZERO
+var _cue_source: Object = null
+var _cue_pan_time: float = 0.6
+var _cue_hold_time: float = 1.5
+var _cue_return_time: float = 0.6
+var _cue_ease: StringName = &"sine"
+var _cue_from: Vector2 = Vector2.ZERO  # the offset the current phase eases from
 
 func _update_kick_hitbox_facing() -> void:
 	kick_hitbox_shape.position.x = -_base_kick_hitbox_x if sprite.flip_h else _base_kick_hitbox_x
@@ -475,7 +488,8 @@ func _reset_teleport_interpolation() -> void:
 ## Camera lead, in idle time so it is smooth at the display's rate (the offset isn't physics-interpolated). The camera
 ## looks ahead of fast horizontal travel (above `camera_lead_start_speed`, so walking never moves it) and down during a
 ## fast fall (above `camera_fall_start_speed`), easing both back as the speed drops. Reads the velocity the last physics
-## step left; a wall hit zeroes it and the lead eases out. Dead or dancing: eases back to centre.
+## step left; a wall hit zeroes it and the lead eases out. Dead or dancing: eases back to centre. The eased lead and
+## look-down live in `_lead_offset`; `camera.offset` is that, or, while a camera cue plays, the cue's offset (below).
 func _process(delta: float) -> void:
 	_update_camera_lead(delta)
 
@@ -487,10 +501,112 @@ func _update_camera_lead(delta: float) -> void:
 		var lead := clampf((absf(velocity.x) - camera_lead_start_speed) * camera_lead_gain, 0.0, camera_lead_max)
 		target.x = lead * signf(velocity.x)
 		target.y = clampf((velocity.y - camera_fall_start_speed) * camera_fall_gain, 0.0, camera_fall_max)
-	camera.offset.x = lerpf(camera.offset.x, target.x, 1.0 - exp(-camera_lead_smoothing * delta))
-	camera.offset.y = lerpf(camera.offset.y, target.y, 1.0 - exp(-camera_fall_smoothing * delta))
+	_lead_offset.x = lerpf(_lead_offset.x, target.x, 1.0 - exp(-camera_lead_smoothing * delta))
+	_lead_offset.y = lerpf(_lead_offset.y, target.y, 1.0 - exp(-camera_fall_smoothing * delta))
+	camera.offset = _cue_offset(delta) if _cue_phase != CuePhase.NONE else _lead_offset
+
+# --- camera cue ----------------------------------------------------------------------------
+# A cue pans the camera to a world point, holds, and returns (see Camera cue under Power). Public entry:
+# show_cue(target, params). It is a timer-driven state advanced in `_process()` (idle time, so pause freezes it),
+# not a Tween. It ends early only through `_end_cue()`, called from take_hit() (every damaging hit, death
+# included) and start_dance(); it is NOT in `_interrupt_current_action()`, which a jump pad launch and a stomp
+# bounce share, and those leave a cue playing. respawn_at() cancels it outright.
+
+## Pans the camera onto `target` (a Vector2 world point, or a Node2D whose `global_position` is read every frame,
+## so a cue parented to a moving platform tracks it), holds, and eases back to the player. `params` keys, all
+## optional: `pan_time` (0.6 s), `hold_time` (1.5), `return_time` (0.6), `ease` (`&"linear"`, `&"sine"` (default) or
+## `&"cubic"`), `source` (an Object handed back through `cue_ended`). A cue shown while another plays replaces it:
+## the pan starts from the camera's current offset and the hold restarts; cues are never queued. Ignored while dead
+## or dancing. No input is locked: the player can move, and be hit, while the camera is elsewhere.
+func show_cue(target: Variant, params: Dictionary = {}) -> void:
+	if camera == null or is_dead or is_dancing:
+		return
+	var is_point := typeof(target) == TYPE_VECTOR2
+	if not is_point and not (is_instance_valid(target) and target is Node2D):
+		return
+	if _cue_phase != CuePhase.NONE:
+		_finish_cue()  # replaced: the old source's cue has ended
+	_cue_target = target
+	_cue_source = params.get("source", null)
+	_cue_pan_time = maxf(float(params.get("pan_time", 0.6)), 0.0)
+	_cue_hold_time = maxf(float(params.get("hold_time", 1.5)), 0.0)
+	_cue_return_time = maxf(float(params.get("return_time", 0.6)), 0.0)
+	_cue_ease = StringName(params.get("ease", &"sine"))
+	_cue_point_last = target if is_point else (target as Node2D).global_position
+	_cue_from = camera.offset  # from wherever the camera is now, lead and look-down included
+	_cue_time = 0.0
+	_cue_phase = CuePhase.PAN
+
+## True while a cue is panning, holding or returning.
+func is_cue_playing() -> bool:
+	return _cue_phase != CuePhase.NONE
+
+## Ends the cue early: the camera eases back from where it is over the cue's `return_time`. No-op without a cue.
+func _end_cue() -> void:
+	if _cue_phase == CuePhase.NONE or _cue_phase == CuePhase.RETURN:
+		return
+	_cue_from = camera.offset
+	_cue_time = 0.0
+	_cue_phase = CuePhase.RETURN
+
+## Drops the cue at once (a hard teleport), telling its source.
+func _cancel_cue() -> void:
+	if _cue_phase != CuePhase.NONE:
+		_finish_cue()
+
+func _finish_cue() -> void:
+	var source := _cue_source
+	_cue_phase = CuePhase.NONE
+	_cue_target = null
+	_cue_source = null
+	cue_ended.emit(source)
+
+## The cue point in world space; a freed node leaves the last known point.
+func _cue_point() -> Vector2:
+	if typeof(_cue_target) == TYPE_VECTOR2:
+		_cue_point_last = _cue_target
+	elif is_instance_valid(_cue_target):
+		_cue_point_last = (_cue_target as Node2D).global_position
+	return _cue_point_last
+
+## Advances the cue by `delta` and returns the camera offset for this frame. The camera has no limits or smoothing
+## node, so its view centre is its own position plus `offset`: the offset that centres the cue point is the point
+## relative to the camera.
+func _cue_offset(delta: float) -> Vector2:
+	var aim := _cue_point() - camera.global_position
+	_cue_time += delta
+	match _cue_phase:
+		CuePhase.PAN:
+			if _cue_time >= _cue_pan_time:
+				_cue_time = 0.0
+				_cue_phase = CuePhase.HOLD
+				return aim
+			return _cue_from.lerp(aim, _cue_curve(_cue_time / _cue_pan_time))
+		CuePhase.HOLD:
+			if _cue_time >= _cue_hold_time:
+				_cue_from = aim
+				_cue_time = 0.0
+				_cue_phase = CuePhase.RETURN
+			return aim
+		CuePhase.RETURN:
+			if _cue_time >= _cue_return_time:
+				_finish_cue()
+				return _lead_offset
+			return _cue_from.lerp(_lead_offset, _cue_curve(_cue_time / _cue_return_time))
+	return _lead_offset
+
+func _cue_curve(t: float) -> float:
+	t = clampf(t, 0.0, 1.0)
+	match _cue_ease:
+		&"linear":
+			return t
+		&"cubic":
+			return 4.0 * t * t * t if t < 0.5 else 1.0 - pow(-2.0 * t + 2.0, 3.0) / 2.0
+	return 0.5 - 0.5 * cos(PI * t)  # sine in-out, the default
 
 func _ready() -> void:
+	if camera != null:
+		_lead_offset = camera.offset
 	floor_snap_length = slope_snap_length
 	health = max_health
 	add_to_group("player")
@@ -1311,6 +1427,7 @@ func take_hit(damage: int, from_position: Vector2) -> bool:
 	health_changed.emit(health, max_health)
 
 	_interrupt_current_action()
+	_end_cue()  # a hit (death included) ends a camera cue so the player can see what hurt them; deliberately not in _interrupt_current_action(), which jump pads and stomps share
 
 	# throw the player away from the hazard: pick the side from the hazard's x relative to ours.
 	# If we're almost exactly on top of it (dropped straight onto it), fall back to backing away
@@ -1406,6 +1523,7 @@ func load_state(d: Dictionary) -> void:
 ## Called by Game after the snapshot has been applied: a hard teleport onto the checkpoint at full health.
 func respawn_at(pos: Vector2) -> void:
 	_end_crust_pass()
+	_cancel_cue()
 	global_position = pos
 	velocity = Vector2.ZERO
 	health = max_health
@@ -1490,6 +1608,7 @@ func start_dance() -> void:
 		return
 	is_dancing = true
 	_interrupt_current_action()  # cancel whatever was in progress (mantle tween, crouch...)
+	_end_cue()
 	velocity.x = 0.0  # stop immediately rather than letting _process_incapacitated's shared
 		# hurt_friction decay (meant for hurt/dead's knockback lurch) skid the dance to a halt.
 		# velocity.y is left alone — a gem collected mid-air should still fall/settle normally.
@@ -1501,6 +1620,7 @@ func start_dance() -> void:
 func _interrupt_current_action() -> void:
 	# Cancels whatever the player was in the middle of. Any NEW held state, one-shot action or
 	# tween added to this script needs a line here, or a hit will leave it running underneath hurt.
+	# (The camera cue is the one exception: it ends in take_hit() and start_dance() only, so a launch doesn't cut it.)
 	if _mantle_tween and _mantle_tween.is_valid():
 		_mantle_tween.kill()
 	_mantle_tween = null

@@ -1,0 +1,10 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/camera_cue.gd" id="1_cue"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="2_target"]
+
+[node name="CameraCue" type="Node2D"]
+script = ExtResource("1_cue")
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("2_target")

@@ -118,6 +118,7 @@ const PLANNED: Array[StringName] = [
 	&"interactive/barrier_break",      # a breakable barrier broken by a fast surf, at the barrier
 	&"interactive/door_open",          # door starting to open (not played while a blocked close waits)
 	&"interactive/door_close",         # door starting to close
+	&"interactive/camera_cue_pan",     # a camera cue starting its pan (not played if the player is dead or dancing)
 	&"interactive/finish_unlock",     # finish turning from locked to unlocked (not at load)
 	&"interactive/finish_open",       # player entering the unlocked finish
 	&"interactive/checkpoint",        # a checkpoint being activated (start of its light-up animation)

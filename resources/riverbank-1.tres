@@ -511,7 +511,7 @@ separation = Vector2i(2, 2)
 4:11/0/custom_data_0 = "ground"
 
 [resource]
-physics_layer_0/collision_layer = 1
+physics_layer_0/collision_layer = 2
 terrain_set_0/mode = 0
 terrain_set_0/terrain_0/name = "Ground"
 terrain_set_0/terrain_0/color = Color(0.549, 0.3843, 0.2235, 1)
