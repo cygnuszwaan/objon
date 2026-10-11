@@ -34,7 +34,7 @@ const BLINK_HALF_PERIOD := 0.06  ## seconds on, and the same off, per blink: 3 b
 const GAIN_STAGGER := 0.2  ## seconds between successive segments when several are gained at once
 const FLASH_STRENGTH := 0.6  ## how far toward white a blink goes; under 1 so the pixel shading stays readable
 
-## Screen pixels per art pixel. The player camera is zoomed 4x, so 4 keeps the bar's pixels the same size as the world's.
+## Screen pixels per art pixel. The player camera is zoomed 2.5x, so 2.5 keeps the bar's pixels the same size as the world's (player.tscn sets it).
 @export var pixel_scale: float = 3.0
 ## Gap between the bar and the top-right corner of the screen, in screen pixels.
 @export var margin: float = 16.0

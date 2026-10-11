@@ -4,6 +4,7 @@
 [ext_resource type="Texture2D" path="res://sprites/effects/5points.png" id="2_p5"]
 [ext_resource type="Texture2D" path="res://sprites/effects/10points.png" id="3_p10"]
 [ext_resource type="Texture2D" path="res://sprites/effects/50points.png" id="4_p50"]
+[ext_resource type="Texture2D" path="res://sprites/effects/20points.png" id="5_p20"]
 
 [sub_resource type="AtlasTexture" id="AtlasTexture_p5_0"]
 atlas = ExtResource("2_p5")
@@ -125,6 +126,46 @@ region = Rect2(0, 128, 16, 16)
 atlas = ExtResource("4_p50")
 region = Rect2(0, 144, 16, 16)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_0"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_1"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_2"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_3"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_4"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 64, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_5"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 80, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_6"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 96, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_7"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 112, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_8"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 128, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_p20_9"]
+atlas = ExtResource("5_p20")
+region = Rect2(0, 144, 16, 16)
+
 [sub_resource type="SpriteFrames" id="SpriteFrames_popup"]
 animations = [{
 "frames": [{
@@ -195,6 +236,41 @@ animations = [{
 }],
 "loop": false,
 "name": &"p10",
+"speed": 10.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_5")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_6")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_7")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_8")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_p20_9")
+}],
+"loop": false,
+"name": &"p20",
 "speed": 10.0
 }, {
 "frames": [{

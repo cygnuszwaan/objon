@@ -285,6 +285,15 @@ var _air_carry_steers: bool = true  # true: left/right steer the carry (swing re
 @export var surf_launch_dive_degrees: float = 10.0  # leaving the ground with the nose down rotates it downward by this (flatter, longer)
 @export var surf_landing_wrong: float = 0.5  # speed kept on landing with the wrong tilt sign for the ground
 @export var surf_landing_level: float = 0.85  # speed kept on landing level on a slope
+@export var surf_landing_min_air_time: float = 0.6  # s in the air before a clean landing earns anything (bonus, conversion, points); a plain surf hop is about 0.53 s, so only a ramp, a ledge, a pad or steam qualifies and hopping can't be farmed
+@export var surf_landing_clean_bonus: float = 1.1  # speed multiplier for a clean landing on a slope (tilt sign matches the ground's, ground not flat) after the minimum air time; the top speed still caps it
+@export var surf_landing_downhill_convert: float = 0.5  # a clean landing on a downhill (after the minimum air time) adds this share of the speed that was going into the floor to the forward speed; the top speed still caps it
+@export var surf_landing_points: Array[int] = [5, 10, 20]  # points for a clean landing, one per entry of surf_landing_points_air_times (each value needs a p<N> popup animation)
+@export var surf_landing_points_air_times: Array[float] = [0.6, 1.0, 1.5]  # s of air time at which each landing tier is reached (ascending)
+@export var surf_bowl_points: Array[int] = [5, 10, 20]  # points for the 1st, 2nd and 3rd-and-later enemy bowled in one chain (each value needs a p<N> popup animation)
+@export var surf_bowl_chain_window: float = 2.0  # s after a bowled enemy within which the next one continues the chain
+@export var surf_skim_points: int = 5  # points per surf_skim_points_distance skimmed over a basin's surface
+@export var surf_skim_points_distance: float = 128.0  # px skimmed per award (8 tiles); 0 turns the reward off
 @export var surf_bowl_speed: float = 300.0  # at or above this speed (ground speed, or horizontal speed in the air) the board bowls over what it hits, if that opts in with bowled_over()
 const SURF_TILT_DEADZONE := 0.3
 const SURF_BOWL_LEAD := 8.0  # px ahead of the swept motion that the bowl query reaches, so a target is hit before the body touches it
@@ -302,6 +311,14 @@ const SURF_FLAT_NORMAL_X := 0.052  # a floor normal with |x| below this (about 3
 @export var surf_skim_drag: float = 160.0  # extra px/s^2 while skimming, on top of the wet friction
 @export var surf_steam_lift: float = 1500.0  # px/s^2 of upward acceleration at full steam lift (WaterManager.get_steam_lift() = 1), on top of gravity; above `gravity` a surfer in full steam leaves the floor and rises. Placeholder, tune with the column
 @export var surf_steam_max_rise: float = 120.0  # px/s: steam never accelerates the board upward beyond this (a faster upward speed, from a jump pad, is left alone)
+@export var camera_lead_start_speed: float = 200.0  # px/s: horizontal speed below which the camera doesn't lead (walking, 150, never does; a surf starts at 240)
+@export var camera_lead_gain: float = 0.25  # s: px of lead per px/s of horizontal speed above the start speed
+@export var camera_lead_max: float = 96.0  # px: the most the camera leads ahead (the view is 512 px wide at zoom 2.5, so the player stays well inside it)
+@export var camera_lead_smoothing: float = 4.0  # 1/s: how fast the horizontal lead eases toward its target (also how fast it swings over on a reversal)
+@export var camera_fall_start_speed: float = 320.0  # px/s: downward speed above which the camera looks down (about 6 tiles of free fall)
+@export var camera_fall_gain: float = 0.2  # s: px of look-down per px/s of downward speed above the start speed
+@export var camera_fall_max: float = 80.0  # px: the most the camera looks down (the view is 288 px tall at zoom 2.5)
+@export var camera_fall_smoothing: float = 6.0  # 1/s: how fast the look-down eases toward its target, and back after the landing
 const SURF_FRICTION_TILE_DATA := &"surf_friction"  # optional float custom-data layer on the ground TileSet: a tile's surf friction scale (0 or unset = 1)
 const SURF_FRICTION_SCALE_MIN := 0.05  # clamp on any floor's scale (a scale of 0 would never stop the board)
 const SURF_FRICTION_SCALE_MAX := 10.0
@@ -321,6 +338,10 @@ const SURF_SHOVE_CLEAR_MARGIN := 1.0  # px the overlap test is grown by before a
 var _surf_prev_velocity: Vector2 = Vector2.ZERO  # the velocity the surf applied last frame (before move_and_slide() changed it): the launch and landing read it
 var _surf_tilt_sign: int = 0  # the board's target tilt this frame, nose-up positive: +1 up, -1 down, 0 level (from left/right relative to the facing)
 var _surf_board_angle: float = 0.0  # the drawn board's current tilt in degrees, nose-up positive; eases to the target
+var _surf_air_time: float = 0.0  # s airborne on the current air carry (reset on leaving the ground, read and cleared at touchdown)
+var _surf_bowl_chain: int = 0  # enemies bowled in the current chain (0 = none)
+var _surf_bowl_chain_timer: float = 0.0  # s left to continue the chain (counts down while surfing)
+var _surf_skim_distance: float = 0.0  # px skimmed since the last skim award, kept for the whole run
 var _surf_jump_pending: bool = false  # a jump was consumed this frame: _surf_move() applies it together with the launch bias
 var _surf_loop  # Audio.LoopPlayer: the board on the ground; silent in the air
 var _surf_loop_base_db: float = 0.0  # the loop's volume at full level, including Audio's per-id tuning
@@ -450,6 +471,24 @@ func _reset_teleport_interpolation() -> void:
 	reset_physics_interpolation()
 	if camera:
 		camera.reset_physics_interpolation()
+
+## Camera lead, in idle time so it is smooth at the display's rate (the offset isn't physics-interpolated). The camera
+## looks ahead of fast horizontal travel (above `camera_lead_start_speed`, so walking never moves it) and down during a
+## fast fall (above `camera_fall_start_speed`), easing both back as the speed drops. Reads the velocity the last physics
+## step left; a wall hit zeroes it and the lead eases out. Dead or dancing: eases back to centre.
+func _process(delta: float) -> void:
+	_update_camera_lead(delta)
+
+func _update_camera_lead(delta: float) -> void:
+	if camera == null:
+		return
+	var target := Vector2.ZERO
+	if not is_dead and not is_dancing:
+		var lead := clampf((absf(velocity.x) - camera_lead_start_speed) * camera_lead_gain, 0.0, camera_lead_max)
+		target.x = lead * signf(velocity.x)
+		target.y = clampf((velocity.y - camera_fall_start_speed) * camera_fall_gain, 0.0, camera_fall_max)
+	camera.offset.x = lerpf(camera.offset.x, target.x, 1.0 - exp(-camera_lead_smoothing * delta))
+	camera.offset.y = lerpf(camera.offset.y, target.y, 1.0 - exp(-camera_fall_smoothing * delta))
 
 func _ready() -> void:
 	floor_snap_length = slope_snap_length
@@ -813,7 +852,7 @@ func _physics_process(delta: float) -> void:
 		_slide_vx = 0.0  # ran into a wall: don't keep "sliding" into it and then take ages to reverse
 	if _air_carry_active and (is_on_floor() or is_climbing or is_hanging or is_swimming or (one_shot_action != OneShotAction.NONE and not (_air_kick and one_shot_action == OneShotAction.KICKING))):
 		if is_surfing and is_on_floor():
-			_surf_speed = _surf_landing_speed()  # landed on the board: the carried velocity becomes the ground surf speed again
+			_surf_touchdown()  # landed on the board: the carried velocity becomes the ground surf speed again, and a clean landing pays out
 		_air_carry_active = false  # landed, grabbed something or got into a one-shot: normal control again
 	if is_climbing or is_hanging or is_swimming:
 		pass  # velocity already fully set above; skip normal horizontal movement
@@ -2299,6 +2338,7 @@ func _start_surf() -> void:
 	_surf_tilt_sign = 0
 	_surf_board_angle = 0.0
 	_surf_jump_pending = false
+	_reset_surf_scoring()
 	velocity.x = _surf_facing * _surf_speed
 	_surf_prev_velocity = Vector2(velocity.x, 0.0)
 	_surf_belt_vx = 0.0
@@ -2329,6 +2369,7 @@ func _end_surf(keep_momentum: bool) -> void:
 	_surf_speed = 0.0
 	_surf_belt_vx = 0.0
 	_surf_jump_pending = false
+	_reset_surf_scoring()
 	if surf_board != null:
 		surf_board.visible = false
 	if _surf_loop != null:
@@ -2364,6 +2405,9 @@ func _surf_move(delta: float, input_dir: float) -> void:
 	_surf_tilt_sign = 0 if absf(input_dir) < SURF_TILT_DEADZONE else int(-signf(input_dir) * _surf_facing)
 	_update_surf_wetness(delta)
 	_update_surf_steam_lift(delta)
+	_surf_bowl_chain_timer = maxf(_surf_bowl_chain_timer - delta, 0.0)
+	if _air_carry_active:
+		_surf_air_time += delta
 	var depart := false
 	var jumped := false
 	var steamed := false  # leaving the floor because the steam out-lifts gravity
@@ -2378,6 +2422,8 @@ func _surf_move(delta: float, input_dir: float) -> void:
 		steamed = true
 	if depart:
 		var from_ground := not _air_carry_active  # false: a coyote jump just after leaving, already airborne
+		if from_ground:
+			_surf_air_time = 0.0  # a coyote jump keeps counting from the moment the board left the floor
 		var v := _surf_prev_velocity if from_ground else Vector2(_air_carry_vx, _surf_prev_velocity.y)
 		if steamed:
 			# No launch bias: the steam, not the tilt, takes the board off. The ground branch writes the velocity along the
@@ -2406,6 +2452,7 @@ func _surf_move(delta: float, input_dir: float) -> void:
 			velocity = Vector2.ZERO
 			_surf_prev_velocity = Vector2.ZERO
 			return
+		_award_surf_skim(_surf_speed * delta)
 		velocity = t * _surf_speed - n * SURF_FLOOR_PRESS
 		_surf_prev_velocity = t * _surf_speed + Vector2(_surf_belt_vx, 0.0)  # the pure tangent plus the belt, without the press: what a launch or a landing should read
 		return
@@ -2440,6 +2487,8 @@ func _apply_surf_steam_lift(delta: float) -> void:
 ## carry's per-frame velocity.x rewrite keeps the pad's push, and into _surf_prev_velocity for the landing. The tilt's
 ## launch bias isn't applied: the pad's own direction is the launch.
 func _apply_surf_launch(vector: Vector2) -> void:
+	if not _air_carry_active:
+		_surf_air_time = 0.0  # launched from the floor: the air time starts here (already airborne: it keeps counting)
 	var carried_vx := _air_carry_vx if _air_carry_active else velocity.x
 	var out := Vector2(carried_vx + vector.x, vector.y)
 	velocity = out
@@ -2502,6 +2551,8 @@ func _surf_bowl_sweep(delta: float) -> void:
 		if body.has_method("bowled_over") and body.bowled_over(_surf_facing, speed_now):
 			add_collision_exception_with(body)
 			Audio.play_at(&"player/surf_bowl", body.global_position, 4.0)
+			if body.is_in_group("enemy"):
+				_award_surf_bowl()  # enemies only: a barrier is a route obstacle, not a skill
 		elif body.has_method("surf_shoved") and _surf_shove_reaches(body, Vector2(lo.x, start.y - half.y), Vector2(hi.x, start.y + half.y - SURF_SHOVE_FOOT_CLEARANCE)):
 			var cost: float = body.surf_shoved(_surf_facing, speed_now)
 			if cost >= 0.0:  # negative = refused: the body stays solid and stops the surf like a wall
@@ -2592,15 +2643,67 @@ func _surf_launch_bias(v: Vector2) -> Vector2:
 		degrees = -surf_launch_dive_degrees
 	return v.rotated(-deg_to_rad(degrees) * _surf_facing)  # up is -angle moving right, +angle moving left
 
-## Landing: the velocity the board arrived with, along the new floor's tangent (what is into the floor is lost), cut by the
-## tilt mismatch against the floor's sign and capped at the top speed.
-func _surf_landing_speed() -> float:
+## Touchdown on the board after an air carry: sets the ground speed from the arrival velocity along the new floor's
+## tangent (what is into the floor is lost), cut by the tilt mismatch and capped at the top speed, and pays the clean
+## landing. *Clean* = the tilt's sign matches the ground's (level on the flat, nose down on a downhill, nose up on an
+## uphill). A mismatch costs speed (`surf_landing_level` / `surf_landing_wrong`). A clean landing after at least
+## `surf_landing_min_air_time` is *earned*: on a slope it multiplies the speed by `surf_landing_clean_bonus`, on a downhill
+## it also adds `surf_landing_downhill_convert` of the speed that was going into the floor (fall speed becomes forward
+## speed, so dips and half-pipes chain), and on any floor it pays the landing points. The flat gets no speed bonus (a level
+## board is the default there, so it would be free) and the minimum air time is above a plain hop, so hopping pumps neither
+## speed nor points; the top-speed cap bounds the rest.
+func _surf_touchdown() -> void:
 	_update_surf_wetness(0.0)  # the floor just reached may be wet, which raises the cap
 	var t := _surf_floor_tangent()
+	var ground_sign := _surf_ground_sign(t)
+	var clean := _surf_tilt_sign == ground_sign
+	var earned := clean and _surf_air_time >= surf_landing_min_air_time
 	var along := maxf(_surf_prev_velocity.dot(t), 0.0)
-	if _surf_tilt_sign != _surf_ground_sign(t):
+	if not clean:
 		along *= surf_landing_level if _surf_tilt_sign == 0 else surf_landing_wrong
-	return minf(along, _surf_top_speed())
+	elif earned and ground_sign != 0:
+		along *= surf_landing_clean_bonus
+		if ground_sign < 0:
+			along += surf_landing_downhill_convert * maxf(-_surf_prev_velocity.dot(_surf_floor_normal()), 0.0)
+	_surf_speed = minf(along, _surf_top_speed())
+	if earned:
+		_award_surf_landing()
+	_surf_air_time = 0.0
+
+## The clean landing's reward: the highest tier whose air time was reached (`surf_landing_points` against
+## `surf_landing_points_air_times`), through add_points() so the popup plays like a gem's.
+func _award_surf_landing() -> void:
+	var tier := -1
+	for i in mini(surf_landing_points.size(), surf_landing_points_air_times.size()):
+		if _surf_air_time >= surf_landing_points_air_times[i]:
+			tier = i
+	if tier >= 0:
+		add_points(surf_landing_points[tier])
+	Audio.play(&"player/surf_land_clean")
+
+## An enemy bowled by the surf: continues the chain if the last one was within `surf_bowl_chain_window`, else starts one.
+## The points step up the chain through `surf_bowl_points` (the last entry repeats).
+func _award_surf_bowl() -> void:
+	_surf_bowl_chain = _surf_bowl_chain + 1 if _surf_bowl_chain_timer > 0.0 else 1
+	_surf_bowl_chain_timer = surf_bowl_chain_window
+	if not surf_bowl_points.is_empty():
+		add_points(surf_bowl_points[mini(_surf_bowl_chain, surf_bowl_points.size()) - 1])
+
+## Skim distance: `surf_skim_points` each time `surf_skim_points_distance` px have been skimmed in the run (the remainder
+## carries over; leaving the surface doesn't clear it).
+func _award_surf_skim(distance: float) -> void:
+	if not _surf_on_skim or surf_skim_points_distance <= 0.0:
+		return
+	_surf_skim_distance += distance
+	if _surf_skim_distance >= surf_skim_points_distance:
+		_surf_skim_distance -= surf_skim_points_distance
+		add_points(surf_skim_points)
+
+func _reset_surf_scoring() -> void:
+	_surf_air_time = 0.0
+	_surf_bowl_chain = 0
+	_surf_bowl_chain_timer = 0.0
+	_surf_skim_distance = 0.0
 
 ## Puts the board under the feet, facing the way the player faces, tilted to the current tilt target (it eases there).
 func _update_surf_board() -> void:

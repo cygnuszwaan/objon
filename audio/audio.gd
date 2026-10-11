@@ -31,8 +31,8 @@ const MUSIC_BUS := &"Music"
 const POOL_SIZE_POSITIONAL := 16
 const POOL_SIZE_FLAT := 8
 
-# AudioStreamPlayer2D's default max_distance is 2000px. At this project's 4x camera zoom the whole
-# screen is only ~320px wide, so at the default nothing would audibly fade with distance.
+# AudioStreamPlayer2D's default max_distance is 2000px. At this project's 2.5x camera zoom the whole
+# screen is only ~512px wide, so at the default nothing would audibly fade with distance.
 const MAX_DISTANCE := 280.0
 
 const RETRIGGER_GUARD_MSEC := 30  # the same id twice within this window is dropped (stops stacked, louder duplicates)
@@ -54,6 +54,7 @@ const PLANNED: Array[StringName] = [
 	&"player/surf_start",              # pulling the board out and mounting it
 	&"player/surf_loop",               # LOOP: the board on the ground; pitch follows the speed, silent in the air
 	&"player/surf_bowl",               # the board bowling something over, at the target
+	&"player/surf_land_clean",         # a clean surf landing after a long enough jump (the one that pays points and a speed bonus)
 	&"player/surf_water_loop",         # LOOP: the board skimming a basin; pitch follows the speed, silent off the surface
 	&"player/surf_splash",             # the board touching a basin's surface (skimming starts), at the board
 	&"player/surf_steam_loop",         # LOOP: steam lifting the board; volume follows the lift, silent without it
