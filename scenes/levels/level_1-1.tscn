@@ -86,9 +86,10 @@ tile_set = ExtResource("4_2ms0b")
 
 [node name="Ladders" type="TileMapLayer" parent="Tilemaps" unique_id=2114889966 groups=["ladder_tilemap"]]
 position = Vector2(-16, 0)
+tile_map_data = PackedByteArray("AAAoAB0AAAAAAAAAAAAoABwAAAAAAAAAAAAoABsAAAAAAAAAAAA=")
 tile_set = ExtResource("5_rljw2")
 
-[node name="Catwalks" type="TileMapLayer" parent="Tilemaps" unique_id=639006999]
+[node name="Catwalks" type="TileMapLayer" parent="Tilemaps" unique_id=639006999 groups=["catwalk"]]
 tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAA=")
 tile_set = SubResource("TileSet_0w3yt")
 

@@ -1573,18 +1573,27 @@ func _ascending_landing_y() -> float:
 	# While climbing up: if the feet have risen into a floor tile the ladder passes through and are
 	# within landing_catch px of its top surface, returns that surface's world y; otherwise INF.
 	# (One-way tiles let the collider pass up through them, so nothing physical stops the climb.)
-	if world_tilemap == null or world_tilemap.tile_set == null:
-		return INF
+	# The floor may be on the world tilemap or on a separate catwalk layer (a TileMapLayer in group "catwalk").
 	var center := collision_shape.global_position
 	var feet_y := center.y + _shape_height(collision_shape.shape) * 0.5
-	var cell := world_tilemap.local_to_map(world_tilemap.to_local(Vector2(center.x, feet_y)))
-	if world_tilemap.get_cell_source_id(cell) == -1:
-		return INF
-	var half_tile_h := world_tilemap.tile_set.tile_size.y * 0.5
-	var top_y := world_tilemap.to_global(world_tilemap.map_to_local(cell) - Vector2(0.0, half_tile_h)).y
-	if feet_y - top_y > landing_catch:
-		return INF
-	return top_y
+	var layers: Array[TileMapLayer] = []
+	if world_tilemap != null:
+		layers.append(world_tilemap)
+	for node in get_tree().get_nodes_in_group("catwalk"):
+		if node is TileMapLayer and node != world_tilemap:
+			layers.append(node as TileMapLayer)
+	for layer in layers:
+		if layer.tile_set == null:
+			continue
+		var cell := layer.local_to_map(layer.to_local(Vector2(center.x, feet_y)))
+		if layer.get_cell_source_id(cell) == -1:
+			continue
+		var half_tile_h := layer.tile_set.tile_size.y * 0.5
+		var top_y := layer.to_global(layer.map_to_local(cell) - Vector2(0.0, half_tile_h)).y
+		if feet_y - top_y > landing_catch:
+			continue
+		return top_y
+	return INF
 
 func _compute_hang_probes(facing: float) -> Dictionary:
 	var space_state := get_world_2d().direct_space_state
