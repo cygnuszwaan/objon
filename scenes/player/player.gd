@@ -1,6 +1,6 @@
 extends CharacterBody2D
 
-enum State { IDLE, RUN, JUMP, FALL, CROUCH, KICK, SURF, CLIMB, HANG, SWIM, HURT, DEAD, DANCE }
+enum State { IDLE, RUN, JUMP, FALL, CROUCH, KICK, SURF, CLIMB, HANG, SWIM, HURT, DEAD, DANCE, SNEAK }
 enum OneShotAction { NONE, UNCROUCHING, KICKING, MANTLING, HURT, CLIMBING_DOWN }
 
 signal health_changed(current: int, maximum: int)  # the HealthBar (a child of this scene) listens
@@ -61,6 +61,9 @@ var swim_shape_bulge_x: float = 0.0  # how far EACH side of the collider bulges 
 @export var ice_accel: float = 450.0
 	# px/s^2 the run speed builds toward its target while standing on a slippery floor (see
 	# is_slippery() contract near _conveyor_push_speed()). Normal floors reach full speed instantly.
+@export var sneak_speed: float = 50.0
+	# px/s while crouched and holding left/right (the SNEAK state). Walk speed is 150. Starts once the crouch-down
+	# animation has finished; applies on ice as a target speed approached at ice_accel / ice_friction.
 @export var ice_friction: float = 120.0
 	# px/s^2 the slide decays by on a slippery floor when there's no input (or while crouching/kicking).
 	# At walk speed 150 that's ~1.25s and ~94px to stop.
@@ -408,6 +411,7 @@ var _debug_catwalk_probe: Dictionary = {}  # cached each physics frame for _draw
 const FRAME_SOUNDS := {
 	&"run": {1: &"player/footstep", 4: &"player/footstep"},
 	&"climb": {0: &"player/climb_step", 2: &"player/climb_step"},
+	&"sneak": {0: &"player/sneak_step", 4: &"player/sneak_step"},  # indices into the 8-entry ping-pong list (0 1 2 3 4 3 2 1)
 }
 @export var land_min_fall_speed: float = 120.0  # px/s: slower touchdowns (tiny hops, slope steps) make no landing sound
 @export var land_full_volume_fall_speed: float = 400.0  # px/s: at or above this the landing plays at full volume
@@ -796,7 +800,7 @@ func _physics_process(delta: float) -> void:
 			one_shot_action = OneShotAction.UNCROUCHING
 			collision_shape.shape = standing_shape
 			collision_shape.position.y -= crouch_offset_y
-			sprite.play("crouch", -1.0)
+			sprite.play("crouch", -1.0, sprite.animation == &"sneak")  # from the sneak clip a reverse would start at frame 0 and end at once: start from the held crouch frame
 			Audio.play(&"player/crouch", -4.0)  # standing back up: same rustle, a bit softer
 
 	# --- horizontal movement ---
@@ -822,7 +826,17 @@ func _physics_process(delta: float) -> void:
 			_air_carry_vx = move_toward(_air_carry_vx, input_dir * speed, carry_air_accel * delta)
 		velocity.x = _air_carry_vx
 	elif is_crouching or one_shot_action == OneShotAction.UNCROUCHING or (one_shot_action == OneShotAction.KICKING and not _air_kick):
-		velocity.x = move_toward(clampf(_slide_vx, -speed, speed), 0.0, ice_friction * delta) if slippery else 0.0
+		# Crouched: creep at sneak_speed when left/right is held (_can_sneak()), otherwise rooted. The stand-up and the
+		# ground kick stay rooted, except that a stand-up that starts in the air (sneaked off an edge) keeps the creep
+		# velocity instead of stopping dead; a crouch-jump from a standstill has _slide_vx 0, so it is unchanged.
+		var sneak_target := input_dir * sneak_speed if _can_sneak() else 0.0
+		if one_shot_action == OneShotAction.UNCROUCHING and not is_on_floor():
+			sneak_target = clampf(_slide_vx, -sneak_speed, sneak_speed)
+		if slippery:
+			var sneak_rate := ice_accel if sneak_target != 0.0 else ice_friction
+			velocity.x = move_toward(clampf(_slide_vx, -speed, speed), sneak_target, sneak_rate * delta)
+		else:
+			velocity.x = sneak_target
 	elif slippery:
 		var rate := ice_accel if input_dir != 0.0 else ice_friction
 		# capped at walk speed so momentum from anything faster doesn't turn into a 600px skate
@@ -959,7 +973,7 @@ func _physics_process(delta: float) -> void:
 		if is_surfing:
 			next_state = State.SURF
 		elif is_crouching:
-			next_state = State.CROUCH
+			next_state = State.SNEAK if (input_dir != 0.0 and _can_sneak()) else State.CROUCH
 		elif not is_on_floor():
 			next_state = State.JUMP if velocity.y < 0.0 else State.FALL
 		else:
@@ -3019,6 +3033,22 @@ func _finish_mantle() -> void:
 	else:
 		_play_animation_for_state()
 
+## True when the crouched player may creep: crouched on the floor with no one-shot running, not on the surf board, and the
+## crouch-down animation has reached its last frame (or the sneak clip is already playing). Pure of input, so the
+## horizontal movement and the state decision share it; callers add the left/right test.
+func _can_sneak() -> bool:
+	if not is_crouching or is_surfing or not is_on_floor() or one_shot_action != OneShotAction.NONE:
+		return false
+	if sprite.animation == &"sneak":
+		return true
+	return sprite.animation == &"crouch" and sprite.frame >= sprite.sprite_frames.get_frame_count(&"crouch") - 1
+
+## Shows the crouch clip's last frame and holds it (the pose a finished crouch-down rests on).
+func _hold_crouch_pose() -> void:
+	sprite.play(&"crouch")
+	sprite.set_frame_and_progress(sprite.sprite_frames.get_frame_count(&"crouch") - 1, 0.0)
+	sprite.pause()
+
 func _on_sprite_frame_changed() -> void:
 	# frame-synced sounds (footsteps, ladder rungs): fires only when a frame actually advances, so a
 	# paused climb animation is silent. Looked up in FRAME_SOUNDS at the top of the file.
@@ -3059,7 +3089,12 @@ func _play_animation_for_state() -> void:
 		State.FALL:
 			sprite.play("fall")
 		State.CROUCH:
-			sprite.play("crouch")
+			if sprite.animation == &"sneak":
+				_hold_crouch_pose()  # stopped sneaking: back to the held crouch frame, not the crouch-down again
+			else:
+				sprite.play("crouch")
+		State.SNEAK:
+			sprite.play("sneak")
 		State.SURF:
 			sprite.play("fall")  # placeholder: reads as a surf pose with the board added; swap for a real "surf" animation
 		State.HANG:

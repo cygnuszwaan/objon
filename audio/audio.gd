@@ -43,6 +43,7 @@ const RANDOM_VOLUME_DB := 1.0     # AudioStreamRandomizer volume jitter (0.0 = n
 # Ids not listed play at 0 dB. The values below are starting guesses, not measured.
 const TUNING := {
 	&"player/footstep": {"volume_db": -6.0},
+	&"player/sneak_step": {"volume_db": -14.0},
 }
 
 # Sounds the code already calls for but that have no file yet. Add the file under res://audio/<folder>/
@@ -59,6 +60,7 @@ const PLANNED: Array[StringName] = [
 	&"player/hang",                    # grabbing a ledge
 	&"player/mantle",                  # pulling up over a ledge
 	&"player/climb_step",              # ladder, frame-synced (see FRAME_SOUNDS in player.gd)
+	&"player/sneak_step",              # creeping while crouched, frame-synced (see FRAME_SOUNDS in player.gd); quieter than the footstep
 	&"player/win",                     # start of the victory dance
 	&"traps/sawwheel_hum",             # LOOP, attached to the saw (Audio.make_loop)
 	&"traps/crusher_extend",
