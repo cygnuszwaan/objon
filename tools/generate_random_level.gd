@@ -77,6 +77,14 @@ const SLOPE_TILES := {
 	"r2_lo": Vector2i(2, 7), "r2_hi": Vector2i(3, 7),
 	"l2_hi": Vector2i(4, 7), "l2_lo": Vector2i(5, 7),
 }
+## Tiles with no terrain bits (autotiling never picks them) that sit under the tip of
+## a slope: all neighbours filled except the corner under the tip (top-left for "/",
+## top-right for "\\"), where the trim follows the slope's own angle instead of ending
+## square. Keyed by the slope tile above; the 2x1 ones go under the low half of a pair.
+const TIP_TILES := {
+	"r1": Vector2i(0, 9), "l1": Vector2i(1, 9),
+	"r2_lo": Vector2i(2, 9), "l2_lo": Vector2i(3, 9),
+}
 ## When re-picking trimmed tiles beside slopes (and terrain borders): true = every
 ## one of the eight neighbours must really be filled for a corner to count as filled;
 ## false = a corner between two filled sides counts as filled (so the air above a
@@ -282,6 +290,8 @@ static func _terrain_info(tile_set: TileSet, terrain_set: int, terrain: int) -> 
 		var slopes_ok := true
 		for co: Vector2i in SLOPE_TILES.values():
 			slopes_ok = slopes_ok and src.has_tile(co)
+		for co: Vector2i in TIP_TILES.values():
+			slopes_ok = slopes_ok and src.has_tile(co)
 		return {
 			"set": terrain_set, "terrain": terrain, "source": sid, "tiles": tiles,
 			"has_slopes": slopes_ok,
@@ -291,30 +301,47 @@ static func _terrain_info(tile_set: TileSet, terrain_set: int, terrain: int) -> 
 
 
 ## Sweep after everything is placed, fixing the trim autotiling leaves where it can't
-## see what is really there. Two cases, and only these cells are touched:
-##  - Each slope tile connects to the ground on two sides: the bottom, and the side it
-##    climbs towards ("/" the right, "\\" the left). The ground tile on each of those
-##    sides is re-picked with the side facing the slope counted as filled and everything
-##    else as it really is, so e.g. a tile trimmed on three sides can become one trimmed
-##    on two, minus the connected side. The slope's other sides stay open.
-##  - Cells touching another terrain's cells (autotiling treats those as empty too) are
-##    re-picked with the other terrain counted as filled.
-## Re-picking chooses, from the cell's own terrain, the tile whose peering bits best
-## match, and overwrites the cell if that differs. Returns how many cells changed.
+## see what is really there. Only these cells are touched. For each slope tile (it
+## climbs towards `climb`, "/" = right, "\\" = left; its thin tip is on the other side):
+##  - The tile below it has the slope on its top side, so that side counts as filled.
+##    For a 1x1 slope and the low half of a 2x1 pair the corner under the tip stays
+##    open, so the trim wraps round that corner; when everything else around the tile
+##    is filled it becomes the slope-edged corner tile (TIP_TILES), whose trim follows
+##    the slope angle, rather than the square-edged one autotiling has.
+##  - The tile on the side it climbs towards has the slope on its facing side.
+##  - The tile diagonally down-and-across (between those two faces), for a 1x1 slope
+##    and the high half of a 2x1 pair, has the slope on its corner facing it, which is
+##    filled, so it is often fully enclosed.
+## Cells touching another terrain's cells (autotiling counts those as empty too) are
+## also fixed, with that terrain counted as filled.
+## Each affected cell is re-picked from its own terrain: the tile whose peering bits
+## best match what is really around it, overwritten if that differs. Returns the count.
 static func _fix_edge_tiles(layer: TileMapLayer, terrains: Array[Dictionary], patch: Dictionary,
 		solid_cells: Array[Vector2i], slopes: Array) -> int:
 	var solid := {}
 	for cell in solid_cells:
 		solid[cell] = true
-	# cell -> bit mask (indices into _PEER_OFFSETS) of sides that touch a slope
-	var forced := {}
+	var forced := {}     # cell -> mask of neighbour bits (indices into _PEER_OFFSETS) to count as filled
+	var kept_open := {}  # cell -> mask of corner bits that must not be filled in
+	var tip_under := {}  # cell -> kind of the slope tip above it
 	for sl: Dictionary in slopes:
 		var sc: Vector2i = sl["cell"]
-		var climb := 1 if (sl["kind"] as String).begins_with("r") else -1
-		for d: Vector2i in [Vector2i(0, 1), Vector2i(climb, 0)]:
-			var n := sc + d
-			if solid.has(n):
-				forced[n] = forced.get(n, 0) | (1 << _PEER_OFFSETS.find(-d))
+		var kind: String = sl["kind"]
+		var climb := 1 if kind.begins_with("r") else -1
+		var tip := kind in ["r1", "l1", "r2_lo", "l2_lo"]
+		var high := kind in ["r1", "l1", "r2_hi", "l2_hi"]
+		var below := sc + Vector2i(0, 1)
+		if solid.has(below):
+			forced[below] = forced.get(below, 0) | (1 << _PEER_OFFSETS.find(Vector2i(0, -1)))
+			if tip:
+				kept_open[below] = kept_open.get(below, 0) | (1 << _PEER_OFFSETS.find(Vector2i(-climb, -1)))
+				tip_under[below] = kind
+		var beside := sc + Vector2i(climb, 0)
+		if solid.has(beside):
+			forced[beside] = forced.get(beside, 0) | (1 << _PEER_OFFSETS.find(Vector2i(-climb, 0)))
+		var diagonal := sc + Vector2i(climb, 1)
+		if high and solid.has(diagonal):
+			forced[diagonal] = forced.get(diagonal, 0) | (1 << _PEER_OFFSETS.find(Vector2i(-climb, -1)))
 	# Cells to re-pick: the slope neighbours plus those next to another terrain.
 	var todo := forced.keys()
 	for cell: Vector2i in solid_cells:
@@ -329,13 +356,14 @@ static func _fix_edge_tiles(layer: TileMapLayer, terrains: Array[Dictionary], pa
 	for cell: Vector2i in todo:
 		var info: Dictionary = terrains[patch[cell]]
 		var mask: int = forced.get(cell, 0)
+		var open: int = kept_open.get(cell, 0)
 		# Desired peering bits: this terrain where filled, -1 (empty) elsewhere.
 		var filled: Array[bool] = []
 		for k in 8:
 			filled.append(solid.has(cell + _PEER_OFFSETS[k]) or (mask & (1 << k)) != 0)
 		if not INTERIOR_NEEDS_CORNERS:
 			for k in [1, 3, 5, 7]:   # corners: filled if both adjacent sides are
-				if filled[(k + 7) % 8] and filled[(k + 1) % 8]:
+				if (open & (1 << k)) == 0 and filled[(k + 7) % 8] and filled[(k + 1) % 8]:
 					filled[k] = true
 		var best: Vector2i = layer.get_cell_atlas_coords(cell)
 		var best_cost := 1 << 30
@@ -348,6 +376,16 @@ static func _fix_edge_tiles(layer: TileMapLayer, terrains: Array[Dictionary], pa
 			if cost < best_cost:
 				best_cost = cost
 				best = t["coords"]
+		# Under a slope tip with everything else filled, use the slope-edged corner tile.
+		if tip_under.has(cell):
+			var tip_kind: String = tip_under[cell]
+			var corner := _PEER_OFFSETS.find(Vector2i(-1 if tip_kind.begins_with("r") else 1, -1))
+			var exact := true
+			for k in 8:
+				if filled[k] == (k == corner):
+					exact = false
+			if exact:
+				best = TIP_TILES[tip_kind]
 		if layer.get_cell_atlas_coords(cell) != best or layer.get_cell_source_id(cell) != info["source"]:
 			layer.set_cell(cell, info["source"], best)
 			changed += 1
