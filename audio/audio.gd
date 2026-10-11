@@ -124,6 +124,8 @@ const PLANNED: Array[StringName] = [
 	&"interactive/checkpoint",        # a checkpoint being activated (start of its light-up animation)
 	&"collectibles/medkit",
 	&"traps/spikes_hit",             # a spike tile hurting the player, at the tile
+	&"traps/spikes_extend",          # a powered spike layer extending (not at startup), at the middle of its tiles
+	&"traps/spikes_retract",         # a powered spike layer retracting, same place
 	&"ui/menu_open",                  # the pause menu opening
 	&"ui/menu_close",                 # the pause menu closing (resume)
 	&"ui/menu_select",                # a menu button being pressed

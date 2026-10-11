@@ -20,7 +20,7 @@ The atoms. Each can be built from the objects in the Object catalogue (`level-de
 - **Clock**: crusher/arc/cannon/rail bot cycles with `phase_offset`; a motorized see-saw read by an angle sensor produces a square wave **(untested)**.
 
 **Spatial**
-- **Gate**: door, breakable barrier, crust, mirror-shielded beam.
+- **Gate**: door, breakable barrier, crust, mirror-shielded beam, a retractable spike field (a gate that hurts instead of blocking, so it also works on a surf route).
 - **Gap crossing**: catwalk hang, crust bridge, ice raft, slag raft, swing, rail slide, ramp-and-skim, pad.
 - **Keyhole**: a corridor only a crouch/sneak fits, a catwalk only a hang passes, a door you can't hang from.
 - **Weighted lever**: see-saw with a threshold sensor.
@@ -30,6 +30,7 @@ The atoms. Each can be built from the objects in the Object catalogue (`level-de
 - **Telegraphed cycle**: crusher (dwell windows), arc turret glow, rail bot glow, grunt windup.
 - **Time-to-live**: ice (2 s in a beam), metal-on-slag (8 s), flipped crawler (4 s), drop platform (1 s), TIMED hold.
 - **Race**: a TIMED button and a door/route you have to reach before it resets.
+- **Unannounced edge**: a powered spike layer extends with no warning phase, so the telegraph has to be built around it: the player's own action that causes it, a visible bullet or beam on its way, a camera cue, or a place to stand that is never spiked.
 
 **Resource**
 - **A block as tool**: shield, weight, bridge, plug, battery of mass.
@@ -55,6 +56,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 **A6. Arc ricochet.** *Arc turret + mirrors + arc receiver.* The arc is slow (220 px/s) and has finite range (480 px), so the path length matters. It passes enemies and the player's layer, so it can run through a room unseen. *Twists:* two arc receivers on TIMED latches (AND); `phase_offset` to stagger turrets; an arc that fizzles because the path is too long teaches range; water on the route electrifies the pool.
 
 **A7. Shoot-through-a-wall.** *Glass wall + laser receiver on the far side.* Light is visible but unreachable until a door opens or a mirror is repositioned. Same for arcs. Reads well as a puzzle statement ("the receiver is right there").
+
+**A8. Window floor.** *Moving platform with a mirror + laser receiver + inverted spike layer.* The beam sweeps the receiver only as the platform passes (A5), and `hold_time` stretches each pass into a window; the spike field on the route is retracted only while the receiver is lit. The player waits for the platform to come round and crosses before the beam moves on. *Twists:* a longer `hold_time` makes it forgiving; two receivers on two staggered platforms in AND make the window rarer; a glass wall lets the player see the receiver they are waiting on (A7). **(untested)**
 
 ### B. Water, slag and steam
 
@@ -90,6 +93,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 
 **C6. Motor and brake.** *Motorized see-saw + riders.* A heavy enough rider on the high side holds it against the stop. A see-saw that oscillates becomes a moving ramp/bridge the player times, and an angle sensor on it is a clock.
 
+**C7. Plug the plate.** *Weight plate (threshold above the player's own weight) + a block + an inverted spike layer.* A source that is on retracts an inverted layer, so a block left on the plate holds the field open; kicking it off re-arms the spikes on that frame. The player has to bring the block to the plate, then cross. *Twists:* an ice block under a laser makes the window the melt time (A4: about 2 s lit), so the player has to run; metal lasts about 3 s and then pours slag onto the plate; a second plate in AND needs a second block. **(untested)**
+
 ### D. Momentum and the surf
 
 **D1. Banked speed.** *Downhill + flat + speed trap or barrier.* The level is designed so the *only* way to reach 450+ is a particular line (downhill matched, wet floor, a clean landing). *Twists:* a belt against the surfer is a speed tax (or a speed assist); a tilt-mismatched section silently drains speed; a pad on the line launches without a tilt penalty.
@@ -107,6 +112,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 **D7. Bowling lane.** *Grunts, tread crawlers and drillbots (from behind only) along a fast lane.* A chain pays 5/10/20 points within a 2 s window. Drillbots punish approaching from the drill side; mines stop the surf and arm; use a barrier to break the lane at a precise speed. *Twists:* a bowled-over grunt that is mid-windup is still bowled; a lane that bends so one enemy faces you.
 
 **D8. Belt and brake.** *Conveyor running against the surfer + stall gate.* If belt speed ≈ the board's speed, the surf stalls. A powered belt lets a button *change what the run does*: belt off = easy, belt on = need more speed. A speed trap *reads* the surf plus belt ground speed.
+
+**D9. Speed gate.** *Speed trap + inverted spike layer across a surf run.* Crossing the trap's line at 450 or more retracts the field for `hold_time` (5 s); a slower pass leaves the spikes out, and a surfer who rides into them is knocked off the board (a surf ends through `take_hit()`). Where D2 stops a slow player with a door, this punishes them. *Twists:* `require_surfing` so a walker cannot trip it; a `hold_time` short enough that the player has to keep the speed down a long field; a second trap with a higher threshold in AND. **(untested)**
 
 ### E. Traversal and spatial
 
@@ -136,6 +143,10 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 
 **F6. Telegraph reading.** *Arc turret and rail bot glows (0.45 s), grunt windup (amber).* Teaching language: amber = coming, red = live. Use it consistently.
 
+**F7. Safe window.** *TIMED button + inverted spike layer + a corridor.* Pressing the button retracts the field for `duration`; the player crosses before it ends. The spikes extend with no warning and hurt a player still in them at once, so `duration` is the only clock: size it for a real crossing with margin. *Twists:* a second TIMED button midway restarts the countdown for a long corridor (pressing a button again restarts its timer; two buttons are OR, so the field stays open while either is on); a button inside a crouch gap (E4) so the press is the crouch; a TOGGLE button instead lets the player latch it open and puts the question on what else the same source drives. **(untested)**
+
+**F8. Pulse floor.** *Cannon + MOMENTARY bullet target + spike layer.* Each shot holds the target on for its pulse (0.3 s by default), and a `fire_rate` longer than that lets it flicker (F5), so the field is out for a blink every shot and retracted otherwise. The bullet is visible in flight, so it is the telegraph: the spikes extend as it lands. Two cannons on different `fire_rate`s feeding two layers drift in and out of phase, which makes a rhythm the player has to learn (F1). *Twists:* an inverted layer is retracted for a blink and dangerous the rest of the time, which only suits a very short gap; a mirror or barrier in the bullet's path lets the player stop the pulses. **(untested)**
+
 ### G. Enemies as mechanisms
 
 **G1. Boot the mine.** *Mine + grunts.* Kick a mine into a grunt group (a mine that slides faster than 40 into a wall or any enemy detonates; a blast hits everything in 40 px and chains to other mines). *Twists:* a laser arms a mine from far away (arm, never damage); a rail bot overhead killed by a mine blast; mines on both sides of a door.
@@ -158,6 +169,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 
 **H4. Checkpoint-aware design.** *Place checkpoints before expensive resets.* Blocks, doors, basins (fill and crust) and enemies are restored; liquid particles, arcs, bullets and sparks aren't, so avoid designs where success depends on an in-flight particle. A restore always sets dangerous things harmless (mines dormant, grunts recovering, drips restarted).
 
+**H5. Cue the opening.** *Camera cue + inverted spike layer on the same source.* The player presses a button; the field in a far shaft retracts and the camera pans to it, so the new route is visible without a hint sign. The cue plays on the rising edge of its own power and the layer is inverted, so both fire on the same press. Keep the hold short, because the world keeps running and input is not locked. *Twists:* `once` so the pan does not repeat on a TOGGLE button; a cue with `invert` on the same source shows the spikes coming back out, which teaches what the button did; a `delay` lines the pan up with the player leaving a calm spot. **(untested)**
+
 ### I. Full-room recipes (stacks of the above)
 
 **I1. The Foundry.** Metal block on a ledge, laser aimed at it (A3). Block melts and slag pours into a basin (B2). Water from a faucet (button) crusts it, making a bridge and steam. The player crosses the crust, and the steam carries a surfer to the upper ledge (D6) with a speed trap on the final line. Checkpoint before the pour.
@@ -169,5 +182,7 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 **I4. The Gauntlet.** A surf run: downhill, a wet section (B7) to hit 800, a barrier at `break_speed` 700 (D3), a speed trap (D2) whose door is 12 tiles on, a launch to a swing (C4), and a release onto a crust bridge. Gems along the arc as guides. Grunts in the lane for a chain.
 
 **I5. The Lock Box.** Three receivers in AND (laser, arc, bullet target) around one vault door. Laser via a mirror relay (A1), the arc via ricochet (A6) and the cannon bullet via a counter mirror (F4). Each is solvable on its own and then interacts: the arc and the laser share a mirror, so turning it for one breaks the other.
+
+**I6. The Moat.** A spike field fills the floor between two ledges, with a catwalk above it. The no-tool route is the underside hang across the catwalk (E1): always safe and slow. The fast route retracts the field: an ice block on a plate under a laser (C7, A4) gives a melt-timed window, and powered gems wired to the same source appear only while the field is open (H1), so the fast line is marked exactly when it is safe. A speed trap at the far end (D9) can make the run a surf instead. Checkpoint before the plate (H4): the block, plate and sources are restored, and the field follows them.
 
 Reads with: `level-design.md` (every object, surface and interaction the patterns use, and the gaps), `roadmap.md` (planned mechanics that will add primitives), `power.md` (the logic contract behind the logic primitives), `lasers-arcs-mirrors.md`, `liquid-system.md`, `player-surf.md`, `rotating-bodies.md`, `meltable-blocks.md`, `enemies.md`

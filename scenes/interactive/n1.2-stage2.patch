@@ -1,0 +1,205 @@
+diff --git a/docs/hazards-traps.md b/docs/hazards-traps.md
+index 43fb5ba..10a011e 100644
+--- a/docs/hazards-traps.md
++++ b/docs/hazards-traps.md
+@@ -10,8 +10,4 @@ Covers: Sawwheel / Crusher hazards; Cannon / Bullet; Spikes; Powered spike layer
+ 
+ - **Powered spike layer** (`res://scenes/traps/powered_spike_layer.gd` + `powered_spike_layer.tscn`, `class_name PoweredSpikeLayer`, `@tool`, a `TileMapLayer` on `ground_tileset.tres` with a `PowerTarget` child; joins group `"hazard_layer"`): a block of spike tiles that is out or retracted as a whole. Paint spike tiles on it exactly as on the `Ground` layer (atlas source 3, one tile per direction); it needs no other setup. **Powered = out** (drawn and dangerous), **unpowered = hidden** (`visible` off) and skipped by the poll. With no valid source the layer is not driven and stays out, so an unwired layer behaves like spikes painted on the ground; `invert` makes the spikes out while the source is off. `sources` and `invert` are exported on the layer root and `sources` is forwarded to the `PowerTarget` child (a copy, at `_enter_tree()` and whenever the list is edited, as `CameraCue` does); `all_required` stays on the child. A conductor wire attaches at the cell the `PowerTarget` child sits in, so **move that child to the tile the wire should end at** (it starts at the layer origin). Power switches the whole layer, so independent groups of spikes are separate layers; per-spike control would need a node and is not built. **Transitions are instant both ways and there is no warning phase**: extending into a cell the player stands in hurts on that physics frame (the poll's normal rules, so `take_hit()` i-frames still apply), and retracting spares the player on the same frame. `set_powered_initial()` snaps the startup state silently; `set_powered()` plays `traps/spikes_extend` or `traps/spikes_retract` (both in `Audio.PLANNED`) at the middle of the painted cells, and only on a real change. **The poll**: `Player._poll_tile_hazards()` reads the world tilemap, then every node in group `"hazard_layer"` whose `is_hazard_active()` is true, through the same `TileHazards.hit_in_rect()` and `danger_zone()`, and takes the most damaging hit, so the hit rule, knockback, surf ending and `traps/spikes_hit` are unchanged; a layer is found by `has_method("is_hazard_active")`, never by class name. `collision_enabled` is forced off in `_ready()`, so nothing painted on the layer can block, and the layer has no `surface_type`, so it is never ground-like; keeping spikes off the world tilemap also avoids the `_ascending_landing_y()` pitfall above. **Nothing is saved**: the layer is a pure function of its sources (`out` is runtime state, authored state is out), so a restore needs no code here, and the layer follows a source whose restore emits `powered_changed` on a change. Enemies and blocks still ignore spikes. `get_warnings()` is a plain method (`_get_configuration_warnings()` calls it): no `PowerTarget` child, no sources on the layer or the child (fine only with a conductor wire; unwired, the spikes stay out), a tile set without `hazard_damage` custom data.
+ 
+-## Status
+-
+-- **Powered spike layer** (roadmap N1.2): built, not yet confirmed in-editor. Checked headless only: out at startup when unwired, hidden at startup when the source is off, `invert`, extend and retract on edges, a standing player hurt on extend and spared on retract, the plain ground spike unchanged, and the poll with no world tilemap. Not checked: how it looks and feels in a level, the Inspector and its warnings, wiring through a conductor layer (the `PowerTarget` cell), the two sounds (no files yet), a checkpoint restore with a real source, and a layer parented to something that moves.
+-
+ Reads with: `power.md` (cannon, crusher, sawwheel and the spike layer are powered devices), `meltable-blocks.md` (crusher jam and shatter), `player.md` (`take_hit()` and its i-frames), `enemies.md` (the same polling pattern, the mine blast).
+diff --git a/docs/level-design.md b/docs/level-design.md
+index 84d11dd..bd71783 100644
+--- a/docs/level-design.md
++++ b/docs/level-design.md
+@@ -54,7 +54,7 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
+ | **Glass** tile | yes | yes | **passes** | blocks | See through a wall of lasers. |
+ | **Catwalk** tile (or body in group `catwalk`) | one-way (jump up through, stand on top) | yes (side + underside) | **passes** | **passes** (falls through) | Keep on its own tile layer in group `catwalk`. |
+ | **Ladder** tile | none | n/a | passes | passes | Own tilemap layer. |
+-| **Spike** tile | none (hurts) | no | passes | passes | Four orientations. Damage polled every frame. **Can't be powered.** |
++| **Spike** tile | none (hurts) | no | passes | passes | Four orientations. Damage polled every frame. A tile can't be powered: paint it on a **powered spike layer** to switch it. |
+ | **Crust** (basin) | yes, walkable | underside only (over a void) | blocks | blocks | Forms when water meets slag. |
+ | **High-friction / ice tile** (`surf_friction`) | yes | yes | blocks | blocks | Per-tile surf friction multiplier. A tile value above 1 is mud, below 1 is slick. |
+ 
+@@ -160,10 +160,17 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
+ | **Cannon** | See Beams and projectiles | yes |
+ | **Laser/arc turret** | See Beams and projectiles | yes |
+ | **Spike tiles** | Hurt from any side; polled, so you're re-hit after i-frames | **no** (tile) |
++| **Powered spike layer** | The same spikes on a layer that is out or hidden as a whole | yes (powered = out, unpowered = hidden and harmless) |
+ | **Slag** (pool/particles) | Hurts on contact | no (but can be drained/crusted/boiled-not) |
+ | **Electrified water** | Hurts if submerged | no (triggered by sparks/arcs) |
+ | **Grunt hammer / drill / stingers / mine blast / rail bot** | See enemies | rail bot yes |
+ 
++**Powered spike layer.** A `TileMapLayer` of spike tiles (paint them exactly as on the `Ground` layer) that is out or retracted as a whole. **Powered = out** (drawn and dangerous); **unpowered = hidden** and harmless. Wire it like any device: `sources` and `invert` on the root, or end a conductor at its `PowerTarget` child.
++- **Knobs**: `sources`, `invert` (spikes out while the source is off, which is what "a button retracts them" needs). No timing exports: the transition is instant.
++- **Reacts to**: the level of the power state, both edges. Unwired it stays out, so it behaves like spikes on the ground; the startup state snaps with no sound and a restore follows the sources.
++- **Affects**: only the player, through the same hit as any spike (1 damage, knockback away from the tile, i-frames, a surf ends). It has no collision and no `surface_type`, so it blocks nothing and is never ground-like. Enemies and blocks ignore it, as with spike tiles.
++- **Gotchas**: **no warning phase**, so spikes that extend under a player standing in them hurt on that frame, and spikes that retract spare the player the same frame. Show the player what is about to extend (layout, a camera cue on the same source) rather than relying on a telegraph. Power switches the whole layer, so independent groups of spikes are separate layers. **Move the `PowerTarget` child to the tile a conductor wire should end at** (it starts at the layer origin). A retracted layer is invisible, so it hides the route it guards until it is powered; pair it with a hint if the player has to find it.
++
+ **Crusher jam rules.** Metal under the extending spike latches the jam: the arm retreats and parks, the spike is harmless, and the jam stays even if the metal later melts or leaves. A wired crusher is reset by cycling its power; an unwired one stays jammed until reload or checkpoint restore. A block pressed against the arm's *side* doesn't jam it.
+ 
+ ### Enemies
+@@ -227,6 +234,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
+ | Rail bot | running | stops dripping when off, still hurts |
+ | Powered gem | present and collectible | unpowered = hidden |
+ | **Camera cue** | **rising edge = pan the camera to it**, hold, return | startup is not an edge; no input lock |
++| **Powered spike layer** | spikes out | unwired stays out; `invert` retracts on power; instant, no warning |
+ | Finish | optional lock input (see Collectibles, checkpoints, finish) | |
+ 
+ ### Collectibles, checkpoints, finish
+@@ -266,7 +274,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
+ ## Gaps, limits and gotchas
+ 
+ **Things you can't do (yet)**
+-- **Spikes can't be powered** (tiles can't carry a `PowerTarget`). A switchable spike must be a node (e.g. a crusher or sawwheel).
++- **Spikes switch per layer, not per tile**: a tile can't carry a `PowerTarget`, so independent groups of spikes are separate layers, and a spike with its own timing (a warning, a stroke) must be a node (e.g. a crusher or sawwheel).
+ - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
+ - **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
+ - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
+diff --git a/docs/power.md b/docs/power.md
+index 7014beb..271a51d 100644
+--- a/docs/power.md
++++ b/docs/power.md
+@@ -4,7 +4,7 @@ The power contract (`PowerTarget`), the powered devices, every power source (but
+ 
+ Covers: Powered devices; Power contract; Button; Speed trap; Laser receiver; Arc receiver; Bullet target; Weight plate; Angle sensor; Basin sensor; Conductors (Connections; Circuits; Terminals are loose ends; Lit/dim; Editor overlay); Door; Camera cue
+ 
+-- **Powered devices** (each scene has a `PowerTarget` child and an `invert` export on its root; unwired they behave as authored): **laser turret** powered = beam on (`set_enabled`); **arc turret** powered = firing (a rising edge fires one arc at once, see Arc turret); **conveyor** powered = running (`set_enabled`; move the `PowerTarget` along the belt to choose where a wire attaches); **faucet** powered = open (`is_open`; `PowerTarget` at the tile centre); **moving platform** powered = running, unpowered = the tween is paused where it is; **cannon** powered = firing (its `Timer` stops/starts; switching on fires one bullet immediately, via a deferred call, then the `Timer` runs, so the next shot is a full `fire_rate` later; a cannon already powered or unwired at load keeps its ordinary first shot after `fire_rate`); **crusher** powered = cycling, unpowered = it finishes its current leg and parks fully retracted at the start of the retracted dwell (never frozen mid-stroke), resuming from there (a power cycle, off then on, also clears a metal jam: see Sawwheel / Crusher hazards); **sawwheel** powered = spinning and dangerous, unpowered = blade paused, hum stopped, no damage; **jump pad** powered = live, unpowered = inert and dimmed (`modulate`; a pad that becomes live under a player launches on the next entry); **mirror** each rising edge of the final power state turns it one step (`rotate_step(1)`), falling edges do nothing, the startup state is not an edge, and an edge during a turn is ignored like a kick (set `kick_rotates` false on a switch-owned mirror); **see-saw** powered = motorized, unpowered = free (see Rotating bodies); **door** as below; **camera cue** a rising edge pans the camera to it (see Camera cue); **powered spike layer** powered = spikes out (dangerous), unpowered = hidden and harmless, unwired = out (see Powered spike layer in `hazards-traps.md`). All user-verified in-editor except the powered spike layer (see Status in `hazards-traps.md`).
++- **Powered devices** (each scene has a `PowerTarget` child and an `invert` export on its root; unwired they behave as authored): **laser turret** powered = beam on (`set_enabled`); **arc turret** powered = firing (a rising edge fires one arc at once, see Arc turret); **conveyor** powered = running (`set_enabled`; move the `PowerTarget` along the belt to choose where a wire attaches); **faucet** powered = open (`is_open`; `PowerTarget` at the tile centre); **moving platform** powered = running, unpowered = the tween is paused where it is; **cannon** powered = firing (its `Timer` stops/starts; switching on fires one bullet immediately, via a deferred call, then the `Timer` runs, so the next shot is a full `fire_rate` later; a cannon already powered or unwired at load keeps its ordinary first shot after `fire_rate`); **crusher** powered = cycling, unpowered = it finishes its current leg and parks fully retracted at the start of the retracted dwell (never frozen mid-stroke), resuming from there (a power cycle, off then on, also clears a metal jam: see Sawwheel / Crusher hazards); **sawwheel** powered = spinning and dangerous, unpowered = blade paused, hum stopped, no damage; **jump pad** powered = live, unpowered = inert and dimmed (`modulate`; a pad that becomes live under a player launches on the next entry); **mirror** each rising edge of the final power state turns it one step (`rotate_step(1)`), falling edges do nothing, the startup state is not an edge, and an edge during a turn is ignored like a kick (set `kick_rotates` false on a switch-owned mirror); **see-saw** powered = motorized, unpowered = free (see Rotating bodies); **door** as below; **camera cue** a rising edge pans the camera to it (see Camera cue); **powered spike layer** powered = spikes out (dangerous), unpowered = hidden and harmless, unwired = out (see Powered spike layer in `hazards-traps.md`). All user-verified in-editor.
+ - **Power contract** (`res://scenes/interactive/power_target.gd`, `class_name PowerTarget`, `@tool` `Node2D`): duck-typed like `take_hit()`/`get_conveyor_speed()`. A **source** emits `powered_changed(on)` and answers `is_powered()` (`Button` and conductor circuits); a **device** implements `set_powered(on: bool)` and optionally `set_powered_initial(on)`. `PowerTarget` sits between them as a child of the device (`debug_power_target.gd` extends it as a disposable test device to delete once real devices exist): `@export var sources: Array[Node]` (typed node-picker), `invert`, `all_required` (default OR). **Invert** may also be exported on the parent device's root script (`@export var invert: bool`), which puts the toggle in the device's own Inspector; `PowerTarget` reads it from its parent (either one inverts, both set = inverted). `sources` and `all_required` stay on the `PowerTarget` child (Editable Children). **No valid sources = not driven**: the device keeps its authored state, so every device scene carries a `PowerTarget` child and behaves as before until something is wired to it. The first recompute is deferred until every `_ready()` (and the conductor layers' own deferred build) has run, so a device is never driven before it is ready; that first apply, if within `STARTUP_FRAMES` (3) of load, goes to the parent's `set_powered_initial(on)` if it has one (door snaps to its state; mirror records it without counting an edge), else `set_powered(on)`. After that `_apply_power(on)` runs once per actual change (default: forwards to the parent's `set_powered()`; subclasses override it), then `power_changed(on)` is emitted. Joins group `"power_target"`; `add_source(node)` attaches a source at runtime (duplicates ignored). `debug_toggle_key` (default `KEY_NONE`) flips the final state from the keyboard so any device can be triggered remotely while testing; it XORs with the computed state, and an unlinked device starts from unpowered. A `draw_links` editor overlay draws a line from the target to each source, orange when inverted. The cell a conductor wire attaches to is the cell the `PowerTarget` node itself sits in, so inside a multi-tile device the child is moved to the tile the wire should end at.
+ - **Button** (`res://scenes/interactive/button.gd`): `Area2D` power source, joins group `"power_source"`; node origin is the centre of its 16×16 tile. `sprites/button1_<colour>.png` (searched in `sprites/interactive/` then `sprites/`), 16×96 = 6 frames drawn by one `Sprite2D`; frame 5 is the dark resting pad, frame 0 the bright active one, animated at 30 fps and turning around from wherever the frame is. `color` (blue/red/yellow/green) only swaps the art. `latch_mode`: `MOMENTARY` (active while pressed; the player *starting* to crouch while standing on it **cycles** it — off then on again within the same physics frame, so targets see a falling and a rising edge, the pad replays its press animation and both sounds play) `TOGGLE` (flips on the rising edge of "pressed", and also when the player starts crouching while standing on it) or `TIMED` (active for `duration` seconds after a press, `duration` shown in the Inspector only in this mode; a press is the step-on edge or the player starting a crouch on it; pressing again while active restarts the countdown with no `powered_changed`, replaying the press sound and sinking the pad again; standing on it doesn't extend it, and once it runs out a player still standing there needs to step off and on, or crouch, to press it again; the pad's frame sweeps from 0 (bright, sunk) to 5 (dark, risen) across the duration, driven from the remaining fraction through the same 30 fps travel cap as the other modes, so it sinks quickly on a press and then rises slowly, and the pedestal collider follows the frame; a glow strip on the pad pulses at 1.5 Hz and at 5 Hz over the last second, fading out over the last half second). The crouch rules are one action per crouch, and arriving already crouched doesn't count; read through the player's `is_crouching`/`is_on_floor()`, so `player.gd` needed no change. Pressed by the player and any `MeltableBlock`, not enemies or liquid; the sensor strip is polled every physics frame like Sawwheel/Crusher rather than tracking `body_entered`/`exited`, so a block that melts on the pad can't leave it stuck. A child `StaticBody2D` pedestal (layer 2, joins `"water_solid"`, deliberately not `"ground"`/`"catwalk"` so it can't be ledge-grabbed) has a collider whose top follows the middle of the art's oval per frame (`SURFACE_TOP_PX`), resized on a per-instance shape. Sounds `interactive/button_press`/`interactive/button_release` follow `active`.
+ - **Speed trap** (`res://scenes/interactive/speed_trap.gd` + `speed_trap.tscn`, `@tool`): a speed camera as a power **source** in the same contract as `Button` (`Area2D`, group `"power_source"`, `is_powered()`, `powered_changed(on)`, so a `PowerTarget` picks it in `sources` and a conductor wire attaches to it by adjacency). The node origin is the centre of a 16×16 tile (the cell a conductor files it under); the sensor strip is the vertical line at the origin's x, from that tile's bottom edge (the floor) up `strip_height` px (default 32), with a camera on a post beside it (`post_side`, left or right) and a three-digit screen. The `Area2D` has no layers and monitoring off; its `CollisionShape2D` (resized per instance from `strip_height`) only shows the strip in the editor, because a 600 px/s surf moves 10 px a frame and would step over a thin overlap. **Crossing**: each physics frame it takes the sign of the player's x relative to the line; a change of sign between two frames, with the player's collider overlapping the strip's height and a step of at most `MAX_CROSS_STEP` (48 px, so a teleport or respawn isn't a crossing), is a read, in either direction; standing in the strip does nothing, and a frame exactly on the line waits for the next. **Read**: `require_surfing` (default on) reads a surfing player only, through `get_surf_speed()` (the board's ground speed, or the horizontal speed it carries in the air), and ignores any other crossing entirely (no flash, no reading), so a pad launch or a swing release can't trigger it; with it off the reading is the player's `|velocity.x|`. A dead or dancing player is ignored. The reading is `floor(speed * display_scale)` (default 0.1, clamped to 999) and the pass test is `speed >= threshold_speed` (default 450): pick a threshold whose product with `display_scale` is whole, so a passing speed never displays below the limit. A pass powers the trap for `hold_time` seconds (default 5; 0 = latched until the level is reset), restarts the countdown if already powered (no new edge), and shows the reading in green; a failed pass shows its reading in red and changes nothing else. The flash is a brief expanding ring and glow at the lens (`FLASH_TIME` 0.18 s), not a full-screen effect. Placeholder art is drawn in code (seven-segment digits with faint unlit segments, dashes before any reading, a green screen edge and a one-pixel drain bar while powered with a timed hold, a status LED; in the editor the screen previews the threshold); the node must not be rotated. Saveable: `powered`, `time_left`, `reading`, `passed`; `load_state()` snaps silently, resets the crossing memory and emits `powered_changed` only if `powered` changed. Sounds `interactive/speed_trap_flash` (every read), `interactive/speed_trap_pass` and `interactive/speed_trap_fail` are in `Audio.PLANNED`. Place it before the Player in the tree so the player draws in front.
+diff --git a/docs/puzzles.md b/docs/puzzles.md
+index 727c197..52bfb5a 100644
+--- a/docs/puzzles.md
++++ b/docs/puzzles.md
+@@ -20,7 +20,7 @@ The atoms. Each can be built from the objects in the Object catalogue (`level-de
+ - **Clock**: crusher/arc/cannon/rail bot cycles with `phase_offset`; a motorized see-saw read by an angle sensor produces a square wave **(untested)**.
+ 
+ **Spatial**
+-- **Gate**: door, breakable barrier, crust, mirror-shielded beam.
++- **Gate**: door, breakable barrier, crust, mirror-shielded beam, a retractable spike field (a gate that hurts instead of blocking, so it also works on a surf route).
+ - **Gap crossing**: catwalk hang, crust bridge, ice raft, slag raft, swing, rail slide, ramp-and-skim, pad.
+ - **Keyhole**: a corridor only a crouch/sneak fits, a catwalk only a hang passes, a door you can't hang from.
+ - **Weighted lever**: see-saw with a threshold sensor.
+@@ -30,6 +30,7 @@ The atoms. Each can be built from the objects in the Object catalogue (`level-de
+ - **Telegraphed cycle**: crusher (dwell windows), arc turret glow, rail bot glow, grunt windup.
+ - **Time-to-live**: ice (2 s in a beam), metal-on-slag (8 s), flipped crawler (4 s), drop platform (1 s), TIMED hold.
+ - **Race**: a TIMED button and a door/route you have to reach before it resets.
++- **Unannounced edge**: a powered spike layer extends with no warning phase, so the telegraph has to be built around it: the player's own action that causes it, a visible bullet or beam on its way, a camera cue, or a place to stand that is never spiked.
+ 
+ **Resource**
+ - **A block as tool**: shield, weight, bridge, plug, battery of mass.
+@@ -56,6 +57,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
+ 
+ **A7. Shoot-through-a-wall.** *Glass wall + laser receiver on the far side.* Light is visible but unreachable until a door opens or a mirror is repositioned. Same for arcs. Reads well as a puzzle statement ("the receiver is right there").
+ 
++**A8. Window floor.** *Moving platform with a mirror + laser receiver + inverted spike layer.* The beam sweeps the receiver only as the platform passes (A5), and `hold_time` stretches each pass into a window; the spike field on the route is retracted only while the receiver is lit. The player waits for the platform to come round and crosses before the beam moves on. *Twists:* a longer `hold_time` makes it forgiving; two receivers on two staggered platforms in AND make the window rarer; a glass wall lets the player see the receiver they are waiting on (A7). **(untested)**
++
+ ### B. Water, slag and steam
+ 
+ **B1. Float up.** *Faucet + basin + ice block + a ledge above.* Fill the basin to float the block up to the ledge. Ice floats at about 80% submerged and follows the rising surface (even with riders). *Twists:* a metal block sinks, so it must be carried another way; `rest_fraction` past 1.0 means too heavy (a big block with riders sinks); a basin sensor opens a door at 50% fill and a drain brings the level back; riders are limited by `rider_load_tiles`.
+@@ -90,6 +93,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
+ 
+ **C6. Motor and brake.** *Motorized see-saw + riders.* A heavy enough rider on the high side holds it against the stop. A see-saw that oscillates becomes a moving ramp/bridge the player times, and an angle sensor on it is a clock.
+ 
++**C7. Plug the plate.** *Weight plate (threshold above the player's own weight) + a block + an inverted spike layer.* A source that is on retracts an inverted layer, so a block left on the plate holds the field open; kicking it off re-arms the spikes on that frame. The player has to bring the block to the plate, then cross. *Twists:* an ice block under a laser makes the window the melt time (A4: about 2 s lit), so the player has to run; metal lasts about 3 s and then pours slag onto the plate; a second plate in AND needs a second block. **(untested)**
++
+ ### D. Momentum and the surf
+ 
+ **D1. Banked speed.** *Downhill + flat + speed trap or barrier.* The level is designed so the *only* way to reach 450+ is a particular line (downhill matched, wet floor, a clean landing). *Twists:* a belt against the surfer is a speed tax (or a speed assist); a tilt-mismatched section silently drains speed; a pad on the line launches without a tilt penalty.
+@@ -108,6 +113,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
+ 
+ **D8. Belt and brake.** *Conveyor running against the surfer + stall gate.* If belt speed ≈ the board's speed, the surf stalls. A powered belt lets a button *change what the run does*: belt off = easy, belt on = need more speed. A speed trap *reads* the surf plus belt ground speed.
+ 
++**D9. Speed gate.** *Speed trap + inverted spike layer across a surf run.* Crossing the trap's line at 450 or more retracts the field for `hold_time` (5 s); a slower pass leaves the spikes out, and a surfer who rides into them is knocked off the board (a surf ends through `take_hit()`). Where D2 stops a slow player with a door, this punishes them. *Twists:* `require_surfing` so a walker cannot trip it; a `hold_time` short enough that the player has to keep the speed down a long field; a second trap with a higher threshold in AND. **(untested)**
++
+ ### E. Traversal and spatial
+ 
+ **E1. Underside route.** *Catwalk (own layer) over spikes or slag.* The player hangs by crouch+jump from standing on the catwalk (or jumps up into it), brachiates across, and mantles at the end. A ladder cell in the path hands off to a climb. *Twists:* the catwalk ends and the player must swing/jump; terrain under the catwalk blocks brachiating; a crust underside as the continuation.
+@@ -136,6 +143,10 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
+ 
+ **F6. Telegraph reading.** *Arc turret and rail bot glows (0.45 s), grunt windup (amber).* Teaching language: amber = coming, red = live. Use it consistently.
+ 
++**F7. Safe window.** *TIMED button + inverted spike layer + a corridor.* Pressing the button retracts the field for `duration`; the player crosses before it ends. The spikes extend with no warning and hurt a player still in them at once, so `duration` is the only clock: size it for a real crossing with margin. *Twists:* a second TIMED button midway restarts the countdown for a long corridor (pressing a button again restarts its timer; two buttons are OR, so the field stays open while either is on); a button inside a crouch gap (E4) so the press is the crouch; a TOGGLE button instead lets the player latch it open and puts the question on what else the same source drives. **(untested)**
++
++**F8. Pulse floor.** *Cannon + MOMENTARY bullet target + spike layer.* Each shot holds the target on for its pulse (0.3 s by default), and a `fire_rate` longer than that lets it flicker (F5), so the field is out for a blink every shot and retracted otherwise. The bullet is visible in flight, so it is the telegraph: the spikes extend as it lands. Two cannons on different `fire_rate`s feeding two layers drift in and out of phase, which makes a rhythm the player has to learn (F1). *Twists:* an inverted layer is retracted for a blink and dangerous the rest of the time, which only suits a very short gap; a mirror or barrier in the bullet's path lets the player stop the pulses. **(untested)**
++
+ ### G. Enemies as mechanisms
+ 
+ **G1. Boot the mine.** *Mine + grunts.* Kick a mine into a grunt group (a mine that slides faster than 40 into a wall or any enemy detonates; a blast hits everything in 40 px and chains to other mines). *Twists:* a laser arms a mine from far away (arm, never damage); a rail bot overhead killed by a mine blast; mines on both sides of a door.
+@@ -158,6 +169,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
+ 
+ **H4. Checkpoint-aware design.** *Place checkpoints before expensive resets.* Blocks, doors, basins (fill and crust) and enemies are restored; liquid particles, arcs, bullets and sparks aren't, so avoid designs where success depends on an in-flight particle. A restore always sets dangerous things harmless (mines dormant, grunts recovering, drips restarted).
+ 
++**H5. Cue the opening.** *Camera cue + inverted spike layer on the same source.* The player presses a button; the field in a far shaft retracts and the camera pans to it, so the new route is visible without a hint sign. The cue plays on the rising edge of its own power and the layer is inverted, so both fire on the same press. Keep the hold short, because the world keeps running and input is not locked. *Twists:* `once` so the pan does not repeat on a TOGGLE button; a cue with `invert` on the same source shows the spikes coming back out, which teaches what the button did; a `delay` lines the pan up with the player leaving a calm spot. **(untested)**
++
+ ### I. Full-room recipes (stacks of the above)
+ 
+ **I1. The Foundry.** Metal block on a ledge, laser aimed at it (A3). Block melts and slag pours into a basin (B2). Water from a faucet (button) crusts it, making a bridge and steam. The player crosses the crust, and the steam carries a surfer to the upper ledge (D6) with a speed trap on the final line. Checkpoint before the pour.
+@@ -170,4 +183,6 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
+ 
+ **I5. The Lock Box.** Three receivers in AND (laser, arc, bullet target) around one vault door. Laser via a mirror relay (A1), the arc via ricochet (A6) and the cannon bullet via a counter mirror (F4). Each is solvable on its own and then interacts: the arc and the laser share a mirror, so turning it for one breaks the other.
+ 
++**I6. The Moat.** A spike field fills the floor between two ledges, with a catwalk above it. The no-tool route is the underside hang across the catwalk (E1): always safe and slow. The fast route retracts the field: an ice block on a plate under a laser (C7, A4) gives a melt-timed window, and powered gems wired to the same source appear only while the field is open (H1), so the fast line is marked exactly when it is safe. A speed trap at the far end (D9) can make the run a surf instead. Checkpoint before the plate (H4): the block, plate and sources are restored, and the field follows them.
++
+ Reads with: `level-design.md` (every object, surface and interaction the patterns use, and the gaps), `roadmap.md` (planned mechanics that will add primitives), `power.md` (the logic contract behind the logic primitives), `lasers-arcs-mirrors.md`, `liquid-system.md`, `player-surf.md`, `rotating-bodies.md`, `meltable-blocks.md`, `enemies.md`
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 0e989bc..971f760 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -2,7 +2,7 @@
+ 
+ Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
+ 
+-Covers: Phase 1 (Quick wins: Powered spikes; Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
++Covers: Phase 1 (Quick wins: Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+ 
+ **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
+ 
+@@ -14,22 +14,10 @@ Covers: Phase 1 (Quick wins: Powered spikes; Zone sensor; Mirror reverse mode; E
+ 
+ ## Ordering
+ 
+-Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: new sources, one new hazard layer and two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
++Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: a new source and two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
+ 
+ ## Phase 1: Quick wins
+ 
+-### N1.2 Powered spikes (S to M)
+-
+-Built, awaiting in-editor confirmation; see Status in hazards-traps.md. Decided for v1: no `warn_time` telegraph (instant both ways), a retracted layer is fully hidden, and spikes that extend onto the player hurt at once.
+-
+-**Gap.** Spike tiles carry no `PowerTarget`, so a retractable spike trap is impossible. This is the most standard trap the game cannot make.
+-
+-**Sketch.** A `PoweredSpikeLayer`: a `TileMapLayer` on the ground tileset in a new group `"hazard_layer"`, no collision, with a `PowerTarget` child and an `invert` export. Powered means the spikes are out and dangerous; unpowered means the layer is hidden and skipped. The player's tile-hazard poll runs over every layer in the group as well as the world tilemap, through the same `TileHazards.hit_in_rect()` and `danger_zone()`, so the hit rule, knockback and sound are unchanged. Power switches the whole layer, so independent groups are separate layers; per-spike control would need a node and is out of scope. Optionally a short harmless rising phase before the layer turns dangerous, as a telegraph, with `warn_time` an export.
+-
+-**Rules to keep.** Spikes stay on a layer with no collision and no `surface_type`, so they are never ground-like. Putting them on their own layer also avoids the `_ascending_landing_y()` pitfall (it treats any painted world-tilemap cell as floor). Add the group to Groups in use in `objon.md`. The layer keeps no state: it derives from power through `set_powered_initial()`, so it has no `save_state()`. Move the `PowerTarget` to the cell a conductor wire should end at.
+-
+-**Touches.** `hazards-traps.md` (Spikes), `power.md` (Powered devices), `player.md` (the poll sits next to Health / Hurt / Dead).
+-
+ ### N1.3 Zone sensor (S)
+ 
+ **Gap.** There is no "something is in this area" power source. It would give a door that shuts behind the player, an ambush trigger, and a lure puzzle where an enemy stands in the zone.
+@@ -120,4 +108,4 @@ The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single
+ 
+ Known weak spots in existing behaviour, listed here so nobody mistakes them for planned features: the Stingbot has no obstacle avoidance and can stick on a wall, and the proximity mine's blast has no line-of-sight test (both in `enemies.md`).
+ 
+-Reads with: `player.md` (hazard poll, launch), `power.md` (sources, devices and the contract most items extend), `hazards-traps.md` (spikes), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)
++Reads with: `player.md` (launch), `power.md` (sources, devices and the contract most items extend), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)
+diff --git a/objon.md b/objon.md
+index fa84f5a..0ea3146 100644
+--- a/objon.md
++++ b/objon.md
+@@ -38,7 +38,7 @@ Read this file in full, then **only the topic files for what you are changing**.
+ - `docs/saving-levels-ui.md`: Checkpoints and save/restore, level loading, finish, pause menu, touch controls, HUD, collectibles, backdrop. Names: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Finish; Health bar; Level-complete overlay; Pause menu; Touch controls; Checkpoint and save/restore.
+ - `docs/level-design.md`: The designer's reference: what the game can do now, as a summary with numbers and gotchas (the topic files hold the detail). Names: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms, belts, pads, rails, barriers; Rotating bodies: see-saw and swing; Blocks: ice and metal; Liquids: water, slag, steam; Beams and projectiles: laser, arc, cannon, mirror; Hazards; Enemies; Power: sources, wiring, devices; Collectibles, checkpoints, finish); Interaction matrix; Gaps, limits and gotchas.
+ - `docs/puzzles.md`: Puzzle primitives and puzzle concepts (design proposals built from the objects in `docs/level-design.md`; not playtested until marked otherwise). Names: Puzzle primitives (Logic; Spatial; Timing; Resource); Puzzle concepts (A. Light, mirrors and receivers; B. Water, slag and steam; C. Weight, balance and swinging; D. Momentum and the surf; E. Traversal and spatial; F. Timing, rhythm and traps; G. Enemies as mechanisms; H. Information, routing and pacing; I. Full-room recipes).
+-- `docs/roadmap.md`: Planned mechanics, in phases (the one file about unbuilt work; read it when choosing or starting a new mechanic, not for how the game works now). Names: Phase 1 (Quick wins: Powered spikes; Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap.
++- `docs/roadmap.md`: Planned mechanics, in phases (the one file about unbuilt work; read it when choosing or starting a new mechanic, not for how the game works now). Names: Phase 1 (Quick wins: Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap.
+ - `docs/water-mechanic.md`: Full liquid reference (data model, API, every constant); read only for deep liquid changes.
+ - `export-audit.md` and `audit_export_writes.py` (project root): the export-write audit log and its scan.
+ 

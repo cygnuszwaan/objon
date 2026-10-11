@@ -1,0 +1,13 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scenes/traps/powered_spike_layer.gd" id="1_layer"]
+[ext_resource type="TileSet" path="res://resources/ground_tileset.tres" id="2_tiles"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="3_target"]
+
+[node name="PoweredSpikeLayer" type="TileMapLayer"]
+tile_set = ExtResource("2_tiles")
+collision_enabled = false
+script = ExtResource("1_layer")
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("3_target")

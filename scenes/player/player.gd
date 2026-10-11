@@ -1208,12 +1208,18 @@ func _water_push_speed() -> float:
 # in them is hurt again once the i-frames end. take_hit() does everything else (knockback away from the tile's
 # side, ending a surf, death), so the surf needs no spike code.
 func _poll_tile_hazards() -> void:
-	if world_tilemap == null:
-		return
 	var size := Vector2(_shape_width(collision_shape.shape), _shape_height(collision_shape.shape))
 	if absf(sin(collision_shape.rotation)) > 0.5:
 		size = Vector2(size.y, size.x)  # the swim pose lies the collider on its side
-	var hit := TileHazards.hit_in_rect(world_tilemap, Rect2(collision_shape.global_position - size * 0.5, size))
+	var rect := Rect2(collision_shape.global_position - size * 0.5, size)
+	var hit := TileHazards.hit_in_rect(world_tilemap, rect)
+	# Switchable spike layers (roadmap N1.2): every layer in the group, skipped while its spikes are retracted.
+	for layer in get_tree().get_nodes_in_group(&"hazard_layer"):
+		if not layer is TileMapLayer or not layer.has_method("is_hazard_active") or not layer.is_hazard_active():
+			continue
+		var layer_hit := TileHazards.hit_in_rect(layer, rect)
+		if not layer_hit.is_empty() and (hit.is_empty() or int(layer_hit["damage"]) > int(hit["damage"])):
+			hit = layer_hit
 	if hit.is_empty():
 		return
 	if take_hit(int(hit["damage"]), hit["position"]):

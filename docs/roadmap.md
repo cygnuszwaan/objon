@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 1 (Quick wins: Powered spikes; Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 1 (Quick wins: Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,19 +14,9 @@ Covers: Phase 1 (Quick wins: Powered spikes; Zone sensor; Mirror reverse mode; E
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: new sources, one new hazard layer and two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
+Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: a new source and two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
 
 ## Phase 1: Quick wins
-
-### N1.2 Powered spikes (S to M)
-
-**Gap.** Spike tiles carry no `PowerTarget`, so a retractable spike trap is impossible. This is the most standard trap the game cannot make.
-
-**Sketch.** A `PoweredSpikeLayer`: a `TileMapLayer` on the ground tileset in a new group `"hazard_layer"`, no collision, with a `PowerTarget` child and an `invert` export. Powered means the spikes are out and dangerous; unpowered means the layer is hidden and skipped. The player's tile-hazard poll runs over every layer in the group as well as the world tilemap, through the same `TileHazards.hit_in_rect()` and `danger_zone()`, so the hit rule, knockback and sound are unchanged. Power switches the whole layer, so independent groups are separate layers; per-spike control would need a node and is out of scope. Optionally a short harmless rising phase before the layer turns dangerous, as a telegraph, with `warn_time` an export.
-
-**Rules to keep.** Spikes stay on a layer with no collision and no `surface_type`, so they are never ground-like. Putting them on their own layer also avoids the `_ascending_landing_y()` pitfall (it treats any painted world-tilemap cell as floor). Add the group to Groups in use in `objon.md`. The layer keeps no state: it derives from power through `set_powered_initial()`, so it has no `save_state()`. Move the `PowerTarget` to the cell a conductor wire should end at.
-
-**Touches.** `hazards-traps.md` (Spikes), `power.md` (Powered devices), `player.md` (the poll sits next to Health / Hurt / Dead).
 
 ### N1.3 Zone sensor (S)
 
@@ -118,4 +108,4 @@ The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single 
 
 Known weak spots in existing behaviour, listed here so nobody mistakes them for planned features: the Stingbot has no obstacle avoidance and can stick on a wall, and the proximity mine's blast has no line-of-sight test (both in `enemies.md`).
 
-Reads with: `player.md` (hazard poll, launch), `power.md` (sources, devices and the contract most items extend), `hazards-traps.md` (spikes), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)
+Reads with: `player.md` (launch), `power.md` (sources, devices and the contract most items extend), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)

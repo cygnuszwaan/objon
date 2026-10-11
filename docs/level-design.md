@@ -54,7 +54,7 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 | **Glass** tile | yes | yes | **passes** | blocks | See through a wall of lasers. |
 | **Catwalk** tile (or body in group `catwalk`) | one-way (jump up through, stand on top) | yes (side + underside) | **passes** | **passes** (falls through) | Keep on its own tile layer in group `catwalk`. |
 | **Ladder** tile | none | n/a | passes | passes | Own tilemap layer. |
-| **Spike** tile | none (hurts) | no | passes | passes | Four orientations. Damage polled every frame. **Can't be powered.** |
+| **Spike** tile | none (hurts) | no | passes | passes | Four orientations. Damage polled every frame. A tile can't be powered: paint it on a **powered spike layer** to switch it. |
 | **Crust** (basin) | yes, walkable | underside only (over a void) | blocks | blocks | Forms when water meets slag. |
 | **High-friction / ice tile** (`surf_friction`) | yes | yes | blocks | blocks | Per-tile surf friction multiplier. A tile value above 1 is mud, below 1 is slick. |
 
@@ -160,9 +160,16 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | **Cannon** | See Beams and projectiles | yes |
 | **Laser/arc turret** | See Beams and projectiles | yes |
 | **Spike tiles** | Hurt from any side; polled, so you're re-hit after i-frames | **no** (tile) |
+| **Powered spike layer** | The same spikes on a layer that is out or hidden as a whole | yes (powered = out, unpowered = hidden and harmless) |
 | **Slag** (pool/particles) | Hurts on contact | no (but can be drained/crusted/boiled-not) |
 | **Electrified water** | Hurts if submerged | no (triggered by sparks/arcs) |
 | **Grunt hammer / drill / stingers / mine blast / rail bot** | See enemies | rail bot yes |
+
+**Powered spike layer.** A `TileMapLayer` of spike tiles (paint them exactly as on the `Ground` layer) that is out or retracted as a whole. **Powered = out** (drawn and dangerous); **unpowered = hidden** and harmless. Wire it like any device: `sources` and `invert` on the root, or end a conductor at its `PowerTarget` child.
+- **Knobs**: `sources`, `invert` (spikes out while the source is off, which is what "a button retracts them" needs). No timing exports: the transition is instant.
+- **Reacts to**: the level of the power state, both edges. Unwired it stays out, so it behaves like spikes on the ground; the startup state snaps with no sound and a restore follows the sources.
+- **Affects**: only the player, through the same hit as any spike (1 damage, knockback away from the tile, i-frames, a surf ends). It has no collision and no `surface_type`, so it blocks nothing and is never ground-like. Enemies and blocks ignore it, as with spike tiles.
+- **Gotchas**: **no warning phase**, so spikes that extend under a player standing in them hurt on that frame, and spikes that retract spare the player the same frame. Show the player what is about to extend (layout, a camera cue on the same source) rather than relying on a telegraph. Power switches the whole layer, so independent groups of spikes are separate layers. **Move the `PowerTarget` child to the tile a conductor wire should end at** (it starts at the layer origin). A retracted layer is invisible, so it hides the route it guards until it is powered; pair it with a hint if the player has to find it.
 
 **Crusher jam rules.** Metal under the extending spike latches the jam: the arm retreats and parks, the spike is harmless, and the jam stays even if the metal later melts or leaves. A wired crusher is reset by cycling its power; an unwired one stays jammed until reload or checkpoint restore. A block pressed against the arm's *side* doesn't jam it.
 
@@ -227,6 +234,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | Rail bot | running | stops dripping when off, still hurts |
 | Powered gem | present and collectible | unpowered = hidden |
 | **Camera cue** | **rising edge = pan the camera to it**, hold, return | startup is not an edge; no input lock |
+| **Powered spike layer** | spikes out | unwired stays out; `invert` retracts on power; instant, no warning |
 | Finish | optional lock input (see Collectibles, checkpoints, finish) | |
 
 ### Collectibles, checkpoints, finish
@@ -266,7 +274,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 ## Gaps, limits and gotchas
 
 **Things you can't do (yet)**
-- **Spikes can't be powered** (tiles can't carry a `PowerTarget`). A switchable spike must be a node (e.g. a crusher or sawwheel).
+- **Spikes switch per layer, not per tile**: a tile can't carry a `PowerTarget`, so independent groups of spikes are separate layers, and a spike with its own timing (a warning, a stroke) must be a node (e.g. a crusher or sawwheel).
 - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
 - **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
