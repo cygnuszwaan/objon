@@ -220,7 +220,6 @@ var _debug_hang_corner: Vector2 = Vector2.ZERO
 @export var hang_forward_probe: float = 10.0     # how far ahead (at hand height) must be clear, and how far the wall/corner-finding rays sweep
 @export var hang_probe_rise: float = 6.0         # slight upward tilt on the forward clearance probe, like the original's diagonal ray
 @export var hang_headroom_check: float = 20.0    # how far up from the ledge point must be clear
-@export var hang_wall_probe_margin: float = 6.0  # how far behind the wall the corner-finding ray starts, to guarantee it actually crosses the wall face
 @export var hang_top_probe_margin: float = 8.0   # how far below hand height the corner-finding ray sweeps, to guarantee it actually crosses the ledge top
 @export var hang_hand_local_offset: Vector2 = Vector2(3.0, -7.0)
 	# measured from the "hang" sprite frame (16x16, AnimatedSprite2D "Centered" pivot assumed):
@@ -653,8 +652,8 @@ func _physics_process(delta: float) -> void:
 					velocity.y = 0.0
 					velocity.x = 0.0
 					_skip_buffered_jump = true
-			elif Input.is_action_just_pressed("climb_up"):
-				_begin_mantle()
+			elif Input.is_action_just_pressed("climb_up") or (hang_style == HangStyle.LEDGE and Input.is_action_just_pressed("move_right" if hang_facing > 0.0 else "move_left")):
+				_begin_mantle()  # a ledge hang also mantles on a fresh press toward the wall; holding it through the grab does not
 			elif hang_style == HangStyle.CATWALK_UNDER:
 				_update_brachiate(input_dir, delta)
 	elif is_swimming:
@@ -1610,27 +1609,25 @@ func _compute_hang_probes(facing: float) -> Dictionary:
 	}
 
 func _find_ledge_corner(facing: float) -> Vector2:
-	# locates the actual physical ledge corner (wall face x, ledge top y), rather than just
-	# using wherever move_and_slide happened to leave the body — this is what makes the hang
-	# position precise instead of a rough guess.
+	# locates the physical ledge corner (wall face x, ledge top y) for the hang position, rather than just
+	# using wherever move_and_slide happened to leave the body: the ledge top comes from a ray, the wall face
+	# from the body's own contact with the wall (see below).
 	#
 	# Returns Vector2.INF (check with is_finite()) when no ledge top is found within reach.
-	# The caller must NOT grab in that case. This used to fall back to "assume the ledge top is at
-	# hand height", which produced the floating-hang bug: if the body's feet were brushing the top
-	# corner of a wall, the real ledge top was 8-15px BELOW the hand — beyond the top ray's reach —
-	# so the ray missed, the fallback put the anchor at hand height, and the player latched onto
-	# empty air nearly a tile above the actual edge. (The wall-face x below still has an
-	# extrapolated fallback; that one is load-bearing for the tuned hang_grip_inset /
-	# mantle_offset.x values, so it is intentionally left alone.)
+	# The caller must NOT grab in that case. (Falling back to "assume the ledge top is at hand height" put the
+	# anchor on empty air nearly a tile above the actual edge whenever the body's feet were brushing the top
+	# corner of a wall, so the real ledge top sat 8-15px below the hand, beyond the top ray's reach.)
 	var space_state := get_world_2d().direct_space_state
 	var hand_pos := global_position + Vector2(0.0, hang_hand_local_offset.y)
 
-	# find the wall's face: sweep from behind the wall, at hand height, toward the facing direction
-	var wall_from := hand_pos - Vector2(facing * hang_wall_probe_margin, 0.0)
-	var wall_to := hand_pos + Vector2(facing * hang_forward_probe, 0.0)
-	var wall_query := PhysicsRayQueryParameters2D.create(wall_from, wall_to, hang_probe_mask, [self])
-	var wall_hit := space_state.intersect_ray(wall_query)
-	var wall_face_x: float = wall_hit.position.x if wall_hit else (hand_pos.x + facing * hang_forward_probe)
+	# The wall-face x is hand_pos.x + facing * hang_forward_probe: the grab only runs while the body is in contact with the
+	# wall (is_on_wall()), so the player is already flush against it and the hang keeps the player's x. hang_grip_inset and
+	# hang_hand_local_offset are tuned against exactly this value. A ray at hand height must not replace it: the hand is
+	# within a pixel of the ledge top at the jump apex, so whether such a ray hits the wall at all depends on which side of the
+	# top the hand is on, and a hit gives the true face, 8 px nearer than this value for a flush player, which shoved the
+	# player off the wall and left the hands on air (it also reads a face that leans away as farther than the body that is
+	# touching it lower down).
+	var wall_face_x: float = hand_pos.x + facing * hang_forward_probe
 
 	# find the ledge's top surface: sweep down from above it, at the far-side probe x
 	var probe_x := hand_pos.x + facing * hang_forward_probe

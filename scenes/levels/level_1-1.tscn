@@ -54,7 +54,7 @@ kill_y = 1024.0
 
 [node name="Player" parent="." unique_id=61703917 instance=ExtResource("8_y0ep0")]
 z_index = 1
-position = Vector2(1000, 908)
+position = Vector2(616, 468)
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 
