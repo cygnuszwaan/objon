@@ -203,6 +203,12 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 
 **Wiring.** Two ways: pick sources per device in the inspector, or paint **conductor** tiles (Red/Yellow/Green/Blue layers, colour is art only). Pieces: straights, corners, Ts, four-way junctions; same-layer crossings are junctions, different-colour layers cross freely. A wire's open end that doesn't meet a matching edge is a **terminal**: the device in the cell beyond it attaches. Lit/dim art tells you the state. Built once at load (painted tiles don't rewire at runtime).
 
+**Camera cue.** A `Node2D` placed at the point to look at (no collision, no art at run time). A rising edge pans the camera there, holds, and eases back, so a trigger that works off-screen (a button, a receiver behind a wall) shows its effect. Wire it like any device: `sources` and `invert` on the root, or end a conductor at its `PowerTarget` child.
+- **Knobs**: `pan_time` 0.6 s, `hold_time` 1.5 s, `return_time` 0.6 s, `delay` (seconds from the edge to the start of the pan; use it to line a door's opening up with the camera arriving), `once`, `cooldown`, `ease_curve` (LINEAR / SINE / CUBIC), `show_view_rect` (editor overlay of the 32×18-tile view centred on the cue). `play()` is callable from a script.
+- **Reacts to**: rising edges only. A falling edge does nothing, and the startup state and a checkpoint restore never cue. An edge during a pending `delay` is ignored; an edge during a cue restarts it, and cues never queue (a second cue replaces the first).
+- **Affects**: only the camera. The cue's position is read every frame, so one parented to a moving platform is tracked. The world keeps running.
+- **Gotchas**: **input is not locked**, so the player can move, surf and be hit while the camera is elsewhere; a damaging hit or the win dance cuts the cue short, and a jump pad launch or stomp bounce does not. Keep holds short and trigger cues from calm moments (a button press, not a speed trap). `once` is saved, so a restore after the cue does not replay it. Nothing plays while the player is dead or dancing.
+
 **Powered devices**
 
 | Device | Powered means | Quirk |
@@ -220,6 +226,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | See-saw / Swing | motor on | |
 | Rail bot | running | stops dripping when off, still hurts |
 | Powered gem | present and collectible | unpowered = hidden |
+| **Camera cue** | **rising edge = pan the camera to it**, hold, return | startup is not an edge; no input lock |
 | Finish | optional lock input (see Collectibles, checkpoints, finish) | |
 
 ### Collectibles, checkpoints, finish

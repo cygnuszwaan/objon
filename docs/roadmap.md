@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 1 (Quick wins: Camera cue; Powered spikes; Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 1 (Quick wins: Powered spikes; Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,30 +14,9 @@ Covers: Phase 1 (Quick wins: Camera cue; Powered spikes; Zone sensor; Mirror rev
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: new sources, one new hazard layer, two small exports, and a camera term in the player's existing camera easing, so each item can ship alone. The camera cue is first because it helps every level built after it. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies; the camera cue's `delay` lines up neatly with the Delay logic node (N2.1) but does not need it.
+Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: new sources, one new hazard layer and two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
 
 ## Phase 1: Quick wins
-
-### N1.1 Camera cue (M)
-
-Built, awaiting in-editor confirmation; see Status in power.md.
-
-**Gap.** When a trigger works somewhere off-screen (a button opens a door two screens away, a receiver lights up behind a wall), the player gets no feedback. A cue pans the camera to the affected spot, holds, and returns to the player, so the effect of a trigger is shown for a moment. It is also a level-design tool in its own right: it lets a puzzle be readable without a hint sign.
-
-**Sketch.** A `CameraCue`: a `Node2D` placed at the point to look at, with a `PowerTarget` child and an `invert` export, so any source or conductor circuit can drive it. A **rising edge** plays the cue. The startup state is not an edge (it goes through `set_powered_initial()`, which does nothing), so a level that loads with the source already on does not cue, which is also what a checkpoint restore needs. Exports: `pan_time` (default 0.6 s), `hold_time` (1.5 s), `return_time` (0.6 s), `delay` (seconds from the edge to the start of the pan, so a door's opening can be lined up with the camera arriving; a Delay logic node from N2.1 does the same thing on the wiring side), `once` (play only the first time), `cooldown` (ignore edges for this long after a cue ends), and an ease choice. A public `play()` lets a script or another device call it. The cue node's `global_position` is read every frame, so a cue parented to a moving platform tracks it.
-
-**Camera side.** The camera is a child of the player and its `offset` is already driven every idle frame by `_update_camera_lead()` (lead from horizontal speed, look-down from falling). The cue adds a second term: `offset = lead_and_fall × (1 − weight) + (cue_point − player.global_position) × weight`, with `weight` tweened 0 to 1 to 0 in idle time (`TWEEN_PROCESS_IDLE`; the offset is not physics-interpolated). Because the cue term is relative to the player, the camera centres on the cue point whether the player stands still or walks. There is no camera limit or smoothing node to fight, so any distance works. The cue is a public method on the player, `show_cue(world_point_or_node, params)`, found through group `"player"` lazily (the player joins it in its own `_ready()`).
-
-**Rules to keep.**
-- **A new tween on the player is added to `_interrupt_current_action()`** (`objon.md`, Cross-system invariants). A hit should end the cue early and ease back, so the player can see what hurt them; a dead or dancing player eases both terms to zero, as the lead and look-down do. A hard teleport (`respawn_at()`) resets camera interpolation as before and cancels any cue.
-- **The cue is runtime only and not saved.** It never produces state a restore must rebuild. `once` needs a saved `fired` flag (the cue is then a saveable, with a silent `load_state()`), or a restore from a checkpoint after the cue would replay it on the next edge.
-- **Pause** freezes the tween with everything else; nothing extra is needed. A new `create_timer()` for `delay` must pass `process_always = false` (see Pause menu).
-- A second cue while one is playing retargets from the current offset and restarts the hold; do not queue them.
-- Authoring: the editor shows the 512×288 view rectangle centred on the cue point, gated on a flag rather than `Engine.is_editor_hint()` (Level editor seams: authoring overlays). The configuration warning (no `PowerTarget` sources) is a plain method. Sound hook: one optional id for the pan (put it in `Audio.PLANNED`, not ending in a digit).
-
-**Locking the player (decided: not in v1).** The world keeps running during a cue (the door has to open on screen), so the player can be hit while the camera is elsewhere, and a surfer keeps going. The first version should not lock input: it ends the cue on a hit, and the level designer keeps holds short and triggers cues from calm moments (a button press, not a speed trap). A lock is the obvious follow-up but is not cheap: the player reads `Input` directly in about two dozen places (`player.gd`), so a lock needs a small input wrapper first (a `get_input_axis()`, `is_pressed()` and `just_pressed()` the player calls instead), and then a rule for what a lock does to a surf, a swing or a hang. Decide that with the first levels in hand.
-
-**Touches.** `player.md` (Camera, `_interrupt_current_action()`, Hard teleports), `power.md` (Power contract: the rising-edge and startup rules; add it to Powered devices), `saving-levels-ui.md` (Pause menu; Checkpoint and save/restore if `once` is saved).
 
 ### N1.2 Powered spikes (S to M)
 
@@ -139,4 +118,4 @@ The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single 
 
 Known weak spots in existing behaviour, listed here so nobody mistakes them for planned features: the Stingbot has no obstacle avoidance and can stick on a wall, and the proximity mine's blast has no line-of-sight test (both in `enemies.md`).
 
-Reads with: `player.md` (camera, hazard poll, launch, `_interrupt_current_action()`), `power.md` (sources, devices and the contract most items extend), `hazards-traps.md` (spikes), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)
+Reads with: `player.md` (hazard poll, launch), `power.md` (sources, devices and the contract most items extend), `hazards-traps.md` (spikes), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)
