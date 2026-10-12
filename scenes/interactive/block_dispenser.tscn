@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/interactive/block_dispenser.gd" id="1_disp"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/ice_block.tscn" id="2_ice"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="3_target"]
+
+[node name="BlockDispenser" type="Node2D"]
+script = ExtResource("1_disp")
+block_scene = ExtResource("2_ice")
+
+[node name="SpawnPoint" type="Marker2D" parent="."]
+position = Vector2(0, 16)
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("3_target")

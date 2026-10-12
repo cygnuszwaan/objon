@@ -133,6 +133,9 @@ const PLANNED: Array[StringName] = [
 	&"ui/menu_open",                  # the pause menu opening
 	&"ui/menu_close",                 # the pause menu closing (resume)
 	&"ui/menu_select",                # a menu button being pressed
+	&"interactive/dispenser_spawn",     # a block dispenser making a block, at the spawn point
+	&"interactive/dispenser_blocked",   # a rising edge dropped because the spawn area is occupied, at the spawn point
+	&"interactive/dispenser_dissolve",  # the oldest block fading out to make room for a new one (played quietly), at the spawn point
 ]
 
 # Registry, filled by _scan_audio()

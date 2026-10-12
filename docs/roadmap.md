@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 2 (Spawning and launch: Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 2 (Launch: See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,19 +14,9 @@ Covers: Phase 2 (Spawning and launch: Block dispenser; See-saw launch); Phase 3 
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 2 adds a block spawner and a see-saw launch, and is where the save/restore rules bite (the spawner). Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
+Phases run from least to most invasive. Phase 2 adds a see-saw launch. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
 
-## Phase 2: Spawning and launch
-
-### N2.2 Block dispenser (M to L)
-
-**Gap.** Nothing creates a block, so ice and metal are one-use. A dispenser makes them a renewable resource (a replaceable shield, a second weight).
-
-**Sketch.** A powered device: a rising edge spawns a block (ice or metal scene, `size_tiles`) at a marker, if the spawn area is free (an `intersect_shape` check, as the door does before closing). Exports: `block_scene`, `size_tiles`, `max_alive`, `cooldown`. When `max_alive` is exceeded the oldest block is removed through its own melt or shatter path, not a bare `queue_free()`.
-
-**The crux is checkpoints.** `Game.apply()` frees every saveable with no snapshot entry, and snapshot keys are node paths relative to the level root, so a block added at runtime would be freed on the next respawn, and a name from a bare `add_child()` is not stable. Plan: the dispenser owns its spawned blocks. It gives each an explicit unique name, a spawned block does not join `"saveable"` itself (a `MeltableBlock` hook is needed to skip that in `_ready()`), and the dispenser's own `save_state()` carries each live block's state and re-creates them in `load_state()`. That keeps the restore independent of order and keeps a restore from producing a surprise hit. This is the same rule a runtime level editor needs (Level editor seams: a placed object's identity is its node name).
-
-**Touches.** `meltable-blocks.md` (Meltable block), `saving-levels-ui.md` (Saveable contract, What each type saves), `power.md` (Powered devices), `objon.md` (Level editor seams).
+## Phase 2: Launch
 
 ### N2.3 See-saw launch (M)
 
@@ -68,4 +58,4 @@ The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single 
 
 Known weak spots in existing behaviour, listed here so nobody mistakes them for planned features: the Stingbot has no obstacle avoidance and can stick on a wall, and the proximity mine's blast has no line-of-sight test (both in `enemies.md`).
 
-Reads with: `player.md` (launch), `power.md` (sources, devices and the contract most items extend), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.2 must satisfy, the pause menu)
+Reads with: `player.md` (launch), `power.md` (sources, devices and the contract most items extend), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the pause menu)

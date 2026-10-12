@@ -145,6 +145,7 @@ const SUPPORT_TOLERANCE := 2.0 ## px: a floor contact this close to the centre o
 const RIDER_SUPPORT_TOLERANCE := 0.5 ## px: slack when deciding the block plus riders balance over the floor contacts (small, so a heavy edge rider still tips it).
 const SUPPORT_LATCH_FRAMES := 12 ## physics frames a body floor (plank, block) keeps counting as supporting the centre of mass after the contact report loses its second corner.
 const SURF_SHOVE_PLAYER_WEIGHT := 2.0 ## The surfer's weight against the block's mass when working out what a shove costs it (mirrors RotatingBody.player_weight).
+const DISSOLVE_TIME := 0.2 ## seconds a dissolving block (see dissolve()) takes to fade out.
 const HOLD_TILT_MARGIN := 0.08 ## rad: a rotating block may lean this much more than the surface under it and still be held.
 
 @export var size_tiles: Vector2i = Vector2i(1, 1):
@@ -194,6 +195,7 @@ const HOLD_TILT_MARGIN := 0.08 ## rad: a rotating block may lean this much more 
 @export var debug_hold: bool = false ## Prints floor/hold state ~6x a second while resting on a floor (for diagnosing a block that slides too early).
 
 var melt_progress: float = 0.0 ## 0..1
+var spawner_owned: bool = false ## Set by a BlockDispenser before add_child(): the block then does not join "saveable", because the dispenser saves and re-creates it (see BlockDispenser). Runtime state, never authored.
 ## Scratch working copy of (own horizontal motion, vertical velocity), valid only inside _physics_process()
 ## and the subclass hooks it calls. The real velocity is linear_velocity.
 var velocity: Vector2 = Vector2.ZERO
@@ -249,7 +251,8 @@ func _ready() -> void:
 		return
 	add_to_group(&"water_solid")
 	add_to_group(&"ground")  # what makes the top edge hangable — see the header note
-	add_to_group(&"saveable")
+	if not spawner_owned:
+		add_to_group(&"saveable")
 	_configure_body()
 	_water_manager = get_tree().get_first_node_in_group(&"water_manager") as WaterManager
 
@@ -840,6 +843,24 @@ func _update_hanger_exception() -> void:
 ## own rotated frame (passed through), not snapped to the tile grid: a block resting on a see-saw is off the grid and
 ## tilted, and a snapped, axis-aligned spread put particles inside the plank, so they fell through it.
 func _melt() -> void:
+	_leave_world()
+	Audio.play_at(_melt_sound(), global_position)
+
+	var manager := get_tree().get_first_node_in_group(&"water_manager") as WaterManager
+	if manager != null:
+		var half := Vector2(size_tiles) * TILE * 0.5
+		for cy in size_tiles.y:
+			for cx in size_tiles.x:
+				var local_center := Vector2(-half.x + (cx + 0.5) * TILE, -half.y + (cy + 0.5) * TILE)
+				manager.spawn_melt_particles(manager.world_to_cell(to_global(local_center)), _melt_liquid_type(), to_global(local_center), global_rotation)
+	else:
+		push_warning("%s: no WaterManager in group 'water_manager' — melted with no liquid" % name)
+	queue_free()
+
+## Everything a block that is going away does at once, whichever way it goes (melt, dissolve): marks itself gone
+## (`is_intact()` turns false), stops its physics step, leaves the water and ground groups, lets go of a hanging
+## player, and stops being solid.
+func _leave_world() -> void:
 	_melted = true
 	set_physics_process(false)
 	remove_from_group(&"water_solid")
@@ -853,18 +874,21 @@ func _melt() -> void:
 		_ignoring_hanger = false
 	$CollisionShape2D.set_deferred("disabled", true)  # stop being solid immediately
 
-	Audio.play_at(_melt_sound(), global_position)
+## True until the block has started melting or dissolving away. A BlockDispenser counts only intact blocks.
+func is_intact() -> bool:
+	return not _melted
 
-	var manager := get_tree().get_first_node_in_group(&"water_manager") as WaterManager
-	if manager != null:
-		var half := Vector2(size_tiles) * TILE * 0.5
-		for cy in size_tiles.y:
-			for cx in size_tiles.x:
-				var local_center := Vector2(-half.x + (cx + 0.5) * TILE, -half.y + (cy + 0.5) * TILE)
-				manager.spawn_melt_particles(manager.world_to_cell(to_global(local_center)), _melt_liquid_type(), to_global(local_center), global_rotation)
-	else:
-		push_warning("%s: no WaterManager in group 'water_manager' — melted with no liquid" % name)
-	queue_free()
+## Quiet retirement (a BlockDispenser calls it on its oldest block): no liquid, no melt sound. The block stops being
+## solid at once, holds still, fades out over DISSOLVE_TIME and frees itself. Does nothing to a block that is already
+## going away.
+func dissolve() -> void:
+	if _melted:
+		return
+	_leave_world()
+	set_deferred("freeze", true)
+	var tween := create_tween()
+	tween.tween_property(self, "modulate:a", 0.0, DISSOLVE_TIME)
+	tween.tween_callback(queue_free)
 
 ## Jam contract (crusher.gd sweeps its stroke for anything with jams_crusher() true): a block that is solid enough to
 ## stall a crusher's piston rather than break. False in the base class; MetalBlock overrides it.

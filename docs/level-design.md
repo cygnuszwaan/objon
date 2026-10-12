@@ -128,6 +128,12 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 - Hanging from a block works while it is flat and still enough (≤10°, ≤90 px/s).
 - A melting block spawns liquid per tile **at the block's position**, which then falls and can land on you, on a see-saw, or into a basin.
 
+**Block dispenser.** A powered device that makes blocks, so ice and metal can be a renewable resource (a shield that replaces itself, a second weight, a stair). A small housing with a **spawn point** (a marker, one tile below it by default) where each block appears, upright and at rest, and then falls under gravity like any block. Its placeholder art is a steel box with a light: green when it is ready, amber while it cools down.
+- **Knobs**: `block_scene` (`ice_block.tscn` by default, or `metal_block.tscn`), `size_tiles` (the size of each block), `max_alive` (1; 0 = unlimited), `cooldown` (0.5 s; 0 = none), `invert`, and `show_spawn_area` (an editor-only outline of the block's footprint at the spawn point). Move the `SpawnPoint` marker to put the block somewhere else, and the `PowerTarget` child to choose where a wire attaches.
+- **Reacts to**: a **rising edge** of its power, nothing else: a source that stays on spawns once, a falling edge does nothing, and an inverted dispenser spawns when its source falls. The startup state and a checkpoint restore are never edges, so a level never loads with a block waiting. An unwired dispenser never spawns. An edge during the cooldown is ignored.
+- **Affects**: its own blocks, which are ordinary blocks in every way (kickable, meltable, a plate or see-saw weight, hangable, carried by belts, launched by pads). It keeps at most `max_alive` of them: a new block **dissolves the oldest** (a quiet fade, no liquid), and a block that melted or shattered no longer counts, so its slot is free. It never touches another dispenser's blocks.
+- **Gotchas**: **a spawn into an occupied area is refused**: if the player, an enemy, a block or a tile is inside the block's footprint, the press does nothing but a "blocked" sound (the old block is not dissolved and the cooldown does not start). That includes the block you made last time if it is still sitting under the dispenser, unless it is the one about to be retired. With `max_alive` above 1, the spawn point has to be somewhere blocks leave (a drop, a slope, a belt, a kick) or the second press is refused. **A block a dispenser made is taken back by the next one**: with `max_alive` 1, a block left on a plate or used as a stair vanishes the next time the dispenser fires, whatever the player is doing with it. The dissolved block stops being solid at once, so whatever stood on it falls. A dispenser's blocks are saved with it: a checkpoint keeps the blocks that were alive then, and a restore makes none. Nothing about its state is visible to the player beyond the light, so wire a lamp, a door or a gem to what it is meant to show. No new block can appear without a rising edge, so a block lost to a melt, a pit or slag can only be replaced by the player causing one.
+
 ### Liquids: water, slag, steam
 
 - **Water particles** flow, creep, and fall through catwalks. Moving particles shove the player a bit and are carried by moving solids. Water on a see-saw adds load.
@@ -261,6 +267,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | Crusher | cycling | parks retracted when off; clears jam on re-power |
 | Sawwheel | spinning/dangerous | |
 | Jump pad | live | |
+| **Block dispenser** | **rising edge = make one block** at its spawn point | startup is not an edge; an edge in the cooldown or into an occupied area is dropped; past `max_alive` the oldest block dissolves |
 | **Mirror** | **step mode: rising edge = turn one step; toggle mode: powered = aim 1, unpowered = aim 0** | step mode: startup is not an edge; toggle mode: snaps to its aim at load, and a change mid-turn turns it back |
 | See-saw / Swing | motor on | |
 | Rail bot | running | stops dripping when off, still hurts |
@@ -299,6 +306,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 | **Slag touch** | melts fast, → crust | floats, slow melt | **crusts** it | rejoins | hurts | – | – | – |
 | **Water touch** | floats | sinks | joins | **crusts** it | – | – | – | – |
 | **Jump pad** | launches (weight-scaled) | launches (less) | – | – | launches | – | – | – |
+| **Block dispenser** (makes) | makes one; past `max_alive` the oldest dissolves | the same | – | – | its spawn area occupied: the press is refused | its spawn area occupied: refused | – | solid in the spawn area: refused |
 | **Mine blast** | – | – | – | – | damage | 2 dmg | – | – |
 | **Retracting catwalk layer** | drops | drops | – (water already falls through a catwalk) | – | drops; a hanger is released | drops | – | – |
 | **Retracting ladder layer** | – | – | – | – | a climber is dropped | – | – | – |
@@ -339,6 +347,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **Surf and slopes**: a see-saw's raised end is a wall for the surf; basin rims and sloped tiles are ramps; a ladder cell with spikes in it breaks climbing.
 - **Closing doors wait**: they won't crush, so don't use a door as a hazard.
 - **Metal blocks sink in water and float on slag**; ice does the reverse (ice in slag melts almost at once). Pick the liquid to pick the block.
+- **A block dispenser refuses an occupied spawn area and retires its own oldest block**: see the dispenser's gotchas under Blocks. The two to remember are a spawn point where blocks never leave (every press after the first is refused) and a block the player is relying on that the dispenser takes back.
 - **Stingbot has no pathing** and can get stuck behind walls. **Mines have no line of sight** and blast through thin walls.
 - **Hanging**: conveyors, button pedestals, receivers and barriers are deliberately *not* ledge-grabbable; doors, blocks and see-saw ends are.
 - **Order of nodes**: place receivers, buttons, doors and swings before the Player in the tree so the player draws in front of them.
