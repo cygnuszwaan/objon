@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_y0ep0"]
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_ladder_layer.tscn" id="9_rljw2"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/button.tscn" id="10_s474h"]
+[ext_resource type="PackedScene" uid="uid://divuey832521a" path="res://scenes/interactive/mirror.tscn" id="12_rljw2"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8dks1"]
 texture = ExtResource("6_dyh2t")
@@ -114,9 +115,19 @@ ghost_opacity = null
 
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
 
+[node name="Red" parent="Tilemaps/ConductorLayers" index="0"]
+tile_map_data = PackedByteArray("AACIAAgAAAAHAAAAAACHAAgAAAAIAAAAAACGAAgAAAAIAAAAAACFAAgAAAAIAAAAAACBAAcAAAAFAAAAAACBAAYAAAAFAAAAAACBAAgAAAAJAAAAAACCAAgAAAAIAAAAAACDAAgAAAAIAAAAAACEAAgAAAAIAAAAAAA=")
+
 [node name="Button" parent="Tilemaps" unique_id=482094233 instance=ExtResource("10_s474h")]
 position = Vector2(2072, 88)
 latch_mode = 2
+duration = 2.0
+
+[node name="Mirror" parent="Tilemaps" unique_id=1989718227 instance=ExtResource("12_rljw2")]
+position = Vector2(2176, 124)
+toggle_between_aims = true
+aim_0_degrees = 45.0
+aim_1_degrees = 135.0
 
 [node name="WaterManager" type="Node2D" parent="." unique_id=1297838409 groups=["water_manager"]]
 script = ExtResource("7_aghq8")

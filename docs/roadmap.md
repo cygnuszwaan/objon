@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 1 (Quick wins: Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 1 (Quick wins: Mirror control modes; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -18,15 +18,15 @@ Phases run from least to most invasive. Phase 1 adds nothing to a shared solver:
 
 ## Phase 1: Quick wins
 
-### N1.4 Mirror reverse mode (S)
+### N1.4 Mirror control modes (S)
+
+Built, awaiting in-editor confirmation; see Status in lasers-arcs-mirrors.md.
 
 **Gap.** A mirror only turns on rising edges, so a powered mirror cannot swing between two aims.
 
-**Sketch.** An export on `Mirror` (for example `falling_turns_back`, default false) that turns one step the other way on a falling edge. The startup state is still not an edge.
+**Sketch.** A per-instance checkbox on `Mirror` (`toggle_between_aims`) picks the control mode. Off: the existing step mode, with a Clockwise / Counter-clockwise enum. On: two authored aims (`aim_0_degrees`, `aim_1_degrees`) that power selects by level, so no falling-edge pairing arises. The Inspector shows only the selected mode's fields.
 
-**Pitfall to resolve first.** A momentary button cycled by crouching produces a falling and a rising edge in one physics frame, and an edge that arrives during a turn is dropped. In reverse mode that would net one step back instead of one forward. Queue at most one pending edge during a turn in this mode, or ignore a falling edge that is paired with a rising edge in the same frame. Kicks during a turn stay dropped.
-
-**Touches.** `lasers-arcs-mirrors.md` (Mirror), `power.md` (Powered devices, Button).
+**Touches.** `lasers-arcs-mirrors.md` (Mirror), `power.md` (Powered devices).
 
 ### N1.5 Enemy weight on plates (S)
 
