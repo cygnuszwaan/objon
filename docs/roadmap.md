@@ -20,6 +20,8 @@ Phases run from least to most invasive. Phase 2 adds logic and resources and is 
 
 ### N2.1 Logic nodes (M)
 
+Built, awaiting in-editor confirmation; see Status in `power.md`.
+
 **Gap.** Logic is only OR, AND (`all_required`) and `invert` on a `PowerTarget`. There is no delay, memory, counter or one-shot, so a combination lock has to be faked with a mirror.
 
 **Sketch.** Four small source nodes, each in the `Button` contract with a `sources: Array[Node]` and `add_source()`: **Delay** (on-delay and off-delay), **Latch** (set and reset sources), **Counter** (on after N rising edges of its sources, optional reset source and auto-reset), **Pulse** (a rising edge powers it for `duration`, restarting while on, with no new edge). Inputs are evaluated the way `PowerTarget` evaluates its own, including the deferred first recompute so nothing is driven before every `_ready()` has run.

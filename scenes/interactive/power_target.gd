@@ -112,6 +112,13 @@ func recompute() -> void:
 	is_initial_apply = false
 	power_changed.emit(on)
 
+## The final (post-invert) state a recompute would apply right now; false while nothing is wired. Read-only: lets a
+## device that is itself a source (the camera cue's pass-through) answer `is_powered()` before its own first apply.
+func evaluate() -> bool:
+	if Engine.is_editor_hint() or (not _has_valid_source() and not _debug_flip):
+		return false
+	return (_sources_powered() != _is_inverted()) != _debug_flip
+
 ## Own `invert`, or a boolean `invert` declared on the parent device.
 func _is_inverted() -> bool:
 	if invert:

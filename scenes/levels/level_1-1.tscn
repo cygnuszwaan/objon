@@ -14,7 +14,7 @@
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_ladder_layer.tscn" id="9_rljw2"]
 [ext_resource type="PackedScene" uid="uid://divuey832521a" path="res://scenes/interactive/mirror.tscn" id="12_rljw2"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/weight_plate.tscn" id="14_yjlda"]
-[ext_resource type="PackedScene" uid="uid://bmjkgbi1jd2s" path="res://scenes/enemies/drillbot.tscn" id="15_yjlda"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/camera_cue.tscn" id="15_aghq8"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8dks1"]
 texture = ExtResource("6_dyh2t")
@@ -101,15 +101,15 @@ tile_set = SubResource("TileSet_0w3yt")
 
 [node name="PoweredCatwalkLayer" parent="Tilemaps" unique_id=1013901616 node_paths=PackedStringArray("sources") instance=ExtResource("7_s474h")]
 tile_map_data = PackedByteArray("AACCAAMAAAAAAAAAAACDAAMAAAAAAAAAAACEAAMAAAAAAAAAAACFAAMAAAAAAAAAAAA=")
-sources = [NodePath("")]
+sources = [null]
 
 [node name="PoweredSpikeLayer" parent="Tilemaps" unique_id=1205680104 node_paths=PackedStringArray("sources") instance=ExtResource("8_7n46g")]
-tile_map_data = PackedByteArray("AACFAAUAAwAAAAAAAAA=")
-sources = [NodePath("")]
+tile_map_data = PackedByteArray("AACNAAMAAwAAAAAAAACOAAMAAwAAAAAAAACPAAMAAwAAAAAAAAA=")
+sources = [NodePath("../../CameraCue2")]
 
 [node name="PoweredLadderLayer" parent="Tilemaps" unique_id=1944668761 node_paths=PackedStringArray("sources") instance=ExtResource("9_rljw2")]
 tile_map_data = PackedByteArray("AACEAAQAAAAAAAAAAACEAAMAAAAAAAAAAAA=")
-sources = [NodePath("")]
+sources = [null]
 
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
 
@@ -150,9 +150,10 @@ position = Vector2(2104, 72)
 z_index = 1
 position = Vector2(2072, 104)
 
-[node name="Drillbot" parent="." unique_id=1754501852 instance=ExtResource("15_yjlda")]
-position = Vector2(2052, 88)
-patrol_distance = 0.0
+[node name="CameraCue2" parent="." unique_id=1673279986 node_paths=PackedStringArray("sources") instance=ExtResource("15_aghq8")]
+position = Vector2(2284, 32)
+once = true
+sources = [NodePath("../WeightPlate")]
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

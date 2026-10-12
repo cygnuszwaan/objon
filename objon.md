@@ -30,7 +30,7 @@ Read this file in full, then **only the topic files for what you are changing**.
 - `docs/meltable-blocks.md`: Ice and metal blocks (the `MeltableBlock` base class). Names: Meltable block; Ice block; Metal block.
 - `docs/rotating-bodies.md`: See-saw, swing and other bodies that turn under torque. Names: Rotating bodies and the see-saw; Swing / trapeze.
 - `docs/lasers-arcs-mirrors.md`: Laser turret and beam solver, arc turret and arc, mirrors. Names: Laser beam solver; Laser turret; Arc turret; Mirror.
-- `docs/power.md`: Power: the contract, powered devices, sources (button, speed trap, receivers, plates, sensors), conductors, door. Names: Powered devices; Power contract; Button; Speed trap; Laser receiver; Arc receiver; Bullet target; Weight plate; Angle sensor; Basin sensor; Zone sensor; Conductors; Door; Camera cue.
+- `docs/power.md`: Power: the contract, powered devices, sources (button, speed trap, receivers, plates, sensors), conductors, door. Names: Powered devices; Power contract; Button; Speed trap; Laser receiver; Arc receiver; Bullet target; Weight plate; Angle sensor; Basin sensor; Zone sensor; Logic nodes; Conductors; Door; Camera cue.
 - `docs/enemies.md`: Enemies: Drillbot, Stingbot, Grunt, Tread crawler, Proximity mine, Rail bot. Names: Drillbot; Stingbot; Grunt; Tread crawler; Proximity mine; Rail bot.
 - `docs/hazards-traps.md`: Sawwheel, crusher, cannon and bullet, spikes, the powered tile layers (spikes, catwalks, ladders). Names: Sawwheel / Crusher hazards; Cannon / Bullet; Spikes; Powered spike layer; Powered catwalk layer; Powered ladder layer.
 - `docs/platforms-conveyors.md`: Moving and drop platforms, conveyor belt, jump pad, breakable barrier. Names: Moving platform; Drop platform; Conveyor belt; Jump pad; Breakable barrier; Rail.
@@ -97,7 +97,7 @@ Callers test with `has_method()` or a group, never a class name. Implementers li
 | `jams_crusher()`, `shatter()` | MeltableBlock (and subclasses) | Crusher | `hazards-traps.md`, `meltable-blocks.md` |
 | Laser reflector: group `"laser_mirror"` and `get_laser_segment()` | Mirror, the see-saw with `mirror_surface` | `LaserBeam` | `lasers-arcs-mirrors.md` |
 | `get_angular_velocity()`, `get_pivot_global()` | RotatingBody | blocks resting on it, `WaterManager` | `rotating-bodies.md` |
-| Power source: group `"power_source"`, `is_powered()`, signal `powered_changed(on)` | Button, speed trap, receivers, bullet target, weight plate, angle sensor, basin sensor, zone sensor, conductor circuits | `PowerTarget` | `power.md` |
+| Power source: group `"power_source"`, `is_powered()`, signal `powered_changed(on)` | Button, speed trap, receivers, bullet target, weight plate, angle sensor, basin sensor, zone sensor, conductor circuits. The logic nodes and the camera cue's pass-through answer the same two but stay **out of the group**, so no wire attaches | `PowerTarget` (and logic nodes) | `power.md` (Power contract, Logic nodes) |
 | Power device: `set_powered(on)`, optional `set_powered_initial(on)`, a `PowerTarget` child, an `invert` export | every powered device | `PowerTarget` | `power.md` (Power contract, Powered devices) |
 | `is_hazard_active() -> bool`, group `"hazard_layer"` | PoweredSpikeLayer | the player's tile-hazard poll | `hazards-traps.md` (Powered spike layer) |
 | `release_hang_from_layer(layer)` | Player | PoweredCatwalkLayer (found through group `"player"`, tested with `has_method()`) | `hazards-traps.md` (Powered catwalk layer), `player.md` (Catwalk underside hang) |
@@ -121,6 +121,7 @@ One line each; the detail and the reason are in the file named. These are what k
 - **The player joins group `"player"` in its own `_ready()`**, so a node that runs earlier finds nothing: look it up again later. (Groups in use, under Project setup)
 - **Hazards that must re-hit after i-frames poll `get_overlapping_bodies()` every physics frame** rather than rely on `body_entered`. (`hazards-traps.md`)
 - **Every powered device scene has a `PowerTarget` child.** No valid sources means not driven: the device keeps its authored state. (`power.md`)
+- **A source that reads other sources answers `is_powered()` correctly before its own first apply** (derive it on demand: logic nodes `_ensure_initial()`, the camera cue `PowerTarget.evaluate()`), or a device whose startup apply runs first reads off, then sees an edge. A source that is not a wire object stays out of group `"power_source"`. (`power.md`)
 - **A `MeltableBlock` subclass never overrides `_ready()` or `_physics_process()` without calling `super()`.** (`meltable-blocks.md`)
 - **Runtime code never writes an export**: authored values are exports, runtime state is a separate variable. Keep `export-audit.md` current. (Level editor seams)
 - **A one-shot `AnimatedSprite2D` animation has Loop off**, or `animation_finished` never fires and the state soft-locks. (`player.md`)

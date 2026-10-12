@@ -19,11 +19,21 @@ extends Node2D
 ## already playing restarts it from the camera's current offset. The pending delay and the cooldown are plain
 ## countdowns in `_physics_process()`, so pausing freezes them and nothing here uses `create_timer()`.
 ##
+## PASS-THROUGH: the cue is also a power SOURCE (`is_powered()`, `powered_changed(on)`; a device picks it in its
+## `sources`, a conductor wire cannot reach it and it is not in group "power_source"). It mirrors the cue's final
+## state (after `invert`) with one difference: a rising edge is held back until the camera is in position, `delay`
+## plus `pan_time` seconds, so what it drives (a door, a bridge) starts moving once the player can see it. A falling
+## edge passes at once and cancels a wait. When no cue will play for the edge (`once` already spent, a cooldown
+## running, no player to show it to, a dead or dancing player) the edge passes with no wait, so the pass-through
+## stays open after the first trigger even with `once` set. An edge that joins a pending `delay` waits out what is
+## left of it. The wait is a plain countdown, unaffected by a hit or the cue ending early. The startup state passes
+## at once and a restore re-derives it, so neither waits.
+##
 ## The camera work is the player's (`show_cue()`, see Camera under Player); this node only decides when. It reads
 ## `global_position` every frame, so a cue parented to a moving platform tracks it. The cue never locks input.
 ##
-## SAVE: only `fired` (what `once` needs). The cue itself is runtime only: `load_state()` is silent and cancels a
-## pending delay.
+## SAVE: only `fired` (what `once` needs). The cue itself and the pass-through are runtime only: `load_state()` is
+## silent and cancels a pending delay and a pending pass; the pass-through is then re-derived from the sources.
 ##
 ## AUTHORING: `show_view_rect` draws the 512x288 view rectangle centred on the cue point, while `authoring_overlay`
 ## is set (the editor sets it; a runtime level editor can too). The sound id `interactive/camera_cue_pan` plays when
@@ -62,6 +72,8 @@ enum CueEase { LINEAR, SINE, CUBIC }
 		show_view_rect = value
 		queue_redraw()
 
+signal powered_changed(on: bool) ## The pass-through output changed (see PASS-THROUGH).
+
 const VIEW_SIZE := Vector2(512.0, 288.0) ## What the camera sees: the 1280x720 viewport at zoom 2.5.
 const SOUND_PAN := &"interactive/camera_cue_pan"
 const OVERLAY_COLOR := Color(1.0, 0.85, 0.3, 0.8)
@@ -70,6 +82,9 @@ var powered: bool = false ## The last final (post-invert) state the device was g
 var authoring_overlay: bool = false ## Draws the view rectangle. Set in `_ready()` in the editor; a runtime level editor can set it too.
 var _fired: bool = false
 var _delay_left: float = -1.0 ## Seconds until the pan starts; negative = no cue is waiting.
+var _out: bool = false ## The pass-through output.
+var _applied: bool = false ## The PowerTarget has applied a state to this device (set_powered or set_powered_initial).
+var _pass_left: float = -1.0 ## Seconds until a rising edge passes; negative = none is waiting.
 var _cooldown_left: float = 0.0
 var _player: Node
 
@@ -88,44 +103,87 @@ func _ready() -> void:
 
 ## The startup state is recorded, never an edge.
 func set_powered_initial(on: bool) -> void:
+	_applied = true
 	powered = on
+	_pass_left = -1.0
+	_set_out(on)
 
 func set_powered(on: bool) -> void:
+	_applied = true
 	var rising := on and not powered
 	powered = on
-	if rising:
-		play()
+	if not on:
+		_pass_left = -1.0
+		_set_out(false)
+		return
+	if not rising:
+		return
+	var wait := _play()
+	if wait > 0.0:
+		_pass_left = wait
+		set_physics_process(true)
+	else:
+		_set_out(true)
+
+## The pass-through output. Before the PowerTarget has applied a first state it answers what that first apply will
+## record, so a device whose own startup apply runs earlier reads the right level.
+func is_powered() -> bool:
+	if _applied:
+		return _out
+	var target := _power_target()
+	return target != null and target.evaluate()
+
+func _set_out(on: bool) -> void:
+	if on == _out:
+		return
+	_out = on
+	powered_changed.emit(on)
 
 ## Starts the cue as a rising edge would: ignored while a delay is already pending, after the first play when
 ## `once` is set, and during a cooldown.
 func play() -> void:
-	if Engine.is_editor_hint() or _delay_left >= 0.0 or _cooldown_left > 0.0:
-		return
-	if once and _fired:
-		return
+	_play()
+
+## `play()`, returning the seconds until the camera is in position: `delay` plus `pan_time`, what is left of a
+## pending delay plus `pan_time`, or 0 when no cue will play for this call (editor, `once` spent, cooldown, nobody to
+## show it to).
+func _play() -> float:
+	if Engine.is_editor_hint():
+		return 0.0
+	if _delay_left >= 0.0:
+		return _delay_left + pan_time
+	if _cooldown_left > 0.0 or (once and _fired):
+		return 0.0
 	if once:
 		_fired = true
 	if delay > 0.0:
 		_delay_left = delay
 		set_physics_process(true)
-	else:
-		_start_cue()
+		return delay + pan_time
+	return pan_time if _start_cue() else 0.0
 
 func _physics_process(delta: float) -> void:
 	if _delay_left >= 0.0:
 		_delay_left -= delta
 		if _delay_left <= 0.0:
 			_delay_left = -1.0
-			_start_cue()
+			if not _start_cue() and _pass_left >= 0.0:
+				_pass_left = 0.0  # nobody to show it to: nothing to wait for
+	if _pass_left >= 0.0:
+		_pass_left -= delta
+		if _pass_left <= 0.0:
+			_pass_left = -1.0
+			_set_out(powered)
 	if _cooldown_left > 0.0:
 		_cooldown_left = maxf(_cooldown_left - delta, 0.0)
-	if _delay_left < 0.0 and _cooldown_left <= 0.0:
+	if _delay_left < 0.0 and _cooldown_left <= 0.0 and _pass_left < 0.0:
 		set_physics_process(false)
 
-func _start_cue() -> void:
+## Starts the pan. True if the camera is now moving (a dead or dancing player ignores the cue).
+func _start_cue() -> bool:
 	var player := _find_player()
 	if player == null:
-		return
+		return false
 	if not player.is_connected(&"cue_ended", _on_cue_ended):
 		player.connect(&"cue_ended", _on_cue_ended)
 	player.show_cue(self, {
@@ -137,6 +195,8 @@ func _start_cue() -> void:
 	})
 	if player.is_cue_playing():  # a dead or dancing player ignores the cue: no sound then
 		Audio.play(SOUND_PAN)
+		return true
+	return false
 
 func _on_cue_ended(source: Object) -> void:
 	if source != self or cooldown <= 0.0:
@@ -167,6 +227,7 @@ func load_state(d: Dictionary) -> void:
 	_fired = d.get("fired", _fired)
 	_delay_left = -1.0  # a restore never plays a cue
 	_cooldown_left = 0.0
+	_pass_left = -1.0  # nor holds an edge back: the pass-through is re-derived by the first apply
 
 ## Copies `sources` onto the `PowerTarget` child (a copy, so a conductor's `add_source()` never writes this export).
 ## `replace` also forwards an empty list, so clearing `sources` in the Inspector clears the child; at load an empty
