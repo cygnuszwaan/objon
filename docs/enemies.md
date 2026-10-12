@@ -38,8 +38,4 @@ Covers: Drillbot; Stingbot; Grunt (States; Ledge and wall tests; Hammer; Placeho
   - **Placeholder art** (`rail_bot_art.gd`): a trolley wheel, stem, striped body and nozzle; the nozzle glow grows over the telegraph, and it greys out unpowered. `RailBot` only needs `set_pose(charge, powered)` to exist on the art node.
   - **Sounds** (planned, in `Audio.PLANNED`): `enemies/railbot_drip`, `enemies/railbot_hit`.
 
-## Status
-
-Enemy weight (roadmap N1.5): built, not yet confirmed in-editor; see Enemy weight above. The default weights are first guesses to tune against plate thresholds.
-
 Reads with: `player.md` (`take_hit()`, the kick), `player-surf.md` (`bowled_over()`), `lasers-arcs-mirrors.md` (lasers and arcs hurt enemies), `hazards-traps.md` (polled hazards, the mine blast), `liquid-system.md` (a spark electrifies water), `platforms-conveyors.md` (belts carry sparks), `power.md` (the rail bot is a powered device; the weight plate reads enemy weight), `saving-levels-ui.md` (the saveable contract).

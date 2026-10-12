@@ -94,11 +94,12 @@ Format: **what it is** → key knobs → reacts to / affects → design notes.
 
 ### Rotating bodies: see-saw and swing
 
-**See-saw.** Torque from loads: player weight 2, ice 1 per tile, metal 4 per tile, water 1 per tile of volume, slag 3. Spring back to level; limit ±25°. Per-instance `length_tiles`.
+**See-saw.** Torque from loads: player weight 2, ice 1 per tile, metal 4 per tile, water 1 per tile of volume, slag 3, and enemies (below). Spring back to level; limit ±25°. Per-instance `length_tiles`.
 - Powered = **motorized**: it oscillates between limits, and the motor must beat opposing loads. Unwired it's free.
 - `mirror_surface` makes the whole top face reflect lasers, so tilting it aims the beam.
 - Ends are ledge-hangable while tilted less than 15° and moving slowly. The underside is not.
 - Read by the **angle sensor** (a power source).
+- **Enemy loads are opt-in**: `enemy_weight_scale` (default 0, so enemies ride a plank for free) multiplies each enemy's weight (grunt, drillbot, crawler 2; mine and landed Stingbot 1; the rail bot none). At 1 a grunt counts as much as the player, and what stands on a weighing enemy counts too.
 - Raised end is a lip (see surf notes). Idle riders are gripped, so they don't slide off.
 - A block or player on the plank shields the face from above, and a lit block melts onto it.
 
@@ -194,6 +195,8 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | **Proximity mine** | Arms within 32 px (h) / 28 px (v) of the player; blast radius 40, fuse 0.8 s, can't disarm | Kick it away (slides at 160 px/s); a kick or laser **arms** it | **Not** bowlable; the surfer stops and it arms | Blast hurts player and enemies (2 dmg: kills grunts, flips crawlers) and chains to other mines. No line-of-sight check, so it blasts through thin walls. |
 | **Rail bot** | Hangs under a rail; contact hurts (and knocks a rail-hanger off); drips **sparks** every 1.6 s (telegraphed) | Laser or mine blast (it's overhead) | n/a | Powered = running. Sparks roll down slopes, ride belts, and electrify water. |
 
+**Enemy weight** (`load_weight`, in the units of block mass): grunt 2, drillbot 2, tread crawler 2 (flipped too), proximity mine 1, Stingbot 1 **only while landed**, rail bot none. An enemy weighs it only while alive and on the floor, so a dying one, a flying Stingbot and anything airborne weigh nothing. Read by the **weight plate** (always, `enemy_weight_scale` 1) and the **see-saw** (opt-in, scale 0). The defaults are first guesses to tune against plate thresholds.
+
 ### Power: sources, wiring, devices
 
 **Every powered device** carries a `PowerTarget`. With nothing wired it behaves as authored. A target has `sources` (any number), `all_required` (AND vs the default OR), and `invert` (also exportable on the device root). `debug_toggle_key` flips any device from the keyboard while testing.
@@ -207,7 +210,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | **Laser receiver** | lit by a beam; stays on `hold_time` (0.3 s) after | the flicker bridge |
 | **Arc receiver** | hit by an arc | `latch_mode`; MOMENTARY pulse 2.5 s, TIMED 5 s, TOGGLE |
 | **Bullet target** | hit by a cannon bullet | `latch_mode`; MOMENTARY pulse 0.3 s, TIMED 5 s, TOGGLE |
-| **Weight plate** | summed weight ≥ `threshold` (2) | `hold_time` 0.15 s; counts stacked blocks and riders up to 3 deep |
+| **Weight plate** | summed weight ≥ `threshold` (2) | `hold_time` 0.15 s, `player_weight` 2, `enemy_weight_scale` 1 (0 = ignore enemies); counts stacked blocks, enemies and riders up to 3 deep |
 | **Angle sensor** | a `RotatingBody` tilts past `threshold_degrees` (15) toward `side` | `hysteresis_degrees` 3 |
 | **Basin sensor** | FILL ≥ 50%, CRUST present, or COLUMN depth ≥ 0.25 tile | `liquid_filter`, hysteresis, `hold_time` |
 | **Zone sensor** | `min_count` or more bodies (player, enemies, blocks, as enabled) are inside its rectangle | `size`, `count_player` / `count_enemies` / `count_blocks`, `min_count`, `hold_time` 0.15 s |
@@ -230,7 +233,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 **Zone sensor.** An `Area2D` source (layer 0, mask 1) that is powered while enough bodies are inside an axis-aligned rectangle: a door that shuts behind the player, an ambush trigger, a lure where an enemy has to stand in the zone. It blocks nothing, so it is wired like any source (`sources` on a device, or a conductor ending at its origin cell). **Invisible and silent in play by default.**
 - **Knobs**: `size` (px, default 48×48, centred on the origin; leave rotation and scale alone), `count_player` (on), `count_enemies` (off), `count_blocks` (off), `min_count` (1; the count is summed across the enabled kinds), `hold_time` (0.15 s, up to 5 s and beyond), `show_zone` (draws the zone and the live `count/min_count` at run time; the editor always draws it), `silent` (on; turn it off for on and off sounds).
 - **Reacts to**: bodies overlapping the zone, in any state. The player counts unless dead or dancing, so a player on a ladder, hanging or swimming counts (unlike a weight plate, which wants the floor). An enemy is anything in group `enemy`, so a dormant mine and a flipped crawler count. A block is any ice or metal block, and weight is irrelevant: a metal block counts as one, like an ice block, and one in the air counts. Each body counts once. It powers the frame the count reaches `min_count` and releases once the count has stayed below it for `hold_time`, so a body crossing the edge cannot chatter it, and a longer `hold_time` is a delay on leaving. Absence is `invert` on the device or target.
-- **Affects**: only what is wired to it. Nothing in the world reads it directly. It is the one source an enemy can power.
+- **Affects**: only what is wired to it. Nothing in the world reads it directly. It counts bodies in any state, where the weight plate counts only weight on the floor.
 - **Gotchas**: the zone is invisible and silent, so the player gets no warning of it. Drive something the player can see coming (a door closing, a bullet in flight, a camera cue) rather than a spike layer that extends with no warning, and put the zone's edge well before the hazard. A zone knows nothing of speed or direction (the speed trap does): a surfer covers 10 to 13 px a physics frame at 600 to 800 px/s, so a zone across a surf line should be deeper than that, or tested. A conductor attaches in the cell the **origin** (the centre) is in, so wire a large zone through `sources`. An enemy leaves the group as it starts to die (a Drillbot and a Stingbot at the end of that frame), and a Stingbot flies, so a zone meant to hold one has to cover its airspace. A zone that only an enemy can power is stuck off once that enemy is dead, so give the route a second way (OR). It saves its state, so a checkpoint restore comes back as it was (a sealed room stays sealed) and keeps power for a few frames until the bodies overlap again.
 
 **Powered devices**
@@ -288,9 +291,10 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 | **Retracting catwalk layer** | drops | drops | – (water already falls through a catwalk) | – | drops; a hanger is released | drops | – | – |
 | **Retracting ladder layer** | – | – | – | – | a climber is dropped | – | – | – |
 | **Zone sensor** (reads) | counted if `count_blocks` | counted if `count_blocks` (weight is irrelevant) | – | – | counted if `count_player` (not dead or dancing) | counted if `count_enemies` | – | – |
+| **Weight plate** (reads) | 1 per tile | 4 per tile | – | – | 2 while on the floor | grunt, drillbot, crawler 2; mine, landed Stingbot 1 (× `enemy_weight_scale`); not in the air or dying | – | – |
 
 **What presses what**
-- Button: player + blocks. Weight plate: player (standing) + blocks (+ stacked riders). See-saw load: player + blocks + liquid. Speed trap: only a surfer. Zone sensor: any body of an enabled kind inside it (player, enemies, blocks), whatever it weighs; the only source an enemy can power.
+- Button: player + blocks. Weight plate: player (standing) + blocks + enemies on the floor (+ stacked riders, through a block or an enemy). See-saw load: player + blocks + liquid (+ enemies when `enemy_weight_scale` is above 0). Speed trap: only a surfer. Zone sensor: any body of an enabled kind inside it (player, enemies, blocks), whatever it weighs.
 - Receivers are lit by beam/arc/bullet *specifically*. A laser does nothing to an arc receiver and vice versa.
 
 ## Gaps, limits and gotchas
@@ -302,12 +306,13 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **A mirror has two powered aims at most** (toggle mode); more positions need step mode (one step per rising edge) or several mirrors.
 - **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
-- **Enemies weigh nothing and press no plate or button**; the one way an enemy powers anything is by standing in a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
+- **An enemy presses a weight plate (and, if the plank opts in, tips a see-saw) but never a button**; it can also power a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
 - **Steam is a surf-only mechanic**; walking players and swimmers don't feel it.
 - **Wire layout is fixed at load**; painted conductors don't rewire at runtime.
 - **A level editor is a stretch goal**, and not built.
 
 **Things that are traps for the designer**
+- **A weight plate in an enemy's lane counts the enemy**: the plate is a flush ribbon with no collider, so grunts, crawlers and drillbots walk across it and press it for the crossing plus `hold_time`; set `enemy_weight_scale` to 0 on a plate meant only for the player and blocks. A Stingbot counts only while landed, and a mine counts even when dormant.
 - **Catwalk layers**: keep catwalks on their own layer in group `catwalk` (a mixed layer breaks brachiating and the surface checks). A powered bridge is its own layer, kept off the static one.
 - **Checkpoint on a bridge**: a restore re-derives a powered layer from its source, so a bridge whose source is off blinks once and retracts under a player respawned on it. Put the checkpoint on ground.
 - **Beams are polled by the turret**, so receiver `hold_time` matters; moving or rotating beams need ≥ 0.1 to 0.3 s.

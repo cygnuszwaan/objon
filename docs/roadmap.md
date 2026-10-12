@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 1 (Quick wins: Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,19 +14,7 @@ Covers: Phase 1 (Quick wins: Enemy weight on plates); Phase 2 (Logic and spawnin
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
-
-## Phase 1: Quick wins
-
-### N1.5 Enemy weight on plates (S)
-
-Built, awaiting in-editor confirmation; see Status in `power.md`.
-
-**Gap.** Enemies weigh nothing, so a grunt cannot hold a plate down.
-
-**Sketch.** An `enemy_weight` export on the weight plate (default 0, so every existing level is unchanged) that adds that weight for each group-`"enemy"` body overlapping the strip. Leave the see-saw alone at first: it would need the same rule in its load scan, and its default must stay 0. If both are wanted later, a duck-typed `get_load_weight() -> float` read by both is the cleaner contract.
-
-**Touches.** `power.md` (Weight plate), `rotating-bodies.md` (Loads) if extended.
+Phases run from least to most invasive. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
 
 ## Phase 2: Logic and spawning
 
