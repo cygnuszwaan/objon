@@ -100,14 +100,17 @@ tile_set = SubResource("TileSet_0w3yt")
 [node name="PoweredCatwalkLayer" parent="Tilemaps" unique_id=1013901616 node_paths=PackedStringArray("sources") instance=ExtResource("7_s474h")]
 tile_map_data = PackedByteArray("AACCAAMAAAAAAAAAAACDAAMAAAAAAAAAAACEAAMAAAAAAAAAAACFAAMAAAAAAAAAAAA=")
 sources = [NodePath("../Button")]
+ghost_opacity = null
 
 [node name="PoweredSpikeLayer" parent="Tilemaps" unique_id=1205680104 node_paths=PackedStringArray("sources") instance=ExtResource("8_7n46g")]
 tile_map_data = PackedByteArray("AACFAAUAAwAAAAAAAAA=")
 sources = [NodePath("../Button")]
+ghost_opacity = null
 
 [node name="PoweredLadderLayer" parent="Tilemaps" unique_id=1944668761 node_paths=PackedStringArray("sources") instance=ExtResource("9_rljw2")]
 tile_map_data = PackedByteArray("AACEAAQAAAAAAAAAAACEAAMAAAAAAAAAAAA=")
 sources = [NodePath("../Button")]
+ghost_opacity = null
 
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
 

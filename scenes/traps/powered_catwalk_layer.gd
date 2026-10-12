@@ -6,7 +6,7 @@ extends PoweredTileLayer
 ##
 ## OUT = collision on, visible and in group "catwalk", so every consumer that finds catwalks through a physics hit
 ## (the hang probes, the laser, the water and steam rays) or through the group (the ladder-landing scan, which reads
-## cells rather than collision) treats it as a catwalk. RETRACTED = collision off, hidden and OUT of the group, so none
+## cells rather than collision) treats it as a catwalk. RETRACTED = collision off, hidden (or a faint non-solid ghost with `show_ghost`) and OUT of the group, so none
 ## of them see it. Nothing here is in "world_tilemap" or "ground": ground tiles can't be switched (see the Powered tile
 ## layers note in hazards-traps.md).
 ##

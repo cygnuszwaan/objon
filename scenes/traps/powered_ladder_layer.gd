@@ -5,7 +5,7 @@ extends PoweredTileLayer
 ## exactly as on the level's `Ladders` layer. A ladder cell is just "a tile is present there" (no collision), and the
 ## player asks every layer in group "ladder_tilemap".
 ##
-## OUT = visible and in group "ladder_tilemap". RETRACTED = hidden and out of the group, so the player no longer sees
+## OUT = visible and in group "ladder_tilemap". RETRACTED = hidden (or a faint ghost with `show_ghost`) and out of the group, so the player no longer sees
 ## a ladder in those cells. A player climbing it is dropped on the next physics frame by the ordinary "no longer on a
 ## ladder" rule, with no code here. During the blink the layer is still a ladder.
 ##

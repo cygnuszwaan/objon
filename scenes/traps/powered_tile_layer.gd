@@ -20,6 +20,10 @@ extends TileMapLayer
 ## power falls and retracts when it ends. Power returning during the blink cancels it (no sound, no change). The
 ## startup state (`set_powered_initial()`) always snaps, with no blink and no sound.
 ##
+## GHOST: with `show_ghost` on, a retracted layer stays drawn as a faint ghost (`ghost_opacity`) so the player can see
+## where it will appear; it is still retracted in every other way (no collision, not in its groups, no hazard).
+## During a blink the layer alternates between full and ghost instead of full and hidden.
+##
 ## SOUND: `_sound_id(extended)` names the extend and retract sounds, played at the middle of the painted cells when
 ## the state really changes after startup (a retract plays when it happens, after any blink).
 
@@ -38,11 +42,27 @@ extends TileMapLayer
 ## The retract is this much later than the source: a TIMED button's `duration` is the time before the blink starts.
 @export_range(0.0, 10.0, 0.05, "or_greater") var warn_time: float = 1.0
 
+## Keep a retracted layer drawn as a faint ghost of where it will be. Purely visual: a ghost is not solid, not a ladder
+## and not a hazard.
+@export var show_ghost: bool = false:
+	set(value):
+		show_ghost = value
+		notify_property_list_changed()
+		if is_node_ready() and not Engine.is_editor_hint():
+			_show(out and _warn_left <= 0.0)
+## How opaque the ghost is, as a fraction of the layer's own opacity.
+@export_range(0.05, 0.8, 0.01) var ghost_opacity: float = 0.25:
+	set(value):
+		ghost_opacity = value
+		if is_node_ready() and not Engine.is_editor_hint():
+			_show(out and _warn_left <= 0.0)
+
 const WARN_BLINK_HZ := 5.0 ## The same pulse rate as a TIMED button's last second.
 
 var out: bool = true ## Runtime state: the layer is out. Authored state is out.
 var _warn_left: float = 0.0 ## Seconds of blink remaining (0 = not warning).
 var _warn_elapsed: float = 0.0
+var _base_alpha: float = 1.0 ## The layer's authored `modulate.a`, which a full draw restores and a ghost scales.
 
 ## Runs before the `PowerTarget` child's own `_ready()`, so its first (deferred) recompute already sees the sources.
 func _enter_tree() -> void:
@@ -50,12 +70,15 @@ func _enter_tree() -> void:
 
 func _ready() -> void:
 	set_physics_process(false)
+	_base_alpha = modulate.a
 	if Engine.is_editor_hint():
 		return
 	_set_out(true)
 
 func _validate_property(property: Dictionary) -> void:
 	if property.name == "warn_time" and not _supports_warning():
+		property.usage = PROPERTY_USAGE_NO_EDITOR
+	elif property.name == "ghost_opacity" and not show_ghost:
 		property.usage = PROPERTY_USAGE_NO_EDITOR
 
 # ---- subclass hooks ---------------------------------------------------------------------------------------------
@@ -119,19 +142,31 @@ func _physics_process(delta: float) -> void:
 		_set_out(false)
 		_play_change(false)
 		return
-	visible = fmod(_warn_elapsed * WARN_BLINK_HZ, 1.0) < 0.5
+	_show(fmod(_warn_elapsed * WARN_BLINK_HZ, 1.0) < 0.5)
 
 func _cancel_warning() -> void:
 	_warn_left = 0.0
 	_warn_elapsed = 0.0
 	set_physics_process(false)
 	if out:
-		visible = true
+		_show(true)
 
 func _set_out(on: bool) -> void:
 	out = on
-	visible = on
+	_show(on)
 	_apply_state(on)
+
+## Draws the layer at full strength, or (not `full`) as the ghost with `show_ghost` and not at all without it.
+func _show(full: bool) -> void:
+	if full:
+		visible = true
+		modulate.a = _base_alpha
+	elif show_ghost:
+		visible = true
+		modulate.a = _base_alpha * ghost_opacity
+	else:
+		visible = false
+		modulate.a = _base_alpha
 
 func _play_change(extended: bool) -> void:
 	var id := _sound_id(extended)
