@@ -87,6 +87,7 @@ Callers test with `has_method()` or a group, never a class name. Implementers li
 | `bowled_over(direction, surf_speed) -> bool` | Grunt, Drillbot, Tread crawler, Breakable barrier | the surf's bowl sweep | `player-surf.md` (Bowling) |
 | `surf_shoved(direction, surf_speed) -> float` | MeltableBlock | the same sweep, for bodies with no `bowled_over()` | `player-surf.md` (Shoving blocks) |
 | `get_surf_friction_scale() -> float` | IceBlock (or a tile's `surf_friction` data) | the surf's floor probe | `player-surf.md` (Surface friction) |
+| `get_load_weight() -> float` | Grunt, Drillbot, Stingbot, Tread crawler, Proximity mine (0 while dying or off the floor) | Weight plate, see-saw (through group `"enemy"`) | `enemies.md` (Enemy weight) |
 | `get_surf_speed()` | Player (public getter) | the bowl threshold, the speed trap | `player-surf.md` |
 | `is_slippery() -> bool` | IceBlock | the player's floor probe | `player.md` (Slippery floors) |
 | `get_conveyor_speed()` | Conveyor belt | the player's `_conveyor_push_speed()` | `platforms-conveyors.md` |
@@ -129,7 +130,7 @@ One line each; the detail and the reason are in the file named. These are what k
 1. **Place it**: the `.gd` beside its `.tscn`, in the folder that matches its role (`enemies/`, `interactive/`, `traps/`, `collectibles/`, `levels/`, `ui/`; see Project setup).
 2. **Layers and masks** (see Physics layers): a new actor masks layer 2, and layer 1 only if it should be solid against other actors; a solid platform or hazard body is layer 2; anything kickable or bowlable is 1|2; a trigger is an `Area2D`.
 3. **Groups** (see Groups in use), joined in its own `_ready()`: `"enemy"` for an enemy, `"water_solid"` if water should rest on it, `"laser_mirror"` for a reflector, `"power_source"` or `"power_target"` for the power contract, `"saveable"` if it keeps state across a checkpoint.
-4. **Contracts**: implement the duck-typed methods it should answer (table above): `take_damage()` and, if the surf can plough through it, `bowled_over()` for an enemy; `set_powered()` for a device; `is_powered()` and `powered_changed` for a source.
+4. **Contracts**: implement the duck-typed methods it should answer (table above): `take_damage()`, `get_load_weight()` (if it should press a plate or tip a see-saw) and, if the surf can plough through it, `bowled_over()` for an enemy; `set_powered()` for a device; `is_powered()` and `powered_changed` for a source.
 5. **Power**: a device scene carries a `PowerTarget` child and an `invert` export on its root; a source joins `"power_source"`. Add it to Powered devices (or the source's own bullet) in `docs/power.md`.
 6. **Save and restore**: if its state changes at runtime, implement `save_state()` and `load_state()` and add it to What each type saves in `docs/saving-levels-ui.md`. A restore must not produce a surprise hit.
 7. **Audio**: add the sound hooks and put every new id in `Audio.PLANNED`.

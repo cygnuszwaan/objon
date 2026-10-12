@@ -20,6 +20,8 @@ Phases run from least to most invasive. Phase 1 adds nothing to a shared solver:
 
 ### N1.5 Enemy weight on plates (S)
 
+Built, awaiting in-editor confirmation; see Status in `power.md`.
+
 **Gap.** Enemies weigh nothing, so a grunt cannot hold a plate down.
 
 **Sketch.** An `enemy_weight` export on the weight plate (default 0, so every existing level is unchanged) that adds that weight for each group-`"enemy"` body overlapping the strip. Leave the see-saw alone at first: it would need the same rule in its load scan, and its default must stay 0. If both are wanted later, a duck-typed `get_load_weight() -> float` read by both is the cleaner contract.

@@ -30,14 +30,14 @@ extends AnimatableBody2D
 # STEP 1.2 (weights and load): every physics frame, after the body has moved, it finds
 # what is standing on it and reports the torque each load would apply about the pivot. Loads are the player
 # (`player_weight`, same units as a block's `mass`: metal 4 and ice 1 per 16px tile) and MeltableBlocks (their
-# `mass`); enemies have no weight and are ignored. Detection is a thin band over the top face of each collision
-# shape, following the rotation (like the grip's), but on layer 1 it also returns rigid blocks, which the grip
+# `mass`) and, when `enemy_weight_scale` is above 0 (default 0: enemies are ignored), enemies by their
+# `get_load_weight()`. Detection is a thin band over the top face of each collision shape, following the rotation (like the grip's), but on layer 1 it also returns rigid blocks, which the grip
 # deliberately skips. A candidate counts only if it is resting on its support: a short probe (2px, along
 # the face normal for this body) must reach the support (a `test_move()` that hits it first for actors, an overlap
 # query for rigid blocks, whose mask includes the player's layer), which excludes a block beside the plank or a player
 # in mid-air. Loads stack: whatever rests on a block that rests on this body (a player on a block, a block on a
-# block, up to MAX_STACK_DEPTH levels) is counted too, at its own x. Torque = weight x (load x - pivot x), positive =
-# clockwise on screen (the same sign as the angle): standing right of the pivot pushes the right side down.
+# block, up to MAX_STACK_DEPTH levels) is counted too, at its own x (a block or an enemy can carry a stack).
+# Torque = weight x (load x - pivot x), positive = clockwise on screen (the same sign as the angle): standing right of the pivot pushes the right side down.
 # `get_net_torque()` (loads + resting liquid; `get_load_torque()` and `get_liquid_torque()` are its two parts) and
 # `get_loads()` are what the dynamics read. `debug_draw` (or `debug_toggle_key`
 # at runtime) draws the pivot, every load's lever arm, weight and torque, and the net torque as an arc, in world
@@ -110,6 +110,9 @@ extends AnimatableBody2D
 @export var liquid_weight_scale: float = 1.0
 ## Weight of the player standing on the body, in the same units as a block's `mass` (metal 4 per tile, ice 1). Tune with the dynamics in step 1.3.
 @export var player_weight: float = 2.0
+## Multiplies every enemy's `get_load_weight()` (a landed enemy standing on the body). 0 = enemies are ignored, so an
+## existing see-saw is unchanged; 1 = they weigh what they are authored to.
+@export_range(0.0, 10.0, 0.1, "or_greater") var enemy_weight_scale: float = 0.0
 @export_group("Hang")
 ## Whether the player can ledge-grab this body's ends. Off = never joins "ground", so it is a plain solid.
 @export var hangable: bool = true
@@ -639,7 +642,7 @@ func _consider_load(candidate: Object, support: PhysicsBody2D, into: Vector2, se
 	seen[id] = true
 	var offset := body.global_position.x - get_pivot_global().x
 	_loads.append({"body": body, "id": id, "weight": weight, "offset": offset, "torque": weight * offset, "position": body.global_position})
-	if depth < MAX_STACK_DEPTH and body is RigidBody2D:
+	if depth < MAX_STACK_DEPTH and _carries_stack(body):
 		_collect_on_top_of(body, seen, depth + 1)
 
 ## Things standing on a block that is itself a load: a band above each of its shapes, straight up in world space.
@@ -657,14 +660,20 @@ func _collect_on_top_of(block: PhysicsBody2D, seen: Dictionary, depth: int) -> v
 		for hit in space.intersect_shape(params, 16):
 			_consider_load(hit["collider"], block, Vector2(0.0, 2.0), seen, depth)
 
-## Weight in block-mass units: a MeltableBlock's `mass`, the player's `player_weight`, nothing else (enemies are
-## weightless).
+## Weight in block-mass units: a MeltableBlock's `mass`, the player's `player_weight`, an enemy's
+## `get_load_weight()` times `enemy_weight_scale`, nothing else.
 func _weight_of(body: PhysicsBody2D) -> float:
 	if body is MeltableBlock:
 		return (body as MeltableBlock).mass
 	if body.is_in_group(&"player"):
 		return player_weight
+	if enemy_weight_scale > 0.0 and body.is_in_group(&"enemy") and body.has_method(&"get_load_weight"):
+		return float(body.call(&"get_load_weight")) * enemy_weight_scale
 	return 0.0
+
+## Whether what rests on `body` is counted too: a rigid block, or an enemy that has weight here.
+func _carries_stack(body: PhysicsBody2D) -> bool:
+	return body is RigidBody2D or (enemy_weight_scale > 0.0 and body.is_in_group(&"enemy") and body.has_method(&"get_load_weight"))
 
 # --- debug drawing ----------------------------------------------------------------------------------------
 

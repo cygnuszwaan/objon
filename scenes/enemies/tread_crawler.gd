@@ -56,6 +56,11 @@ enum State { WALK, TURN, FLIPPED, RIGHTING }
 @export_group("Attack")
 ## Damage per contact, passed to `take_hit()`.
 @export var damage: int = 1
+## Weight on a weight plate or see-saw, in block-mass units (metal 4, ice 1 per tile, the player 2). Counts only while
+## it is alive and on the floor (`get_load_weight()`); 0 = it never presses anything. An authored value only.
+@export_group("Load")
+@export_range(0.0, 40.0, 0.5, "or_greater") var load_weight: float = 2.0
+@export_group("")
 
 const EXPLOSION_SCENE: PackedScene = preload("res://scenes/effects/explosion.tscn")
 const HIT_FLASH_COLOR := Color(1.6, 0.5, 0.5)
@@ -318,3 +323,10 @@ func _knock_out(direction: float) -> void:
 	tween.tween_property(art, "rotation", TAU * KNOCKOUT_SPINS * direction, KNOCKOUT_DURATION)
 	tween.tween_property(art, "modulate:a", 0.0, KNOCKOUT_DURATION * 0.4).set_delay(KNOCKOUT_DURATION * 0.6)
 	tween.chain().tween_callback(queue_free)
+
+## Weight contract, read by the weight plate and the see-saw (duck-typed, found through group "enemy"): `load_weight`
+## while this body is alive and standing on something, else 0 (a body in the air presses nothing).
+func get_load_weight() -> float:
+	if _dead or not is_on_floor():
+		return 0.0
+	return load_weight

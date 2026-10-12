@@ -56,6 +56,11 @@ enum State { DORMANT, ARMED }
 @export var kick_speed: float = 160.0
 ## Slowing of a slide, px/s^2.
 @export var slide_friction: float = 120.0
+## Weight on a weight plate or see-saw, in block-mass units (metal 4, ice 1 per tile, the player 2). Counts only while
+## it is alive and on the floor (`get_load_weight()`); 0 = it never presses anything. An authored value only.
+@export_group("Load")
+@export_range(0.0, 40.0, 0.5, "or_greater") var load_weight: float = 1.0
+@export_group("")
 
 const EXPLOSION_SCENE: PackedScene = preload("res://scenes/effects/explosion.tscn")
 const EXPLOSION_SCALE := 1.5  # the standard explosion drawn larger: this is a bigger bang than a bot dying
@@ -232,3 +237,10 @@ func load_state(d: Dictionary) -> void:
 	velocity = Vector2.ZERO
 	_apply_pose()
 	reset_physics_interpolation()
+
+## Weight contract, read by the weight plate and the see-saw (duck-typed, found through group "enemy"): `load_weight`
+## while this body is alive and standing on something, else 0 (a body in the air presses nothing).
+func get_load_weight() -> float:
+	if _exploded or not is_on_floor():
+		return 0.0
+	return load_weight

@@ -30,6 +30,11 @@ enum Phase { AIRBORNE, LANDING, RECHARGING, LAUNCHING }
 
 @export var flight_time: float = 6.0    ## Seconds airborne before it must land and recharge.
 @export var recharge_time: float = 2.0  ## Seconds spent landed before launching again.
+## Weight on a weight plate or see-saw, in block-mass units (metal 4, ice 1 per tile, the player 2). Counts only while
+## it is alive and on the floor (`get_load_weight()`); 0 = it never presses anything. An authored value only.
+@export_group("Load")
+@export_range(0.0, 40.0, 0.5, "or_greater") var load_weight: float = 1.0
+@export_group("")
 
 # Internal tuneables — not exported, same idiom as Bullet's `speed` / Drillbot's `_speed`.
 var _fly_speed: float = 30.0
@@ -254,3 +259,10 @@ func _die() -> void:
 	get_parent().add_child(explosion)  # not add_child on self — see Drillbot's _die for why
 
 	queue_free()
+
+## Weight contract, read by the weight plate and the see-saw (duck-typed, found through group "enemy"): `load_weight`
+## while this body is alive and standing on something, else 0 (a body in the air presses nothing).
+func get_load_weight() -> float:
+	if _dead or not is_on_floor():
+		return 0.0
+	return load_weight

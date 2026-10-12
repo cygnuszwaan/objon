@@ -26,6 +26,11 @@ extends CharacterBody2D
 # fall through its own floor.
 ## Px each way from the spawn point. 0 = patrol freely: walk until a wall or a ledge, dwell, turn round.
 @export_range(0.0, 512.0, 1.0, "or_greater") var patrol_distance: float = 96.0
+## Weight on a weight plate or see-saw, in block-mass units (metal 4, ice 1 per tile, the player 2). Counts only while
+## it is alive and on the floor (`get_load_weight()`); 0 = it never presses anything. An authored value only.
+@export_group("Load")
+@export_range(0.0, 40.0, 0.5, "or_greater") var load_weight: float = 2.0
+@export_group("")
 
 var _speed: float = 40.0
 var _dwell_time: float = 1.0
@@ -342,3 +347,10 @@ func _die() -> void:
 		# queue_free() and would take a child down with it before the animation finishes
 
 	queue_free()
+
+## Weight contract, read by the weight plate and the see-saw (duck-typed, found through group "enemy"): `load_weight`
+## while this body is alive and standing on something, else 0 (a body in the air presses nothing).
+func get_load_weight() -> float:
+	if _dead or not is_on_floor():
+		return 0.0
+	return load_weight

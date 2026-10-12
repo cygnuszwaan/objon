@@ -5,34 +5,38 @@ extends Area2D
 ## PowerTargets pick it in their `sources` list and conductor wires attach to it by adjacency, like a Button.
 ##
 ## Weight is in the units the see-saw already uses: a MeltableBlock's engine `mass` (set per 16px tile in its scene:
-## metal 4, ice 1) and the player's `player_weight` (2, the same default as RotatingBody). Enemies and liquid weigh
-## nothing, so they never press it. The default `threshold` of 2 is the player alone; an ice block (1) is not
-## enough alone, two stacked are, and a metal block is. A melting ice block lowers the reading, so a plate can
-## release by itself, which makes it a timer.
+## metal 4, ice 1), the player's `player_weight` (2, the same default as RotatingBody) and an enemy's
+## `get_load_weight()` (its own `load_weight` while alive and on the floor, else 0: a landed Stingbot counts, a
+## flying one or a rail bot never does), times `enemy_weight_scale`. Liquid weighs nothing. The default `threshold`
+## of 2 is the player alone; an ice block (1) is not enough alone, two stacked are, and a metal block is. A melting
+## ice block lowers the reading, so a plate can release by itself, which makes it a timer.
 ##
-## What counts: the sensor is a strip straddling the top of the pedestal (the same geometry as Button's), polled every
+## What counts: the sensor is the ribbon above, polled every
 ## physics frame like Button, Sawwheel and Crusher rather than through body_entered/exited, so a block that melts
 ## on the plate can't leave it stuck. Each body overlapping the strip counts once. The player counts only while on the
-## floor, so jumping through the strip doesn't. Blocks (and the player) resting on a block that is on the plate
-## count too, up to MAX_STACK_DEPTH levels, found with a thin band above each of its shapes, like the see-saw's
-## load scan (a player on a block on the plate loads it). A candidate must be centred above the block under it, so a
+## floor, so jumping through the strip doesn't, and an enemy counts only while alive and on the floor. Blocks and
+## enemies (and the player) resting on a block or an enemy that is on the plate count too, up to MAX_STACK_DEPTH
+## levels, found with a thin band above each of its shapes, like the see-saw's load scan (a player on a block on
+## the plate loads it, and so does a player on a grunt). A candidate must be centred above the block under it, so a
 ## block standing beside it doesn't count. A block merely falling through the strip counts for the frames it overlaps.
 ##
 ## Power: rises the physics frame the reading reaches `threshold`; falls once it has been below it for `hold_time`
 ## seconds (default 0.15), which absorbs a block bobbing on the plate or a reading that dips for a frame. Hold is the
 ## shared rule for a source read from an analogue quantity (no hysteresis is needed on top of it).
 ##
-## Pedestal: a child StaticBody2D (layer 2, "water_solid", not "ground"/"catwalk", so it can't be ledge-grabbed)
-## whose top sinks 2px while powered (eased at SINK_SPEED), so the plate visibly gives under load.
+## Ribbon, not a solid: the plate has no collider that anything can stand on or bump into. Its only physics is the
+## sensor ribbon, a 16x4 strip centred on the top edge of the tile the plate is in (2px above it and 2px into it), so
+## it is flush with the walking surface and an actor walks, steps or falls across it with no step to climb and no
+## recess to catch on. The plate goes in the cell that is the TOP of the floor, over a ground tile (or any other solid
+## the actors stand on there): that tile is what carries the weight, and a body resting on it overlaps the ribbon.
+## The plate does not sink; the ribbon changes colour and fills with the reading.
 ##
 ## Expected scene layout (weight_plate.tscn):
 ##   WeightPlate (Area2D, this script, collision_layer 0, collision_mask 1)
-##     - CollisionShape2D   (sensor strip)
-##     - Solid (StaticBody2D, layer 2)
-##         - CollisionShape2D   (RectangleShape2D; resized by this script at runtime)
+##     - CollisionShape2D   (the sensor ribbon, 16x4 at (0, -8))
 ##
 ## Origin: the centre of a 16x16 tile (the cell a ConductorLayer files it under, like Button). Art is drawn in code
-## (a slab with a fill bar showing weight against the threshold) until sprites exist; `show_weight` prints the
+## (a thin strip along the top edge of the tile, filling with the weight against the threshold) until sprites exist; `show_weight` prints the
 ## live reading above it at runtime, for tuning a threshold. Sounds `interactive/weight_plate_press` and
 ## `interactive/weight_plate_release` (on a change of `powered`) are in Audio.PLANNED.
 ##
@@ -50,20 +54,21 @@ signal powered_changed(on: bool)
 @export_range(0.0, 5.0, 0.05, "or_greater") var hold_time: float = 0.15
 ## The player's weight, in the same units as a block's `mass` (matches RotatingBody.player_weight).
 @export var player_weight: float = 2.0
+## Multiplies every enemy's `get_load_weight()`. 1 = enemies weigh what they are authored to; 0 = this plate ignores
+## them (a plate in a patrol route that only the player and blocks should press).
+@export_range(0.0, 10.0, 0.1, "or_greater") var enemy_weight_scale: float = 1.0
 ## Runtime only: draw the live weight and threshold above the plate, for tuning.
 @export var show_weight: bool = false
 @export var draw_placeholder: bool = true
 
-const HALF_TILE := 8.0
-const SURFACE_TOP := -5.0 ## local y of the pedestal's top when not pressed (Button's resting height).
-const SINK_PX := 2.0 ## how far the top sinks while powered.
-const SINK_SPEED := 30.0 ## px/s the top moves at.
-const SOLID_WIDTH := 14.0
+const HALF_TILE := 8.0 ## the ribbon's art sits on the tile's top edge, y = -HALF_TILE.
+const RIBBON_WIDTH := 16.0 ## the art's width (the sensor shape in the scene is the same).
+const RIBBON_ART_HEIGHT := 3.0 ## the art's height, inside the tile below its top edge.
 const RIDER_MASK := 1 ## layer 1: the player, enemies and blocks (blocks are layers 1|2).
 const RIDER_BAND := 3.0 ## px above a block's shape that counts as "on it" for the stack query.
 const MAX_STACK_DEPTH := 3 ## levels of blocks (and what stands on them) counted above the plate.
 const RESTORE_GRACE_FRAMES := 3
-const COLOR_SLAB := Color(0.34, 0.36, 0.42)
+const COLOR_SLAB := Color(0.18, 0.19, 0.23)
 const COLOR_SLAB_ON := Color(0.35, 0.8, 0.45)
 const COLOR_EDGE := Color(0.6, 0.63, 0.7)
 const COLOR_BAR := Color(1.0, 0.75, 0.25)
@@ -71,24 +76,16 @@ const COLOR_BAR := Color(1.0, 0.75, 0.25)
 var powered: bool = false
 var weight: float = 0.0 ## The reading from the last physics frame.
 var _time_left: float = 0.0 ## Hold remaining while the reading is below the threshold.
-var _sink: float = 0.0
 var _restore_grace: int = 0
 var _drawn_weight: float = -1.0
-
-@onready var _solid: StaticBody2D = $Solid
-@onready var _solid_shape: CollisionShape2D = $Solid/CollisionShape2D
 
 func _ready() -> void:
 	add_to_group(&"power_source")  # what ConductorLayer scans to attach sources to circuits by adjacency
 	queue_redraw()
 	if Engine.is_editor_hint():
-		set_physics_process(false)  # the scene file already holds the resting collider
+		set_physics_process(false)  # the scene file already holds the sensor ribbon
 		return
 	add_to_group(&"saveable")
-	# The shape resource is shared by every instance of this scene: give this one its own before it is resized.
-	_solid_shape.shape = RectangleShape2D.new()
-	_sync_solid()
-	_solid.add_to_group(&"water_solid")  # collision only; water rests on the pedestal
 
 ## Power-source contract (PowerTarget and conductor circuits read this).
 func is_powered() -> bool:
@@ -98,7 +95,7 @@ func is_powered() -> bool:
 func save_state() -> Dictionary:
 	return {"powered": powered, "time_left": _time_left}
 
-## Snaps with no sound: the pedestal goes straight to its sunk or resting height. Emits powered_changed only if
+## Snaps with no sound. Emits powered_changed only if
 ## `powered` differs from the current value; the live reading takes over from the next physics frame.
 func load_state(d: Dictionary) -> void:
 	var was := powered
@@ -107,8 +104,6 @@ func load_state(d: Dictionary) -> void:
 	if powered and _time_left <= 0.0:
 		_time_left = hold_time
 	_restore_grace = RESTORE_GRACE_FRAMES if powered else 0
-	_sink = SINK_PX if powered else 0.0
-	_sync_solid()
 	queue_redraw()
 	if powered != was:
 		powered_changed.emit(powered)
@@ -126,11 +121,6 @@ func _physics_process(delta: float) -> void:
 			_time_left = maxf(_time_left - delta, 0.0)
 			if _time_left <= 0.0:
 				_set_powered(false)
-	var target := SINK_PX if powered else 0.0
-	if not is_equal_approx(_sink, target):
-		_sink = move_toward(_sink, target, SINK_SPEED * delta)
-		_sync_solid()
-		queue_redraw()
 	if not is_equal_approx(weight, _drawn_weight):
 		_drawn_weight = weight
 		queue_redraw()
@@ -166,19 +156,26 @@ func _weight_with_stack(body: Object, seen: Dictionary, depth: int) -> float:
 	if own <= 0.0:
 		return 0.0
 	seen[physics_body.get_instance_id()] = true
-	if depth < MAX_STACK_DEPTH and physics_body is RigidBody2D:
+	if depth < MAX_STACK_DEPTH and _carries_stack(physics_body):
 		own += _stack_above(physics_body, seen, depth + 1)
 	return own
 
-## Weight in block-mass units: a MeltableBlock's `mass`, the player's `player_weight` while on the floor, nothing
-## else (enemies are weightless).
+## Weight in block-mass units: a MeltableBlock's `mass`, the player's `player_weight` while on the floor, an enemy's
+## `get_load_weight()` times `enemy_weight_scale` (0 for one that is dying, in the air or has no weight), nothing else.
 func _weight_of(body: PhysicsBody2D) -> float:
 	if body is MeltableBlock:
 		return (body as MeltableBlock).mass
 	if body.is_in_group(&"player"):
 		var character := body as CharacterBody2D
 		return player_weight if character != null and character.is_on_floor() else 0.0
+	if body.is_in_group(&"enemy") and body.has_method(&"get_load_weight"):
+		return float(body.call(&"get_load_weight")) * enemy_weight_scale
 	return 0.0
+
+## Whether what stands on `body` is counted too: a rigid block, or a weighing enemy (so a player on a flipped crawler
+## that is on the plate loads it).
+func _carries_stack(body: PhysicsBody2D) -> bool:
+	return body is RigidBody2D or (body.is_in_group(&"enemy") and body.has_method(&"get_load_weight"))
 
 ## What stands on `block`: a band above each of its shapes, straight up in world space. A candidate must be centred
 ## above the block, which filters out a block touching it sideways.
@@ -200,30 +197,22 @@ func _stack_above(block: PhysicsBody2D, seen: Dictionary, depth: int) -> float:
 				total += _weight_with_stack(above, seen, depth)
 	return total
 
-# --- solid ---------------------------------------------------------------------------------------
-
-## Resize the pedestal so its top follows the sink and its bottom stays on the tile's lower edge.
-func _sync_solid() -> void:
-	var top := SURFACE_TOP + _sink
-	var rect := _solid_shape.shape as RectangleShape2D
-	rect.size = Vector2(SOLID_WIDTH, HALF_TILE - top)
-	_solid_shape.position = Vector2(0.0, (top + HALF_TILE) * 0.5)
-
 # --- drawing -------------------------------------------------------------------------------------
 
 func _draw() -> void:
 	if not draw_placeholder:
 		return
-	var top := SURFACE_TOP + _sink
-	var slab := COLOR_SLAB_ON if powered else COLOR_SLAB
-	draw_rect(Rect2(-SOLID_WIDTH * 0.5, top, SOLID_WIDTH, HALF_TILE - top), COLOR_SLAB.darkened(0.3))
-	draw_rect(Rect2(-SOLID_WIDTH * 0.5, top, SOLID_WIDTH, 2.0), slab)
-	draw_rect(Rect2(-SOLID_WIDTH * 0.5, top, SOLID_WIDTH, HALF_TILE - top), COLOR_EDGE, false, 1.0)
-	# A fill bar below the top: how much of the threshold is on the plate.
-	var fill := clampf(weight / maxf(threshold, 0.001), 0.0, 1.0) if not Engine.is_editor_hint() else 0.0
-	var bar_width := (SOLID_WIDTH - 4.0)
-	draw_rect(Rect2(-bar_width * 0.5, top + 4.0, bar_width, 2.0), Color(0.12, 0.13, 0.16))
-	if fill > 0.0:
-		draw_rect(Rect2(-bar_width * 0.5, top + 4.0, bar_width * fill, 2.0), COLOR_BAR)
+	# A thin strip along the top edge of the tile: dark when idle with an amber bar filling left to right as the weight
+	# nears the threshold, green while powered.
+	var left := -RIBBON_WIDTH * 0.5
+	var strip := Rect2(left, -HALF_TILE, RIBBON_WIDTH, RIBBON_ART_HEIGHT)
+	draw_rect(strip, COLOR_SLAB)
+	if powered:
+		draw_rect(strip, COLOR_SLAB_ON)
+	else:
+		var fill := clampf(weight / maxf(threshold, 0.001), 0.0, 1.0) if not Engine.is_editor_hint() else 0.0
+		if fill > 0.0:
+			draw_rect(Rect2(left, -HALF_TILE, RIBBON_WIDTH * fill, RIBBON_ART_HEIGHT), COLOR_BAR)
+	draw_line(Vector2(left, -HALF_TILE + 0.5), Vector2(-left, -HALF_TILE + 0.5), COLOR_EDGE, 1.0)
 	if show_weight and not Engine.is_editor_hint():
-		draw_string(ThemeDB.fallback_font, Vector2(-14.0, top - 4.0), "%.1f/%.1f" % [weight, threshold], HORIZONTAL_ALIGNMENT_CENTER, 28.0, 8, Color.WHITE)
+		draw_string(ThemeDB.fallback_font, Vector2(-14.0, -HALF_TILE - 4.0), "%.1f/%.1f" % [weight, threshold], HORIZONTAL_ALIGNMENT_CENTER, 28.0, 8, Color.WHITE)
