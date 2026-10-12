@@ -8,9 +8,11 @@
 [ext_resource type="Texture2D" uid="uid://cn55xxm03e6ja" path="res://sprites/tiles/catwalks.png" id="6_dyh2t"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="6_yjlda"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="7_aghq8"]
-[ext_resource type="PackedScene" path="res://scenes/traps/powered_spike_layer.tscn" id="7_s474h"]
+[ext_resource type="PackedScene" path="res://scenes/traps/powered_catwalk_layer.tscn" id="7_s474h"]
+[ext_resource type="PackedScene" path="res://scenes/traps/powered_spike_layer.tscn" id="8_7n46g"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_y0ep0"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/zone_sensor.tscn" id="11_s474h"]
+[ext_resource type="PackedScene" path="res://scenes/traps/powered_ladder_layer.tscn" id="9_rljw2"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/button.tscn" id="10_s474h"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8dks1"]
 texture = ExtResource("6_dyh2t")
@@ -95,11 +97,23 @@ tile_set = ExtResource("5_rljw2")
 tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAA=")
 tile_set = SubResource("TileSet_0w3yt")
 
-[node name="PoweredSpikeLayer" parent="Tilemaps" unique_id=1751045172 node_paths=PackedStringArray("sources") instance=ExtResource("7_s474h")]
-tile_map_data = PackedByteArray("AACCAAUAAwAAAAAAAACBAAUAAwAAAAAAAACBAAMAAgABAAEAAAA=")
-sources = [NodePath("../../ZoneSensor")]
+[node name="PoweredCatwalkLayer" parent="Tilemaps" unique_id=1013901616 node_paths=PackedStringArray("sources") instance=ExtResource("7_s474h")]
+tile_map_data = PackedByteArray("AACCAAMAAAAAAAAAAACDAAMAAAAAAAAAAACEAAMAAAAAAAAAAACFAAMAAAAAAAAAAAA=")
+sources = [NodePath("../Button")]
+
+[node name="PoweredSpikeLayer" parent="Tilemaps" unique_id=1205680104 node_paths=PackedStringArray("sources") instance=ExtResource("8_7n46g")]
+tile_map_data = PackedByteArray("AACFAAUAAwAAAAAAAAA=")
+sources = [NodePath("../Button")]
+
+[node name="PoweredLadderLayer" parent="Tilemaps" unique_id=1944668761 node_paths=PackedStringArray("sources") instance=ExtResource("9_rljw2")]
+tile_map_data = PackedByteArray("AACEAAQAAAAAAAAAAACEAAMAAAAAAAAAAAA=")
+sources = [NodePath("../Button")]
 
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
+
+[node name="Button" parent="Tilemaps" unique_id=482094233 instance=ExtResource("10_s474h")]
+position = Vector2(2072, 88)
+latch_mode = 2
 
 [node name="WaterManager" type="Node2D" parent="." unique_id=1297838409 groups=["water_manager"]]
 script = ExtResource("7_aghq8")
@@ -124,10 +138,6 @@ position = Vector2(2044, 88)
 [node name="Dynamic" type="Node" parent="." unique_id=223122078]
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
-
-[node name="ZoneSensor" parent="." unique_id=969214654 instance=ExtResource("11_s474h")]
-position = Vector2(2112, 56)
-hold_time = 3.9
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

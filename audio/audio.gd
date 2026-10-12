@@ -128,6 +128,8 @@ const PLANNED: Array[StringName] = [
 	&"traps/spikes_hit",             # a spike tile hurting the player, at the tile
 	&"traps/spikes_extend",          # a powered spike layer extending (not at startup), at the middle of its tiles
 	&"traps/spikes_retract",         # a powered spike layer retracting, same place
+	&"traps/bridge_extend",          # a powered catwalk or ladder layer extending (not at startup), at the middle of its tiles
+	&"traps/bridge_retract",         # a powered catwalk or ladder layer retracting (after its blink), same place
 	&"ui/menu_open",                  # the pause menu opening
 	&"ui/menu_close",                 # the pause menu closing (resume)
 	&"ui/menu_select",                # a menu button being pressed

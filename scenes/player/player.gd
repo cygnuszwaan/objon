@@ -90,7 +90,12 @@ var climb_speed: float = 100.0
 var is_climbing: bool = false
 
 var world_tilemap: TileMapLayer
-var ladder_tilemap: TileMapLayer  # separate layer (group "ladder_tilemap") so a ladder can share a cell with a catwalk tile; a tile present = ladder cell
+# Ladders live on their own layers (group "ladder_tilemap") so a ladder can share a cell with a catwalk tile; a tile present = ladder
+# cell. There can be several: the level's static `Ladders` layer and any `PoweredLadderLayer`, which is in the group only while out.
+# `_ladder_layers()` reads the group every call, so a layer that retracts or extends is seen at once. These remember which layer
+# the last `_ladder_cell_overlapping()` / `_ladder_cell_under_feet()` hit was on, for the x-snap on mount.
+var _ladder_hit_layer: TileMapLayer
+var _ladder_mount_layer: TileMapLayer
 var water_manager: WaterManager
 	# Found via the "water_manager" group in _ready(), same lookup convention as world_tilemap/
 	# ladder_tilemap above. Unlike those two, no push_warning if missing — a level with no water in it
@@ -651,8 +656,7 @@ func _ready() -> void:
 	world_tilemap = get_tree().get_first_node_in_group("world_tilemap")
 	if world_tilemap == null:
 		push_warning("No TileMapLayer found in group 'world_tilemap' — hanging will not work")
-	ladder_tilemap = get_tree().get_first_node_in_group("ladder_tilemap")
-	if ladder_tilemap == null:
+	if get_tree().get_first_node_in_group("ladder_tilemap") == null:
 		push_warning("No TileMapLayer found in group 'ladder_tilemap' — climbing will not work")
 	water_manager = get_tree().get_first_node_in_group("water_manager")
 	surf_board = get_node_or_null("SurfBoard") as Node2D
@@ -744,7 +748,8 @@ func _physics_process(delta: float) -> void:
 		is_climbing = true
 		# snap the player's x to the ladder tile's center column
 		var snap_cell: Vector2i = mount_cell if can_mount_from_above else ladder_cell
-		global_position.x = ladder_tilemap.to_global(ladder_tilemap.map_to_local(snap_cell)).x
+		var snap_layer: TileMapLayer = _ladder_mount_layer if can_mount_from_above else _ladder_hit_layer
+		global_position.x = snap_layer.to_global(snap_layer.map_to_local(snap_cell)).x
 		if can_mount_from_above:
 			global_position.y += ladder_mount_sink  # see ladder_mount_sink: lets the collider pass down through a one-way surface
 		elif is_on_floor():
@@ -1728,38 +1733,53 @@ func _can_stand_up() -> bool:
 	var result := space_state.intersect_shape(query)
 	return result.is_empty()
 
-func _is_ladder_cell(cell: Vector2i) -> bool:
-	# the ladder layer holds nothing but ladders, so any tile at all counts
-	return ladder_tilemap != null and ladder_tilemap.get_cell_source_id(cell) != -1
+func _ladder_layers() -> Array[TileMapLayer]:
+	# Every ladder layer that is live right now: the static one(s) and any powered ladder layer that is out (a retracted
+	# one has left the group).
+	var layers: Array[TileMapLayer] = []
+	for node in get_tree().get_nodes_in_group("ladder_tilemap"):
+		if node is TileMapLayer:
+			layers.append(node as TileMapLayer)
+	return layers
+
+func _is_ladder_cell(layer: TileMapLayer, cell: Vector2i) -> bool:
+	# a ladder layer holds nothing but ladders, so any tile at all counts
+	return layer.get_cell_source_id(cell) != -1
 
 func _ladder_cell_overlapping() -> Vector2i:
-	# The ladder cell any part of the collider is overlapping, or Vector2i.MAX for none. Samples
-	# three points down the collider's centerline (middle, then just inside the bottom and top
+	# The ladder cell any part of the collider is overlapping, or Vector2i.MAX for none; `_ladder_hit_layer` is the layer
+	# it was found on. Samples three points down the collider's centerline (middle, then just inside the bottom and top
 	# edges) rather than testing the full rectangle: a ladder is one tile wide, the collider is
 	# narrower than a tile, and the centerline keeps the x-snap on entry small. Uses the CURRENT
 	# shape (crouching included).
-	if ladder_tilemap == null:
-		return Vector2i.MAX
+	_ladder_hit_layer = null
 	var center := collision_shape.global_position
 	var half := _shape_height(collision_shape.shape) * 0.5
 	var inset := maxf(half - 1.0, 0.0)
-	for sample_y in [center.y, center.y + inset, center.y - inset]:
-		var cell := ladder_tilemap.local_to_map(ladder_tilemap.to_local(Vector2(center.x, sample_y)))
-		if _is_ladder_cell(cell):
-			return cell
+	for layer in _ladder_layers():
+		for sample_y in [center.y, center.y + inset, center.y - inset]:
+			var cell := layer.local_to_map(layer.to_local(Vector2(center.x, sample_y)))
+			if _is_ladder_cell(layer, cell):
+				_ladder_hit_layer = layer
+				return cell
 	return Vector2i.MAX
 
 func _ladder_cell_under_feet() -> Vector2i:
 	# Ladder-top mounting probe: while standing on a surface, the ladder cell starting just below the
 	# feet (a ladder whose top is flush with the walking surface, sharing the catwalk tile's cell).
-	# Vector2i.MAX if there isn't one. At a ladder's BASE this looks into the ground tile instead,
-	# which has no ladder in it, so down still just crouches there.
-	if ladder_tilemap == null or not is_on_floor() or is_crouching:
+	# Vector2i.MAX if there isn't one; `_ladder_mount_layer` is the layer it was found on. At a ladder's BASE this looks
+	# into the ground tile instead, which has no ladder in it, so down still just crouches there.
+	_ladder_mount_layer = null
+	if not is_on_floor() or is_crouching:
 		return Vector2i.MAX
 	var center := collision_shape.global_position
 	var feet_y := center.y + _shape_height(collision_shape.shape) * 0.5
-	var cell := ladder_tilemap.local_to_map(ladder_tilemap.to_local(Vector2(center.x, feet_y + 2.0)))  # +2px: a little under the feet, tolerant of float error
-	return cell if _is_ladder_cell(cell) else Vector2i.MAX
+	for layer in _ladder_layers():
+		var cell := layer.local_to_map(layer.to_local(Vector2(center.x, feet_y + 2.0)))  # +2px: a little under the feet, tolerant of float error
+		if _is_ladder_cell(layer, cell):
+			_ladder_mount_layer = layer
+			return cell
+	return Vector2i.MAX
 
 func _ascending_landing_y() -> float:
 	# While climbing up: if the feet have risen into a floor tile the ladder passes through and are
@@ -2431,6 +2451,17 @@ func _follow_hang_platform() -> void:
 	hang_anchor = change * hang_anchor
 	mantle_target = change * mantle_target
 	_mantle_start = change * _mantle_start
+
+func release_hang_from_layer(layer: TileMapLayer) -> void:
+	# Called by a PoweredCatwalkLayer as it retracts (duck-typed). A tile hang has no platform to follow (hang_platform is
+	# null for a tile), so without this the player would stay pinned in the air under a catwalk that is gone. Lets go (and
+	# stops a mantle onto it) only if the grip point, a pixel inside the underside, is in one of that layer's cells.
+	if not is_hanging or hang_style != HangStyle.CATWALK_UNDER or hang_platform != null:
+		return
+	var underside := hang_anchor.y - catwalk_hang_grip_drop
+	var cell := layer.local_to_map(layer.to_local(Vector2(hang_anchor.x, underside - 1.0)))
+	if layer.get_cell_source_id(cell) != -1:
+		_force_release_hang()
 
 func _force_release_hang() -> void:
 	# The platform made the hang untenable (see MeltableBlock.is_hangable()): let go the way crouch does, plus
