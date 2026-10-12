@@ -9,7 +9,7 @@ Fails (exit 1) when:
   - a docs/ file does not end with a "Reads with:" line, or that line names a .md file that does not exist;
   - any `x.md` named in backticks in objon.md or docs/ does not exist (a stale cross-reference).
 Warns (exit code unaffected) when objon.md, the core every session reads, is over about 10k tokens
-(characters / 4), a topic file is over about 12k, or a scene under scenes/interactive, traps, enemies or
+(characters / 4), a topic file is over about 12k (except the human-facing level-design.md and puzzles.md, which are exempt), or a scene under scenes/interactive, traps, enemies or
 collectibles is never named in docs/level-design.md (so a new object type nobody added to the designer's
 reference shows up here). The check is a normalised substring match, so it is a nudge, not proof.
 """
@@ -20,6 +20,7 @@ core = root / 'objon.md'
 docs = root / 'docs'
 CORE_BUDGET_TOKENS = 10000
 TOPIC_BUDGET_TOKENS = 12000
+BUDGET_EXEMPT = {'level-design.md', 'puzzles.md'}  # written for human readers, not AI digestibility
 
 errors, warnings = [], []
 text = core.read_text(encoding='utf-8')
@@ -49,7 +50,7 @@ for p in topic_files:
         for n in re.findall(r'`([\w\-./]+\.md)`', last):
             if n.split('/')[-1] not in known:
                 errors.append('docs/%s: "Reads with:" names %s, which does not exist' % (p.name, n))
-    if len(t) / 4 > TOPIC_BUDGET_TOKENS:
+    if p.name not in BUDGET_EXEMPT and len(t) / 4 > TOPIC_BUDGET_TOKENS:
         warnings.append('docs/%s is about %dk tokens (budget %dk): consider splitting it' %
                         (p.name, len(t) // 4000, TOPIC_BUDGET_TOKENS // 1000))
 

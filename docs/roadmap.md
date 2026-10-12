@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 2 (Spawning and launch: Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,23 +14,9 @@ Covers: Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launc
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
+Phases run from least to most invasive. Phase 2 adds a block spawner and a see-saw launch, and is where the save/restore rules bite (the spawner). Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
 
-## Phase 2: Logic and spawning
-
-### N2.1 Logic nodes (M)
-
-Built, awaiting in-editor confirmation; see Status in `power.md`.
-
-**Gap.** Logic is only OR, AND (`all_required`) and `invert` on a `PowerTarget`. There is no delay, memory, counter or one-shot, so a combination lock has to be faked with a mirror.
-
-**Sketch.** Four small source nodes, each in the `Button` contract with a `sources: Array[Node]` and `add_source()`: **Delay** (on-delay and off-delay), **Latch** (set and reset sources), **Counter** (on after N rising edges of its sources, optional reset source and auto-reset), **Pulse** (a rising edge powers it for `duration`, restarting while on, with no new edge). Inputs are evaluated the way `PowerTarget` evaluates its own, including the deferred first recompute so nothing is driven before every `_ready()` has run.
-
-**Design choice to make first.** Whether a logic node is also a `PowerTarget` (it already has an `_apply_power(on)` hook meant for subclasses) so a conductor wire can end at it and start from it. A node in both `"power_target"` and `"power_source"` makes circuits chainable, but then a loop of such nodes is possible; give it a cycle guard.
-
-**Rules to keep.** Saveable: delay timers, latch state and count are saved; `load_state()` snaps silently and emits `powered_changed` only on a change, and tolerates `set_powered_initial()` running afterwards. Derive-from-level steps are named methods. Configuration warnings are plain methods (an empty `sources`, a counter threshold of 0).
-
-**Touches.** `power.md` (Power contract, Conductors), `saving-levels-ui.md` (What each type saves).
+## Phase 2: Spawning and launch
 
 ### N2.2 Block dispenser (M to L)
 
@@ -82,4 +68,4 @@ The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single 
 
 Known weak spots in existing behaviour, listed here so nobody mistakes them for planned features: the Stingbot has no obstacle avoidance and can stick on a wall, and the proximity mine's blast has no line-of-sight test (both in `enemies.md`).
 
-Reads with: `player.md` (launch), `power.md` (sources, devices and the contract most items extend), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.1 and N2.2 must satisfy, the pause menu)
+Reads with: `player.md` (launch), `power.md` (sources, devices and the contract most items extend), `lasers-arcs-mirrors.md` (mirrors), `rotating-bodies.md` (see-saw), `meltable-blocks.md` (blocks, launch), `liquid-system.md` (steam, crust), `water-mechanic.md` (the crust data model), `saving-levels-ui.md` (the saveable contract that N2.2 must satisfy, the pause menu)
