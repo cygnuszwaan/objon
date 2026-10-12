@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 1 (Quick wins: Zone sensor; Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 1 (Quick wins: Mirror reverse mode; Enemy weight on plates); Phase 2 (Logic and spawning: Logic nodes; Block dispenser; See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,17 +14,9 @@ Covers: Phase 1 (Quick wins: Zone sensor; Mirror reverse mode; Enemy weight on p
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: a new source and two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
+Phases run from least to most invasive. Phase 1 adds nothing to a shared solver: two small exports, so each item can ship alone. Phase 2 adds logic and resources and is where the save/restore rules bite. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
 
 ## Phase 1: Quick wins
-
-### N1.3 Zone sensor (S)
-
-**Gap.** There is no "something is in this area" power source. It would give a door that shuts behind the player, an ambush trigger, and a lure puzzle where an enemy stands in the zone.
-
-**Sketch.** A power source in the same contract as `Button` (group `"power_source"`, `is_powered()`, `powered_changed(on)`): an `Area2D` on layer 0, mask 1, polled every physics frame (never `body_entered`). Exports: `count_player`, `count_enemies`, `count_blocks`, `min_count` (default 1), `hold_time` (the shared analogue-source rule, so a body crossing the edge cannot chatter it). Enemies are group `"enemy"`, blocks are `MeltableBlock`; a dead or dancing player never counts. Not physical, so it is wired like any source. Saves `powered` and `time_left` per the shared rule, and keeps power for a few physics frames after a restore even if the sensor reads empty, as `Button` and the weight plate do (a restored body only overlaps once the physics server has stepped).
-
-**Touches.** `power.md` (Button and Weight plate are the patterns; add it to the sources), `enemies.md` (which bodies count).
 
 ### N1.4 Mirror reverse mode (S)
 

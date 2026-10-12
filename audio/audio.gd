@@ -112,6 +112,8 @@ const PLANNED: Array[StringName] = [
 	&"interactive/angle_sensor_off",    # an angle sensor losing power (the body came back past the hysteresis), at the sensor
 	&"interactive/basin_sensor_on",     # a basin sensor powering (its basin reached the fill, crust or column reading), at the sensor
 	&"interactive/basin_sensor_off",    # a basin sensor losing power (after its hysteresis and hold time), at the sensor
+	&"interactive/zone_sensor_on",       # a zone sensor powering (the count reached min_count; only when `silent` is off), at the sensor
+	&"interactive/zone_sensor_off",      # a zone sensor losing power (after its hold time; only when `silent` is off), at the sensor
 	&"interactive/speed_trap_flash",    # the camera flashing on any read (every crossing it reads), at the trap
 	&"interactive/speed_trap_pass",     # a reading at or above the threshold: the trap powers
 	&"interactive/speed_trap_fail",     # a reading below the threshold

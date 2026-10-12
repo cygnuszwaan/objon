@@ -200,6 +200,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | **Weight plate** | summed weight ≥ `threshold` (2) | `hold_time` 0.15 s; counts stacked blocks and riders up to 3 deep |
 | **Angle sensor** | a `RotatingBody` tilts past `threshold_degrees` (15) toward `side` | `hysteresis_degrees` 3 |
 | **Basin sensor** | FILL ≥ 50%, CRUST present, or COLUMN depth ≥ 0.25 tile | `liquid_filter`, hysteresis, `hold_time` |
+| **Zone sensor** | `min_count` or more bodies (player, enemies, blocks, as enabled) are inside its rectangle | `size`, `count_player` / `count_enemies` / `count_blocks`, `min_count`, `hold_time` 0.15 s |
 | **Conductor circuit** | any attached source is on | wired by painted tiles |
 
 **Button specifics worth remembering**
@@ -215,6 +216,12 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 - **Reacts to**: rising edges only. A falling edge does nothing, and the startup state and a checkpoint restore never cue. An edge during a pending `delay` is ignored; an edge during a cue restarts it, and cues never queue (a second cue replaces the first).
 - **Affects**: only the camera. The cue's position is read every frame, so one parented to a moving platform is tracked. The world keeps running.
 - **Gotchas**: **input is not locked**, so the player can move, surf and be hit while the camera is elsewhere; a damaging hit or the win dance cuts the cue short, and a jump pad launch or stomp bounce does not. Keep holds short and trigger cues from calm moments (a button press, not a speed trap). `once` is saved, so a restore after the cue does not replay it. Nothing plays while the player is dead or dancing.
+
+**Zone sensor.** An `Area2D` source (layer 0, mask 1) that is powered while enough bodies are inside an axis-aligned rectangle: a door that shuts behind the player, an ambush trigger, a lure where an enemy has to stand in the zone. It blocks nothing, so it is wired like any source (`sources` on a device, or a conductor ending at its origin cell). **Invisible and silent in play by default.**
+- **Knobs**: `size` (px, default 48×48, centred on the origin; leave rotation and scale alone), `count_player` (on), `count_enemies` (off), `count_blocks` (off), `min_count` (1; the count is summed across the enabled kinds), `hold_time` (0.15 s, up to 5 s and beyond), `show_zone` (draws the zone and the live `count/min_count` at run time; the editor always draws it), `silent` (on; turn it off for on and off sounds).
+- **Reacts to**: bodies overlapping the zone, in any state. The player counts unless dead or dancing, so a player on a ladder, hanging or swimming counts (unlike a weight plate, which wants the floor). An enemy is anything in group `enemy`, so a dormant mine and a flipped crawler count. A block is any ice or metal block, and weight is irrelevant: a metal block counts as one, like an ice block, and one in the air counts. Each body counts once. It powers the frame the count reaches `min_count` and releases once the count has stayed below it for `hold_time`, so a body crossing the edge cannot chatter it, and a longer `hold_time` is a delay on leaving. Absence is `invert` on the device or target.
+- **Affects**: only what is wired to it. Nothing in the world reads it directly. It is the one source an enemy can power.
+- **Gotchas**: the zone is invisible and silent, so the player gets no warning of it. Drive something the player can see coming (a door closing, a bullet in flight, a camera cue) rather than a spike layer that extends with no warning, and put the zone's edge well before the hazard. A zone knows nothing of speed or direction (the speed trap does): a surfer covers 10 to 13 px a physics frame at 600 to 800 px/s, so a zone across a surf line should be deeper than that, or tested. A conductor attaches in the cell the **origin** (the centre) is in, so wire a large zone through `sources`. An enemy leaves the group as it starts to die (a Drillbot and a Stingbot at the end of that frame), and a Stingbot flies, so a zone meant to hold one has to cover its airspace. A zone that only an enemy can power is stuck off once that enemy is dead, so give the route a second way (OR). It saves its state, so a checkpoint restore comes back as it was (a sealed room stays sealed) and keeps power for a few frames until the bodies overlap again.
 
 **Powered devices**
 
@@ -266,9 +273,10 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 | **Water touch** | floats | sinks | joins | **crusts** it | – | – | – | – |
 | **Jump pad** | launches (weight-scaled) | launches (less) | – | – | launches | – | – | – |
 | **Mine blast** | – | – | – | – | damage | 2 dmg | – | – |
+| **Zone sensor** (reads) | counted if `count_blocks` | counted if `count_blocks` (weight is irrelevant) | – | – | counted if `count_player` (not dead or dancing) | counted if `count_enemies` | – | – |
 
 **What presses what**
-- Button: player + blocks. Weight plate: player (standing) + blocks (+ stacked riders). See-saw load: player + blocks + liquid. Speed trap: only a surfer.
+- Button: player + blocks. Weight plate: player (standing) + blocks (+ stacked riders). See-saw load: player + blocks + liquid. Speed trap: only a surfer. Zone sensor: any body of an enabled kind inside it (player, enemies, blocks), whatever it weighs; the only source an enemy can power.
 - Receivers are lit by beam/arc/bullet *specifically*. A laser does nothing to an arc receiver and vice versa.
 
 ## Gaps, limits and gotchas
@@ -278,7 +286,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
 - **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
-- **Doors can't be opened by enemies or liquid**; enemies weigh nothing and don't press plates or buttons.
+- **Enemies weigh nothing and press no plate or button**; the one way an enemy powers anything is by standing in a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
 - **Steam is a surf-only mechanic**; walking players and swimmers don't feel it.
 - **Wire layout is fixed at load**; painted conductors don't rewire at runtime.
 - **A level editor is a stretch goal**, and not built.

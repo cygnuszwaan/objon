@@ -13,16 +13,18 @@ The atoms. Each can be built from the objects in the Object catalogue (`level-de
 - **OR**: several sources, default. Gives alternate solutions for free.
 - **NOT**: `invert` on the device or target. A door that closes when you press the button.
 - **Latch / memory**: TOGGLE button, TOGGLE bullet/arc target, a crust (never thins), a jam (latched until power cycle).
-- **Timer**: TIMED button / speed trap `hold_time` / receiver `hold_time` / melting ice on a plate.
+- **Timer**: TIMED button / speed trap `hold_time` / receiver `hold_time` / melting ice on a plate / a zone sensor's `hold_time`, which keeps it on for that long after the last body leaves (a delay on leaving, where a TIMED button is a delay after a press).
+- **Presence and absence**: a zone sensor is on while `min_count` bodies of the enabled kinds (player, enemies, blocks) are inside it, so `invert` makes it absence ("the room is empty", "nobody is in the shelter"). It sums across kinds, so "the player and a block together" is `min_count` 2 with both on, and it is the one source an enemy can power.
 - **Counter / sequence**: a mirror turning one step per rising edge. Aim at the receiver only at step N.
 - **Pulse**: MOMENTARY target; a cannon firing faster than `pulse_length` holds it on.
 - **Analogue threshold with hysteresis**: angle sensor, basin sensor, weight plate. Can't chatter.
-- **Clock**: crusher/arc/cannon/rail bot cycles with `phase_offset`; a motorized see-saw read by an angle sensor produces a square wave **(untested)**.
+- **Clock**: crusher/arc/cannon/rail bot cycles with `phase_offset`; a patrolling crawler or rail bot crossing a zone sensor (G8); a motorized see-saw read by an angle sensor produces a square wave **(untested)**.
 
 **Spatial**
 - **Gate**: door, breakable barrier, crust, mirror-shielded beam, a retractable spike field (a gate that hurts instead of blocking, so it also works on a surf route).
 - **Gap crossing**: catwalk hang, crust bridge, ice raft, slag raft, swing, rail slide, ramp-and-skim, pad.
 - **Keyhole**: a corridor only a crouch/sneak fits, a catwalk only a hang passes, a door you can't hang from.
+- **Trip zone**: an invisible rectangle that reacts to a body being somewhere (a sealed room, an ambush, a camera look-ahead, a tripwire). Make it deeper than the fastest body moves in a frame (10 to 13 px for a surf), and give the player something visible to read, since the zone itself is neither drawn nor heard.
 - **Weighted lever**: see-saw with a threshold sensor.
 - **Aiming**: mirror steps, a tilted mirror see-saw, a moving platform with a mirror, liquid poured as a variable load.
 
@@ -30,11 +32,12 @@ The atoms. Each can be built from the objects in the Object catalogue (`level-de
 - **Telegraphed cycle**: crusher (dwell windows), arc turret glow, rail bot glow, grunt windup.
 - **Time-to-live**: ice (2 s in a beam), metal-on-slag (8 s), flipped crawler (4 s), drop platform (1 s), TIMED hold.
 - **Race**: a TIMED button and a door/route you have to reach before it resets.
-- **Unannounced edge**: a powered spike layer extends with no warning phase, so the telegraph has to be built around it: the player's own action that causes it, a visible bullet or beam on its way, a camera cue, or a place to stand that is never spiked.
+- **Unannounced edge**: a powered spike layer extends with no warning phase, so the telegraph has to be built around it: the player's own action that causes it, a visible bullet or beam on its way, a camera cue, or a place to stand that is never spiked. A zone sensor adds an edge the player cannot see at all, so a zone-driven trap uses one of the same telegraphs and puts the zone's edge well before the hazard.
 
 **Resource**
 - **A block as tool**: shield, weight, bridge, plug, battery of mass.
 - **A liquid as tool**: load, crust-maker, steam-maker, lift, aim.
+- **An enemy as tool**: a key (parked at a ledge, standing in a zone), a clock (a fixed patrol that crosses a zone every lap), a counter (the zone stays occupied until the last one is dead), or a stepping stone (a flipped crawler). Killing it is then a choice with a cost.
 - **Momentum as tool**: surf speed that is *banked* over a stretch and *spent* on a barrier, trap or launch.
 
 ## Puzzle concepts
@@ -79,6 +82,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 
 **B9. Relaxation oscillator.** *Basin + steady faucet + basin sensor FILL + drain faucet wired to the sensor.* The pool fills to 50%, the sensor opens the drain, it falls below the threshold minus hysteresis, the drain closes, and it refills. The result is a slow periodic signal driving doors, crushers, or a plate **(untested; the docs only guarantee one swing without inflow)**.
 
+**B10. Floating key.** *Faucet + basin + ice block + a zone high in a shaft (`count_player` and `count_blocks`, `min_count` 2) + door.* The zone sits where only a raised block can put the player: fill the basin so the ice block floats up with the player riding it (B1; a floating block follows the surface even with riders), and the block and the player are both in the zone at once. Either alone is a count of 1, and a metal block sinks, so the ice is the only lift. Shape the shaft so the player cannot jump into the zone from a ledge. A drain brings the level back, and the door closes `hold_time` after they drop out of the zone. *Twists:* `count_player` off makes the block a plug rather than a lift, so the player only has to get it up there; a basin sensor on the same basin in AND adds a fill condition; `hold_time` is the margin for hopping off at the top. **(untested)**
+
 ### C. Weight, balance and swinging
 
 **C1. Counterweight.** *See-saw + metal block (weight 4 per tile) + angle sensor + door.* The player alone (weight 2) can't tip the plank, so the block must be positioned first and the player completes the load. *Twists:* the door only holds while the plank stays tipped, so something must be left on it; the plank's motor fights the player's weight and you only win while standing on the high end; the block is on the plank *and* the plate.
@@ -94,6 +99,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 **C6. Motor and brake.** *Motorized see-saw + riders.* A heavy enough rider on the high side holds it against the stop. A see-saw that oscillates becomes a moving ramp/bridge the player times, and an angle sensor on it is a clock.
 
 **C7. Plug the plate.** *Weight plate (threshold above the player's own weight) + a block + an inverted spike layer.* A source that is on retracts an inverted layer, so a block left on the plate holds the field open; kicking it off re-arms the spikes on that frame. The player has to bring the block to the plate, then cross. *Twists:* an ice block under a laser makes the window the melt time (A4: about 2 s lit), so the player has to run; metal lasts about 3 s and then pours slag onto the plate; a second plate in AND needs a second block. **(untested)**
+
+**C8. Headcount.** *Zone (`count_blocks`, `min_count` 3) + blocks of mixed weights + door.* The zone counts bodies, not weight (C2 counts weight), so a 1×1 ice block and a 1×1 metal block are worth the same. The puzzle is getting enough blocks into an area, and what is easy to place differs: an ice block slides about 4 tiles on a kick, a metal block about 1. *Twists:* a laser melts one of the three once it is in place (a melted block frees itself and leaves the count after `hold_time`), so it has to be shielded or timed (A3); the zone is over a basin, so floating ice counts but a sunk metal block below the zone does not; `count_player` as well, so the player has to stand in the zone with the stack. **(untested)**
 
 ### D. Momentum and the surf
 
@@ -129,6 +136,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 
 **E6. Pad chains.** *Jump pads aimed by rotation + a moving platform or swing as the landing.* Pads keep the surf's speed. Powered pads are *live only when a source says so*, so a pad route can be a timed window. Blocks also get launched (lighter ones go higher).
 
+**E7. Shut-in.** *Zone (`count_player`) covering a room + a door on `invert` at its entry + a puzzle inside whose exit is gated another way.* Put the zone just past the doorway. The inverted door starts open, closes behind the player as they step in, and stays shut while they are inside. A door never crushes and waits if the player stops in the doorway, so the trap cannot hurt anyone. Leaving by the exit empties the zone and the entry reopens `hold_time` later. A checkpoint inside the room restores it sealed, because the zone and the door's frame are both saved, so a retry never finds the door open. *Twists:* a `hold_time` of several seconds is a lock-out timer on the entry; the exit door is wired to the room's own puzzle, so the zone and the puzzle together are the only way out; two rooms share a zone for a sealed pair. **(untested)**
+
 ### F. Timing, rhythm and traps
 
 **F1. Phase corridor.** *Crushers, sawwheels or cannons with `phase_offset`.* The spike is the dangerous end and the arm (side) is solid; dwell windows are the safe beats. Stagger so the player has to learn a rhythm. *Twists:* a powered crusher parks *safe* when off, so a button is a pause; a TIMED button pauses it just long enough.
@@ -147,17 +156,25 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 
 **F8. Pulse floor.** *Cannon + MOMENTARY bullet target + spike layer.* Each shot holds the target on for its pulse (0.3 s by default), and a `fire_rate` longer than that lets it flicker (F5), so the field is out for a blink every shot and retracted otherwise. The bullet is visible in flight, so it is the telegraph: the spikes extend as it lands. Two cannons on different `fire_rate`s feeding two layers drift in and out of phase, which makes a rhythm the player has to learn (F1). *Twists:* an inverted layer is retracted for a blink and dangerous the rest of the time, which only suits a very short gap; a mirror or barrier in the bullet's path lets the player stop the pulses. **(untested)**
 
+**F9. Tripwire cannon.** *Zone (`count_player`) + cannon + a corridor.* A powered cannon fires one bullet at once on a rising edge and then every `fire_rate`, so entering the zone starts the barrage. Set the zone back from the muzzle so a bullet is in flight, and visible, before it can reach the player: the bullet is the telegraph. *Twists:* `hold_time` keeps the cannon firing for that long after the player leaves; `invert` gives a cannon that fires except while the player stands in a shelter zone, and `hold_time` is the grace before it resumes; `count_blocks` instead of the player lets the player kick a block into the zone to start it from a distance, and a bullet target at the far end turns that into a remote switch (F5). **(untested)**
+
 ### G. Enemies as mechanisms
 
 **G1. Boot the mine.** *Mine + grunts.* Kick a mine into a grunt group (a mine that slides faster than 40 into a wall or any enemy detonates; a blast hits everything in 40 px and chains to other mines). *Twists:* a laser arms a mine from far away (arm, never damage); a rail bot overhead killed by a mine blast; mines on both sides of a door.
 
 **G2. Crawler stepping stones.** *Tread crawler between two safe spots over spikes or slag.* Stomp it flipped (you bounce), then stand on it. It stays pinned while you stand there. After the top is clear it rights itself after 4 s. *Twists:* one stone, two players of time; the crawler flips on the far side of a pit because its patrol ends there.
 
-**G3. Lure.** *Grunt + laser.* A chasing grunt stops at a ledge and walks into a beam; the laser does 1 damage per 0.5 s, so two beams or a long exposure kill it. *Twists:* an enemy in the beam *shields* a receiver behind it (a Stingbot crossing it flickers it); a grunt chased onto a plate does nothing (enemies weigh nothing).
+**G3. Lure.** *Grunt + laser.* A chasing grunt stops at a ledge and walks into a beam; the laser does 1 damage per 0.5 s, so two beams or a long exposure kill it. *Twists:* an enemy in the beam *shields* a receiver behind it (a Stingbot crossing it flickers it); a grunt chased onto a plate does nothing (enemies weigh nothing), but one parked in a zone sensor does (G7).
 
 **G4. Stingbot windows.** *Stingbot landing for 2 s every 8 s.* The recharge is a safe window. Use it as a timed door-opening or a way to cross a hazard *under* its flight path. It doesn't avoid obstacles, so a wall can *trap* it. **(untested)**
 
 **G5. Drillbot lane.** *Drillbot patrolling a narrow ledge.* Bowl it from behind (surf), or kick it three times *from behind* (its body is harmless), or cross over the top. *Twists:* the free-patrol (`patrol_distance` 0) walks to ledges, so it patrols the whole platform.
+
+**G6. Clear the room.** *Zone over an arena (`count_enemies`) + a door on `invert` + grunts, a crawler and a mine.* The zone is powered while any enemy is inside, so the inverted door stays shut until the last one is dead (an enemy leaves the group as it starts to die, so the door opens about `hold_time` after the last kill). A dormant mine and a flipped crawler still count, so a mine has to be booted into the others (G1) and a crawler has to be killed, not just stomped. A Stingbot flies, so the zone must cover its airspace, and it has no pathing, so wall off anywhere it could stick or the room soft-locks. *Twists:* two arenas in AND; `min_count` 2 opens the door when only one enemy is left, which the player can then choose to leave alone; a checkpoint inside restores the enemies and the zone together. **(untested)**
+
+**G7. Park the lure.** *Grunt + a ledge + a zone at the ledge's edge (`count_enemies`, `count_player` off) + door, with the player across a gap.* A chasing grunt stops at a ledge (G3), so it parks in a predictable place: put the zone there, and the door is held open for as long as it stands in it. G3 kills the lure; here it has to stay alive, and the player has to get through while keeping it interested. Leaving its aggro range may let it wander off and shut the door, which is the part to test. *Twists:* two grunts on two ledges in AND, with the player between them; a mine kicked beside the parked grunt would blast it, so the player's own tool becomes the failure state; the door is a spike layer on `invert`, so a grunt that wanders off re-arms the route. **(untested)**
+
+**G8. Patrol clock.** *Tread crawler (or a rail bot on its rail) on a fixed patrol + a zone over part of it (`count_enemies`) + a door or spike layer.* Each pass through the zone powers the source for the pass plus `hold_time`, a window that repeats every lap, and the crawler's turn pause at each end is part of the period. The player times a crossing to the lap. A rail bot gives a ceiling clock whose sparks also drip on the route below (E3). *Twists:* a mirror that turns one step per rising edge counts laps for free, so the player waits N laps (A2 without the button); flip the crawler and stand on it inside the zone (G2) and the pinned enemy holds the source on for as long as the player stays; kill the clock and the source stays off, so give the route a second way (OR) or the player can soft-lock. **(untested)**
 
 ### H. Information, routing and pacing
 
@@ -170,6 +187,8 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 **H4. Checkpoint-aware design.** *Place checkpoints before expensive resets.* Blocks, doors, basins (fill and crust) and enemies are restored; liquid particles, arcs, bullets and sparks aren't, so avoid designs where success depends on an in-flight particle. A restore always sets dangerous things harmless (mines dormant, grunts recovering, drips restarted).
 
 **H5. Cue the opening.** *Camera cue + inverted spike layer on the same source.* The player presses a button; the field in a far shaft retracts and the camera pans to it, so the new route is visible without a hint sign. The cue plays on the rising edge of its own power and the layer is inverted, so both fire on the same press. Keep the hold short, because the world keeps running and input is not locked. *Twists:* `once` so the pan does not repeat on a TOGGLE button; a cue with `invert` on the same source shows the spikes coming back out, which teaches what the button did; a `delay` lines the pan up with the player leaving a calm spot. **(untested)**
+
+**H6. Look-ahead trigger.** *Zone (`count_player`) + camera cue (`once`) + a far door or route.* Walking to a spot pans the camera to what has just changed, with no button to press (H5 is the deliberate-act version). The cue plays only on a rising edge, never at startup or after a restore, and `once` is saved, so a retry does not replay it. Put the zone on a calm stretch of the route, because input is not locked while the camera is away, and use `delay` to line the pan up with a door opening. *Twists:* the zone sits on the far side of a hazard, so the pan is a reward and not a distraction; the same zone also drives the door itself, so one trigger opens it and shows it. **(untested)**
 
 ### I. Full-room recipes (stacks of the above)
 
@@ -184,5 +203,7 @@ Each concept lists **ingredients** and how it plays, then **twists** to scale di
 **I5. The Lock Box.** Three receivers in AND (laser, arc, bullet target) around one vault door. Laser via a mirror relay (A1), the arc via ricochet (A6) and the cannon bullet via a counter mirror (F4). Each is solvable on its own and then interacts: the arc and the laser share a mirror, so turning it for one breaks the other.
 
 **I6. The Moat.** A spike field fills the floor between two ledges, with a catwalk above it. The no-tool route is the underside hang across the catwalk (E1): always safe and slow. The fast route retracts the field: an ice block on a plate under a laser (C7, A4) gives a melt-timed window, and powered gems wired to the same source appear only while the field is open (H1), so the fast line is marked exactly when it is safe. A speed trap at the far end (D9) can make the run a surf instead. Checkpoint before the plate (H4): the block, plate and sources are restored, and the field follows them.
+
+**I7. The Kennel.** A shut-in room (E7) whose entry door closes behind the player. Inside are two grunts and a dormant mine. A second zone over the room counts enemies and drives an inverted exit door (G6), which opens only once the room is clear. The mine is the player's tool (G1) and the grunts' windups are the telegraph (F6). A camera cue on the exit's source (H5) pans to it opening. Checkpoint just before the entry (H4): the doors, both zones and the enemies come back as saved, with the mine dormant. **(untested)**
 
 Reads with: `level-design.md` (every object, surface and interaction the patterns use, and the gaps), `roadmap.md` (planned mechanics that will add primitives), `power.md` (the logic contract behind the logic primitives), `lasers-arcs-mirrors.md`, `liquid-system.md`, `player-surf.md`, `rotating-bodies.md`, `meltable-blocks.md`, `enemies.md`
