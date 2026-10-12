@@ -2,7 +2,7 @@
 
 A designer's view of the game as it stands: every verb, surface, object and interaction, with the numbers and gotchas that matter when laying out a level. It is a summary: the topic files hold the detail and the reasoning, and where this file and the code disagree, the code wins. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first. The puzzle patterns built from these pieces are in a separate file.
 
-Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms, belts, pads, rails, barriers; Rotating bodies: see-saw and swing; Blocks: ice and metal; Liquids: water, slag, steam; Beams and projectiles: laser, arc, cannon, mirror; Hazards; Enemies; Power: sources, wiring, devices; Collectibles, checkpoints, finish); Interaction matrix; Gaps, limits and gotchas
+Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms, belts, pads, rails, barriers, powered bridges and ladders; Rotating bodies: see-saw and swing; Blocks: ice and metal; Liquids: water, slag, steam; Beams and projectiles: laser, arc, cannon, mirror; Hazards; Enemies; Power: sources, wiring, devices; Collectibles, checkpoints, finish); Interaction matrix; Gaps, limits and gotchas
 
 **Units.** 1 tile = 16 px. The camera shows 512×288 px, which is **32×18 tiles**. Speeds are px/s; a walk is 150 px/s (about 9.4 tiles/s). Numbers are the documented defaults and may have been retuned.
 
@@ -15,7 +15,7 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 | Kick | kick | Hits enemies (`take_damage`), turns mirrors, shoves ice/metal blocks, boots mines. Ground kick roots you; **air kick** doesn't, and cancels upward speed (never slows a fall). No dash, no dodge. |
 | Ladder | up/down at a ladder tile | Ladders are their own tile layer, sharing a cell with the catwalk they pass through. |
 | Ledge hang + mantle | airborne beside a ledge | Works on ground, glass, catwalk tiles and on bodies in group `ground` (doors, blocks, see-saw ends, moving/drop platforms). **Not** on conveyors, button pedestals, receivers, barriers. |
-| Catwalk underside hang | jump up into a catwalk, or crouch + jump while standing on one | Left/right **brachiates** hand-over-hand. Jump goes up through the catwalk. Blocked by terrain. Hands off onto a ladder with up/down. |
+| Catwalk underside hang | jump up into a catwalk, or crouch + jump while standing on one | Left/right **brachiates** hand-over-hand. Jump goes up through the catwalk. Blocked by terrain. Hands off onto a ladder with up/down. A **powered catwalk layer** that retracts lets you go. |
 | Crust underside hang | same as catwalk, under a basin's crust | Only where a **drain has left a void** under the crust. Refused while liquid fills the space. |
 | Swing hang | airborne near a swing bar | Left/right pumps; jump releases with the bar's velocity; crouch drops. |
 | Rail hang | airborne near a grabbable rail | Flat rail: brachiate. Steep rail (>10°): slide. Jump or crouch to leave. |
@@ -52,8 +52,8 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 |---|---|---|---|---|---|
 | **Ground** tile | yes | yes | blocks | blocks | The normal wall/floor. |
 | **Glass** tile | yes | yes | **passes** | blocks | See through a wall of lasers. |
-| **Catwalk** tile (or body in group `catwalk`) | one-way (jump up through, stand on top) | yes (side + underside) | **passes** | **passes** (falls through) | Keep on its own tile layer in group `catwalk`. |
-| **Ladder** tile | none | n/a | passes | passes | Own tilemap layer. |
+| **Catwalk** tile (or body in group `catwalk`) | one-way (jump up through, stand on top) | yes (side + underside) | **passes** | **passes** (falls through) | Keep on its own tile layer in group `catwalk`. A **powered catwalk layer** makes a run of it appear and vanish. |
+| **Ladder** tile | none | n/a | passes | passes | Own tilemap layer. A **powered ladder layer** makes a run of it appear and vanish. |
 | **Spike** tile | none (hurts) | no | passes | passes | Four orientations. Damage polled every frame. A tile can't be powered: paint it on a **powered spike layer** to switch it. |
 | **Crust** (basin) | yes, walkable | underside only (over a void) | blocks | blocks | Forms when water meets slag. |
 | **High-friction / ice tile** (`surf_friction`) | yes | yes | blocks | blocks | Per-tile surf friction multiplier. A tile value above 1 is mud, below 1 is slick. |
@@ -83,6 +83,14 @@ Format: **what it is** → key knobs → reacts to / affects → design notes.
 **Rail.** A Path2D built from draggable `Marker2D`s. Grabbable by the player. A `RailBot` can ride it (see enemies). Steep rails are slides: gravity speeds you up, and you coast off the end with the slide's velocity.
 
 **Door.** Powered = open. Recedes into the floor (open = a harmless 2 px foot). **Closing never crushes**: it waits while a player, enemy or block is in the way. Rotates in 90° steps. Hangable. Blocks lasers, arcs and water. `invert` makes it start open.
+
+**Powered catwalk layer and powered ladder layer.** Two `TileMapLayer`s that exist only while powered: a bridge or a ladder a button summons. Paint catwalk or ladder tiles on them exactly as on the level's `Catwalks` and `Ladders` layers (the catwalk layer's tile set is the ground tileset, the ladder layer's is the ladder tileset) and wire them like any device. A catwalk with a ladder through it takes one layer of each on the same source; put the ladder layer at the same position as the level's `Ladders` layer so the cells line up.
+- **Knobs**: `sources`, `invert` (out while the source is off: a floor a button removes), `warn_time` (1 s, 0 = none), `show_ghost` (off) and `ghost_opacity` (0.25 of the layer's own opacity; only shown while the ghost is on). The same ghost knobs are on the spike layer.
+- **Reacts to**: the level of the power state. Powered = out, unpowered = retracted, unwired stays out. **Extending is instant. Retracting waits `warn_time`**: the layer blinks at 5 Hz, still solid (a ladder still climbable), then goes, so the retract is `warn_time` later than the source and a TIMED button's `duration` is the time before the blink starts. Power returning during the blink cancels it. The startup state snaps with no blink and nothing is saved: the layer follows its source after a restore.
+- **Affects (catwalk layer)**: out, it is a one-way solid in group `catwalk`, so the player's hang probes, the laser (passes), water and steam (pass) and the ladder-landing scan all treat it as any catwalk. Retracted, a standing player, block or enemy **drops**, and a player hanging from its underside or mid-mantle is **released** (with the regrab lockout). Extending into a body is harmless: the tiles are one-way, so it rises through.
+- **Affects (ladder layer)**: out, the player can climb it; a player on it as it retracts is dropped on the next frame. Nothing else reads ladders.
+- **Ghost view**: with `show_ghost` a retracted layer stays drawn faintly where it will be. It is only a drawing: nothing about it is solid, climbable or dangerous, and the blink alternates full and ghost. It says where, never when.
+- **Gotchas**: **only catwalk tiles** go on a catwalk layer (ground and glass can't be switched; a configuration warning names a stray cell). A powered bridge's cells must stay off the static catwalk layer: a static tile in the same cell keeps its collision, so a hanger is released and may re-grab it (untested). Water falls through a bridge, so a bridge holds no liquid, and a beam passes it. Without the ghost a retracted layer is invisible, so it hides the route it guards. **A checkpoint on a powered bridge** restores the layer from its source: with the source off the bridge gets one blink and then retracts under the respawned player. Move the layer's `PowerTarget` child to the tile a conductor wire should end at. `traps/bridge_extend` and `traps/bridge_retract` are shared by both layers.
 
 ### Rotating bodies: see-saw and swing
 
@@ -166,10 +174,10 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | **Grunt hammer / drill / stingers / mine blast / rail bot** | See enemies | rail bot yes |
 
 **Powered spike layer.** A `TileMapLayer` of spike tiles (paint them exactly as on the `Ground` layer) that is out or retracted as a whole. **Powered = out** (drawn and dangerous); **unpowered = hidden** and harmless. Wire it like any device: `sources` and `invert` on the root, or end a conductor at its `PowerTarget` child.
-- **Knobs**: `sources`, `invert` (spikes out while the source is off, which is what "a button retracts them" needs). No timing exports: the transition is instant.
+- **Knobs**: `sources`, `invert` (spikes out while the source is off, which is what "a button retracts them" needs). No timing exports: the transition is instant. `show_ghost` and `ghost_opacity` (see the catwalk and ladder layers) draw the retracted field faintly; a ghost spike is harmless.
 - **Reacts to**: the level of the power state, both edges. Unwired it stays out, so it behaves like spikes on the ground; the startup state snaps with no sound and a restore follows the sources.
 - **Affects**: only the player, through the same hit as any spike (1 damage, knockback away from the tile, i-frames, a surf ends). It has no collision and no `surface_type`, so it blocks nothing and is never ground-like. Enemies and blocks ignore it, as with spike tiles.
-- **Gotchas**: **no warning phase**, so spikes that extend under a player standing in them hurt on that frame, and spikes that retract spare the player the same frame. Show the player what is about to extend (layout, a camera cue on the same source) rather than relying on a telegraph. Power switches the whole layer, so independent groups of spikes are separate layers. **Move the `PowerTarget` child to the tile a conductor wire should end at** (it starts at the layer origin). A retracted layer is invisible, so it hides the route it guards until it is powered; pair it with a hint if the player has to find it.
+- **Gotchas**: **no warning phase**, so spikes that extend under a player standing in them hurt on that frame, and spikes that retract spare the player the same frame. Show the player what is about to extend (layout, a camera cue on the same source) rather than relying on a telegraph. Power switches the whole layer, so independent groups of spikes are separate layers. **Move the `PowerTarget` child to the tile a conductor wire should end at** (it starts at the layer origin). A retracted layer is invisible unless `show_ghost` is on, so it hides the route it guards until it is powered; turn the ghost on (it marks where the spikes will be, not when) or pair it with a hint if the player has to find it.
 
 **Crusher jam rules.** Metal under the extending spike latches the jam: the arm retreats and parks, the spike is harmless, and the jam stays even if the metal later melts or leaves. A wired crusher is reset by cycling its power; an unwired one stays jammed until reload or checkpoint restore. A block pressed against the arm's *side* doesn't jam it.
 
@@ -242,6 +250,8 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | Powered gem | present and collectible | unpowered = hidden |
 | **Camera cue** | **rising edge = pan the camera to it**, hold, return | startup is not an edge; no input lock |
 | **Powered spike layer** | spikes out | unwired stays out; `invert` retracts on power; instant, no warning |
+| **Powered catwalk layer** | bridge out (one-way solid) | unwired stays out; `invert` removes it on power; extends at once, blinks `warn_time` before it retracts; releases a hanger |
+| **Powered ladder layer** | ladder out | as the catwalk layer; a climber is dropped as it retracts |
 | Finish | optional lock input (see Collectibles, checkpoints, finish) | |
 
 ### Collectibles, checkpoints, finish
@@ -273,6 +283,8 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 | **Water touch** | floats | sinks | joins | **crusts** it | – | – | – | – |
 | **Jump pad** | launches (weight-scaled) | launches (less) | – | – | launches | – | – | – |
 | **Mine blast** | – | – | – | – | damage | 2 dmg | – | – |
+| **Retracting catwalk layer** | drops | drops | – (water already falls through a catwalk) | – | drops; a hanger is released | drops | – | – |
+| **Retracting ladder layer** | – | – | – | – | a climber is dropped | – | – | – |
 | **Zone sensor** (reads) | counted if `count_blocks` | counted if `count_blocks` (weight is irrelevant) | – | – | counted if `count_player` (not dead or dancing) | counted if `count_enemies` | – | – |
 
 **What presses what**
@@ -283,6 +295,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 
 **Things you can't do (yet)**
 - **Spikes switch per layer, not per tile**: a tile can't carry a `PowerTarget`, so independent groups of spikes are separate layers, and a spike with its own timing (a warning, a stroke) must be a node (e.g. a crusher or sawwheel).
+- **Only catwalks, ladders and spikes can be switched as terrain.** Ground and glass can't (the basin scans, the water manager and the laser's world lookup assume one `world_tilemap`), so a wall or floor that appears is a door, a drop platform or a crust.
 - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
 - **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
@@ -292,7 +305,8 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **A level editor is a stretch goal**, and not built.
 
 **Things that are traps for the designer**
-- **Catwalk layers**: keep catwalks on their own layer in group `catwalk` (a mixed layer breaks brachiating and the surface checks).
+- **Catwalk layers**: keep catwalks on their own layer in group `catwalk` (a mixed layer breaks brachiating and the surface checks). A powered bridge is its own layer, kept off the static one.
+- **Checkpoint on a bridge**: a restore re-derives a powered layer from its source, so a bridge whose source is off blinks once and retracts under a player respawned on it. Put the checkpoint on ground.
 - **Beams are polled by the turret**, so receiver `hold_time` matters; moving or rotating beams need ≥ 0.1 to 0.3 s.
 - **Mirrors rotate on rising edges only**: an inverted or momentary source may give you edges you didn't expect on load (startup is not an edge).
 - **Arcs aren't saved**: a restore never leaves an arc mid-flight. Don't depend on one.
