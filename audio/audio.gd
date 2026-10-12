@@ -83,6 +83,7 @@ const PLANNED: Array[StringName] = [
 	&"interactive/metal_shunt",        # metal block kicked (heavy scrape; quieter/duller than ice_shunt)
 	&"interactive/seesaw_creak",      # LOOP, at the see-saw's pivot (RotatingBody); volume and pitch follow its angular speed
 	&"interactive/seesaw_thud",       # the see-saw hitting an angle limit (louder the faster it arrives)
+	&"interactive/seesaw_launch",     # a see-saw throwing a load off its raised end (once per stop), at the first load thrown
 	&"interactive/swing_creak",       # LOOP, at the swing's pivot (Swing, a RotatingBody); volume and pitch follow its angular speed
 	&"interactive/swing_thud",        # the swing hitting an angle limit (rare: pumping tapers off before it)
 	&"enemies/grunt_hit",             # a kick landing on a grunt (a grunt's grunt)

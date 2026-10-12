@@ -101,6 +101,8 @@ Format: **what it is** → key knobs → reacts to / affects → design notes.
 - Read by the **angle sensor** (a power source).
 - **Enemy loads are opt-in**: `enemy_weight_scale` (default 0, so enemies ride a plank for free) multiplies each enemy's weight (grunt, drillbot, crawler 2; mine and landed Stingbot 1; the rail bot none). At 1 a grunt counts as much as the player, and what stands on a weighing enemy counts too.
 - Raised end is a lip (see surf notes). Idle riders are gripped, so they don't slide off.
+- **Launch** (opt-in): `launch_gain` above 0 (default 0 = a plain plank) makes it a **catapult**. When the plank arrives at a stop faster than `launch_min_speed` (default 0.2 rad/s), everything resting on its **raised** end is thrown along the plank's face normal, about 25° off vertical and leaning toward the end that came down, at `angular speed × its distance from the pivot × launch_gain` px/s, capped at `launch_max_speed` (default 500). Standing at the tip throws furthest. The player and blocks are thrown; enemies are not. Loads on the lowered end, where the weight that tipped it stands, are never thrown. A heavy block's drop arrives at only about 0.3 rad/s, so gains are in the tens (40 on a 4-tile plank threw the player about 3.5 tiles up and 9 across; headless figure).
+- **Launch gotchas**: a gentle tip below `launch_min_speed` throws nothing (a light ice block on a short plank may not fire). A **motorised** plank hits its stops every cycle and so launches only with `launch_when_motorised` (default off). A **block** takes the throw divided by its mass, so metal barely moves at a gain that flings the player and ice flies about as far as the player. A player **hanging** from the raised end is not a load and is not thrown. Each stop throws once; a checkpoint restore throws nothing. Sound `interactive/seesaw_launch` (no file yet).
 - A block or player on the plank shields the face from above, and a lit block melts onto it.
 
 **Swing.** A rigid-rod pendulum, `length_tiles` (default 4), default ±80° limits. `free_rotation` allows full circles. The player pumps with left/right. Catching it transfers your momentum (`ω = r × v / |r|²`). Releasing hands the bar's tangential velocity to the player (jump adds jump speed). The bar is **not solid**. The arc must be clear of solid tiles (hanging bodies aren't physics-resolved). Powered = motor.
@@ -306,6 +308,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 | **Slag touch** | melts fast, → crust | floats, slow melt | **crusts** it | rejoins | hurts | – | – | – |
 | **Water touch** | floats | sinks | joins | **crusts** it | – | – | – | – |
 | **Jump pad** | launches (weight-scaled) | launches (less) | – | – | launches | – | – | – |
+| **See-saw stop** (with `launch_gain`) | launches if on the raised end (weight-scaled) | launches (less) | – | – | launches if on the raised end | – (no `launch()`) | – | – |
 | **Block dispenser** (makes) | makes one; past `max_alive` the oldest dissolves | the same | – | – | its spawn area occupied: the press is refused | its spawn area occupied: refused | – | solid in the spawn area: refused |
 | **Mine blast** | – | – | – | – | damage | 2 dmg | – | – |
 | **Retracting catwalk layer** | drops | drops | – (water already falls through a catwalk) | – | drops; a hanger is released | drops | – | – |
@@ -325,9 +328,9 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **Only catwalks, ladders and spikes can be switched as terrain.** Ground and glass can't (the basin scans, the water manager and the laser's world lookup assume one `world_tilemap`), so a wall or floor that appears is a door, a drop platform or a crust.
 - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
 - **A mirror has two powered aims at most** (toggle mode); more positions need step mode (one step per rising edge) or several mirrors.
-- **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
+- **No lever object**; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
-- **An enemy presses a weight plate (and, if the plank opts in, tips a see-saw) but never a button**; it can also power a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
+- **An enemy presses a weight plate (and, if the plank opts in, tips a see-saw, and so can drive a catapult's drop) but never a button, and a see-saw never throws one**; it can also power a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
 - **Steam is a surf-only mechanic**; walking players and swimmers don't feel it.
 - **Wire layout is fixed at load**; painted conductors don't rewire at runtime. A conductor also cannot reach a logic node or the camera cue's pass-through (neither is a wire object): put a button or sensor on the wire, or pick the source in `sources`.
 - **No free-running clock node**: a clock is a crusher, an arc turret, a patrol through a zone or a motorised see-saw read by a sensor. A ring of logic nodes is not a supported one: the editor warns of the loop, and startup is not an edge, so it would not start by itself (untested).

@@ -184,6 +184,7 @@ var _creak_level: float = 0.0  # 0..1, smoothed
 var _overlay: TorqueOverlay  # the debug drawing (top level, so it draws in world space), or null
 var _load_ids: Dictionary = {}  # instance ids of the loads reported last frame
 var _load_misses: Dictionary = {}  # instance id -> consecutive frames its resting test has failed while latched
+var _launched_frame: Dictionary = {}  # instance id -> physics frame a subclass launched it (see `_launched_recently()`); not saved
 var _gripped: Dictionary = {}  # rider (CharacterBody2D: the player, enemies; never a rigid block) -> anchor in this body's local space
 
 func _ready() -> void:
@@ -335,6 +336,7 @@ func load_state(d: Dictionary) -> void:
 	_loads.clear()
 	_load_ids.clear()
 	_load_misses.clear()
+	_launched_frame.clear()
 	_net_torque = 0.0
 	_liquid_torque = 0.0
 	_apply_angle()
@@ -395,6 +397,14 @@ func _joins_water_solid() -> bool:
 func _joins_ground() -> bool:
 	return true
 
+## Subclass hook: the angle just clamped at a stop. `speed` is the angular speed (rad/s, always >= 0) the body was
+## turning into it with, 0 if it only pressed against it; `side` is +1 at the clockwise (max) stop and -1 at the
+## counter-clockwise (min) one. Runs inside the dynamics step, after `_angle` is clamped and before the transform is
+## applied (read the pose from `get_pose_global()`), and with `_loads` still last frame's scan. The see-saw's launch
+## uses it. Never called with `free_rotation`, which has no stops.
+func _stop_reached(_speed: float, _side: float) -> void:
+	pass
+
 ## Whether the player may grab, or keep hanging from, this body right now (duck-typed, read by player.gd at the grab
 ## and every frame of the hang). Within `hang_max_tilt_degrees` of the rest pose and no faster than
 ## `hang_max_angular_speed`; `get_angular_velocity()` is the real step's change of angle, so a body resting against a
@@ -423,12 +433,16 @@ func _integrate_dynamics(delta: float) -> void:
 		var high := deg_to_rad(maxf(min_angle_degrees, max_angle_degrees))
 		if _angle >= high:
 			_angle = high
-			_hit_stop(maxf(_omega, 0.0))
+			var arrival := maxf(_omega, 0.0)
+			_hit_stop(arrival)
+			_stop_reached(arrival, 1.0)
 			_omega = minf(_omega, 0.0)  # into the stop: velocity dies, no bounce
 			_motor_dir = -1.0  # the motor turns round at a stop
 		elif _angle <= low:
 			_angle = low
-			_hit_stop(maxf(-_omega, 0.0))
+			var arrival := maxf(-_omega, 0.0)
+			_hit_stop(arrival)
+			_stop_reached(arrival, -1.0)
 			_omega = maxf(_omega, 0.0)
 			_motor_dir = 1.0
 
@@ -479,6 +493,16 @@ func _apply_angle() -> void:
 	var about_pivot := Transform2D(_angle, _pivot_parent - _pivot_parent.rotated(_angle))
 	transform = about_pivot * _rest_transform
 
+## Whether the body with this instance id was launched off the plank within the last `LOAD_LATCH_FRAMES` frames. Such a
+## body is neither re-anchored by the grip nor kept as a load by the latch, so a launch is never undone or repeated.
+func _launched_recently(id: int) -> bool:
+	if not _launched_frame.has(id):
+		return false
+	if Engine.get_physics_frames() - int(_launched_frame[id]) > LOAD_LATCH_FRAMES:
+		_launched_frame.erase(id)
+		return false
+	return true
+
 ## Pins standing-still riders to their anchors; must run after _apply_angle() so to_global() uses the new pose.
 func _grip_riders() -> void:
 	var riders := _find_riders()
@@ -486,7 +510,9 @@ func _grip_riders() -> void:
 		if not is_instance_valid(r) or not riders.has(r):
 			_gripped.erase(r)
 	for rider in riders:
-		if absf(rider.velocity.x) > IDLE_SPEED:
+		if _launched_recently(rider.get_instance_id()):
+			_gripped.erase(rider)  # just thrown: never pin it back onto the face
+		elif absf(rider.velocity.x) > IDLE_SPEED:
 			_gripped.erase(rider)  # moving under its own power: engine carry only, re-anchor when idle again
 		elif _gripped.has(rider):
 			var foot := Vector2(0.0, _foot_offset(rider))
@@ -631,6 +657,8 @@ func _consider_load(candidate: Object, support: PhysicsBody2D, into: Vector2, se
 		# standing on a block on the plank: the probe can report the player, or a block pressed in and out of the
 		# face by the solver misses the 2px reach for a frame). A load that counted last frame and is still in the
 		# band over the face keeps counting for a few frames, so the torque doesn't drop to zero and back.
+		if _launched_recently(id):
+			return  # it left because it was launched, not because of a contact glitch: no latch
 		var misses: int = _load_misses.get(id, 0)
 		if debug_loads:
 			print("%s: %s failed the resting test on %s (miss %d, was load: %s)" % [name, body.name, support.name, misses, _load_ids.has(id)])

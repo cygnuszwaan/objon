@@ -23,12 +23,20 @@ extends RotatingBody
 # tie on the front face. The turret solves before the see-saw moves (process_physics_priority 100), so the reflected
 # beam trails the plank by one frame; a receiver on it needs its hold_time.
 #
+# Launch: with `launch_gain` above 0, a plank that arrives at a stop faster than `launch_min_speed` throws what rests on
+# its raised end. Each such load (the player, a block) gets `launch(vector)`, the same duck-typed contract a jump pad
+# uses, along the plank's face normal at the stop, at `omega * distance from the pivot * launch_gain` px/s, capped at
+# `launch_max_speed`. So standing at the tip throws furthest. The loads on the lowered end (the side that came down onto
+# the stop, which is where whatever tipped the plank is) are never launched. A motorised plank hits its stops every cycle
+# and so launches only with `launch_when_motorised`. See `_stop_reached()`.
+#
 # Pivot marker: with `show_pivot`, a `PivotMarker` child (made here, never saved, kept as the last child so it
 # draws over the placeholder art and the skin) draws a small circle at the Fulcrum, in the editor too.
 
 const TILE := 16.0
 const SKIN_NAME := "PlankSkin"
 const MARKER_NAME := "PivotMarker"
+const LAUNCH_SOUND_DB := -3.0  # the launch sound's level; the thud already carries the impact
 const MIRROR_LIFT := 1.0  # px the reflective segment sits in front of the plank's top face, so it wins the tie against the collider
 
 @export_group("Plank")
@@ -66,6 +74,17 @@ const MIRROR_LIFT := 1.0  # px the reflective segment sits in front of the plank
 	set(value):
 		mirror_surface = value
 		_apply_mirror_surface()
+@export_group("Launch")
+## Throws what rests on the raised end when the plank hits a stop: speed = angular speed x the load's distance from the pivot x this, along the face normal. 0 = off (a plain see-saw). The raw speed is small (a heavy block's drop arrives at about 0.3 rad/s, so 10 px/s at a 32 px lever), so useful values are in the tens; tune by feel.
+@export_range(0.0, 100.0, 0.5, "or_greater") var launch_gain: float = 0.0
+## Angular speed (rad/s) into a stop below which nothing is launched. Above it the throw is proportional, so a gentle landing doesn't fling anyone.
+@export_range(0.0, 3.0, 0.05, "or_greater") var launch_min_speed: float = 0.2
+## Cap on the launch speed (px/s) before a block divides it by its weight.
+@export_range(0.0, 1000.0, 10.0, "or_greater") var launch_max_speed: float = 500.0
+## Whether a motorised plank (motor on, `motor_torque` not 0) launches too. Off by default: it hits a stop every cycle, so riders would be thrown on every swing.
+@export var launch_when_motorised: bool = false
+## One-shot when something is launched (Audio id; empty = none), at the first launched load.
+@export var launch_sound: StringName = &"interactive/seesaw_launch"
 @export_group("")
 
 func _ready() -> void:
@@ -123,6 +142,40 @@ func _apply_pivot_marker() -> void:
 	marker.color = pivot_color
 	marker.queue_redraw()
 	move_child(marker, get_child_count() - 1)  # last = drawn on top of the art and the skin
+
+# --- launch (N2.3) -----------------------------------------------------------------------------------------------
+
+## The plank has just clamped at a stop (see RotatingBody). `side` +1 is the clockwise stop, so the left end is the
+## raised one. Throws every load on the raised end along the face normal.
+func _stop_reached(speed: float, side: float) -> void:
+	if launch_gain <= 0.0 or speed < launch_min_speed:
+		return
+	if get_motor_torque() != 0.0 and not launch_when_motorised:
+		return
+	var pose := get_pose_global()
+	var pivot := get_pivot_global()
+	var axis := pose.x.normalized()  # along the plank, local +X: right-and-down at the clockwise stop
+	var normal := get_laser_normal() if _plank_shape() != null else pose.basis_xform(Vector2.UP).normalized()
+	var played := false
+	for entry in _loads:
+		var body := instance_from_id(int(entry["id"])) as PhysicsBody2D
+		if body == null or not is_instance_valid(body) or not body.has_method(&"launch"):
+			continue
+		if _launched_recently(int(entry["id"])):
+			continue  # a latched load that has already left must not be thrown twice
+		var from_pivot := body.global_position - pivot
+		if from_pivot.dot(axis) * side >= 0.0:
+			continue  # on the lowered end (or at the pivot): that is where the weight is, not what it throws
+		var launch_speed := minf(speed * from_pivot.length() * launch_gain, launch_max_speed)
+		if launch_speed <= 0.0:
+			continue
+		_gripped.erase(body)  # release an idle rider's anchor, or the grip pulls it back onto the face
+		_launched_frame[int(entry["id"])] = Engine.get_physics_frames()
+		_load_misses.erase(int(entry["id"]))
+		body.call(&"launch", normal * launch_speed)
+		if not played and launch_sound != &"":
+			Audio.play_at(launch_sound, body.global_position, LAUNCH_SOUND_DB)
+			played = true
 
 # --- mirror surface (laser contract, read by LaserBeam) ---------------------------------------------------------
 

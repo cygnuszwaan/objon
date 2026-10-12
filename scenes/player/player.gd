@@ -1034,6 +1034,8 @@ func _physics_process(delta: float) -> void:
 			_apply_surf_launch(_pending_launch)
 		else:
 			velocity = _pending_launch
+			if absf(velocity.x) > 1.0:
+				_begin_air_carry(velocity.x, true)  # else the input line above wipes the horizontal part next frame; steering and the walk-speed floor are the swing release's
 		_has_pending_launch = false
 		_pending_launch_keeps_surf = false
 

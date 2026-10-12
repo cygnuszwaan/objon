@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 2 (Launch: See-saw launch); Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
+Covers: Phase 3 (Reach of existing systems: Steam for blocks and walkers; Freeze); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,19 +14,7 @@ Covers: Phase 2 (Launch: See-saw launch); Phase 3 (Reach of existing systems: St
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 2 adds a see-saw launch. Phase 3 extends liquid and steam. Within a phase the order is by value. There are no hard dependencies.
-
-## Phase 2: Launch
-
-### N2.3 See-saw launch (M)
-
-**Gap.** A see-saw tips and carries riders but never throws them, so a heavy block dropped on one end cannot fling the player off the other.
-
-**Sketch.** An opt-in `launch_gain` export on the see-saw (0 = off, so existing planks are unchanged). When the plank hits its stop at an angular speed above `launch_min_speed` (the stop sound already measures that speed), it calls `launch(vector)` on the loads resting on the raised end, along the plank's face normal, scaled by the end's speed and `launch_gain` and capped. The load that caused the tip is excluded. `get_loads()` already supplies each body, offset and weight. The existing `launch()` contract does the rest: the player buffers it and drops held states, and a block divides it by `mass ^ launch_weight_exponent` with its vertical speed capped.
-
-**Pitfalls.** Release an idle rider's grip anchor before launching, or the grip pulls it back onto the face. A load that is latched for `LOAD_LATCH_FRAMES` must not launch twice. Tune by playtest; headless runs cannot judge the feel.
-
-**Touches.** `rotating-bodies.md` (Rotating bodies and the see-saw: Loads, Audio), `platforms-conveyors.md` (Jump pad, for the shared contract), `player.md` (Jump pads), `meltable-blocks.md` (Jump pad launch).
+Phases run from least to most invasive. Phase 3 extends liquid and steam. (Phase 2, the see-saw launch, is built and confirmed.) Within a phase the order is by value. There are no hard dependencies.
 
 ## Phase 3: Reach of existing systems
 
