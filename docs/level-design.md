@@ -157,7 +157,9 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 - **Laser turret**: aim = instance rotation. Powered = beam on. `damage`, `boils_water`.
 - **Arc turret**: `fire_interval` 2 s, `phase_offset`, `arc_speed`, `arc_range`. Powered = firing (a rising edge fires one at once). The telegraph is a growing glow in the last 0.45 s.
 - **Cannon**: `fire_rate`. Powered = firing (rising edge fires one at once). Aim = rotation. The housing is a standable solid.
-- **Mirror**: 45° step per kick (`rotation_step_degrees`), `rotate_direction`, `rotate_time`. Also turns on each **rising edge** of power (falling edges do nothing). `bullet_rotates` (off by default) lets a bullet turn it one step. Solid to the player. A mirror's back and edge block beams. Can ride a moving platform.
+- **Mirror**: one checkbox per instance, `toggle_between_aims`, picks how it turns; the Inspector shows only that mode's fields. `rotate_time`, `kick_rotates`, `bullet_rotates` (off by default) and `invert` apply to both. Solid to the player. A mirror's back and edge block beams. Can ride a moving platform.
+  - **Step mode** (default): the instance's rotation is step 0. A kick turns it `rotation_step_degrees` (45°) in `rotate_direction`, and so does each **rising edge** of power (falling edges do nothing). A bullet turns it one step.
+  - **Toggle mode**: two aims, `aim_0_degrees` (unpowered, and the start) and `aim_1_degrees` (powered), each the node's rotation in degrees, so the instance's rotation in the editor is ignored. Power **follows the level**: on is aim 1, off is aim 0, on both edges. A kick or a bullet flips to the other aim until the next power change. The sweep takes `rotate_time` and runs the numeric way (0 to 270 turns 270°, 0 to -90 the short way). The editor draws both aims.
 
 ### Hazards
 
@@ -244,7 +246,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | Crusher | cycling | parks retracted when off; clears jam on re-power |
 | Sawwheel | spinning/dangerous | |
 | Jump pad | live | |
-| **Mirror** | **rising edge = turn one step** | startup is not an edge |
+| **Mirror** | **step mode: rising edge = turn one step; toggle mode: powered = aim 1, unpowered = aim 0** | step mode: startup is not an edge; toggle mode: snaps to its aim at load, and a change mid-turn turns it back |
 | See-saw / Swing | motor on | |
 | Rail bot | running | stops dripping when off, still hurts |
 | Powered gem | present and collectible | unpowered = hidden |
@@ -274,9 +276,9 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 |---|---|---|---|---|---|---|---|---|
 | **Laser** | melts → water | melts → slag | optional boil (needs flags) | not boiled | damage/frame | 1 dmg/0.5 s | reflects | stopped |
 | **Arc** | – | – | electrifies | – | damage | – (passes) | reflects | stopped |
-| **Bullet** | – | – | – | – | damage | – | turns it (opt-in) | stopped |
+| **Bullet** | – | – | – | – | damage | – | turns or flips it (opt-in) | stopped |
 | **Spark** | – | – | electrifies | – | damage | – | – | – |
-| **Kick** | slides it | slides it (short) | – | – | – | damage / flips crawler / arms mine | turns 45° | – |
+| **Kick** | slides it | slides it (short) | – | – | – | damage / flips crawler / arms mine | turns 45° (step) or flips aim (toggle) | – |
 | **Surf** | shoves (long) | shoves (short) | skims if ≥180 | burns/ends surf | – | bowls | – | breaks barrier |
 | **Crusher** | **shatters** | **jams crusher** | – | – | damage | – | – | – |
 | **Slag touch** | melts fast, → crust | floats, slow melt | **crusts** it | rejoins | hurts | – | – | – |
@@ -297,6 +299,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **Spikes switch per layer, not per tile**: a tile can't carry a `PowerTarget`, so independent groups of spikes are separate layers, and a spike with its own timing (a warning, a stroke) must be a node (e.g. a crusher or sawwheel).
 - **Only catwalks, ladders and spikes can be switched as terrain.** Ground and glass can't (the basin scans, the water manager and the laser's world lookup assume one `world_tilemap`), so a wall or floor that appears is a door, a drop platform or a crust.
 - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
+- **A mirror has two powered aims at most** (toggle mode); more positions need step mode (one step per rising edge) or several mirrors.
 - **No catapult or launch from a see-saw**; no lever object; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
 - **Enemies weigh nothing and press no plate or button**; the one way an enemy powers anything is by standing in a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
@@ -308,7 +311,9 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **Catwalk layers**: keep catwalks on their own layer in group `catwalk` (a mixed layer breaks brachiating and the surface checks). A powered bridge is its own layer, kept off the static one.
 - **Checkpoint on a bridge**: a restore re-derives a powered layer from its source, so a bridge whose source is off blinks once and retracts under a player respawned on it. Put the checkpoint on ground.
 - **Beams are polled by the turret**, so receiver `hold_time` matters; moving or rotating beams need ≥ 0.1 to 0.3 s.
-- **Mirrors rotate on rising edges only**: an inverted or momentary source may give you edges you didn't expect on load (startup is not an edge).
+- **Step-mode mirrors rotate on rising edges only**: an inverted or momentary source may give you edges you didn't expect on load (startup is not an edge). A toggle-mode mirror reads the level instead, so use it wherever the state, not the click count, should aim the beam.
+- **Toggle-mode mirrors ignore a momentary button's crouch-cycle** (falling then rising in one frame): the mirror ends where it started (one stray turn sound may play). Stepping on and off the button is what swings it.
+- **A kick or bullet can put a toggle-mode mirror on the aim the power state doesn't name**; the next power change puts it back. Set `kick_rotates` false (and leave `bullet_rotates` off) on a mirror a switch owns.
 - **Arcs aren't saved**: a restore never leaves an arc mid-flight. Don't depend on one.
 - **AND of arcs/bullets** needs TIMED latches, since they rarely arrive together.
 - **`breakable_barrier` `break_speed`** below 300 acts as 300 and above 800 is unreachable; above 600 needs wet ground.
