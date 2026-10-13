@@ -8,11 +8,12 @@ extends Node2D
 ## Each physics frame it solves the beam with LaserBeam.trace() (so it reflects off mirrors, passes catwalks and glass, and is
 ## stopped by everything that stops a laser, a crust included), draws it, and dispatches:
 ##   - whatever the beam finally hit, if it has on_freeze_hit(point, direction): told it is lit (the freeze receiver)
-##   - the player (group "player" with apply_chill): chilled, every frame (chill scales walk and swim speed and never
-##     removes control; see the Player chill rule in player.md). The beam is NON-LETHAL: it deals no damage to anyone.
+##   - the player or an enemy (anything with apply_chill): chilled, every frame (chill scales speed and never removes
+##     control, and turns the body blue; see Chill in player.md and the shared ChillState). The beam is NON-LETHAL: it
+##     deals no damage to anyone.
 ##   - every `freezable` basin the beam crosses: frost builds on it (WaterManager.freeze_along_beam()) and it freezes
 ##     once it has had `freeze_time` seconds of beam.
-## An enemy is simply opaque (it is not chilled in v1). Everything else the beam touches is opaque too.
+## Everything else the beam touches is opaque.
 ##
 ## Expected scene layout (same as the laser turret):
 ##   FreezeTurret (Node2D, this script)
@@ -42,7 +43,7 @@ var enabled: bool = true:  # runtime state (the authored value is `start_enabled
 		if is_inside_tree() and not Engine.is_editor_hint():
 			_apply_enabled()
 
-const CHILL_STRENGTH := 1.0 ## What the beam passes to the player's apply_chill(); the player's own constant sets how strong chill is.
+const CHILL_STRENGTH := 1.0 ## What the beam passes to a body's apply_chill(); ChillState sets how strong chill is.
 
 @onready var _muzzle: Marker2D = $Muzzle
 @onready var _body: StaticBody2D = $Body
@@ -125,7 +126,7 @@ func _dispatch(result: LaserBeam.Result) -> void:
 		return
 	if target.has_method(&"on_freeze_hit"):
 		target.on_freeze_hit(result.end_point, result.end_direction)
-	if target is Node and (target as Node).is_in_group(&"player") and target.has_method(&"apply_chill"):
+	if target.has_method(&"apply_chill"):  # the player and every enemy answer it; the beam is opaque to both
 		target.apply_chill(CHILL_STRENGTH)
 
 # --- drawing -------------------------------------------------------------------------------

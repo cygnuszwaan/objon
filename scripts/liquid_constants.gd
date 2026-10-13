@@ -85,12 +85,15 @@ class LiquidProfile:
 	# Swimming in this liquid: px/s UPWARD the passive (no input) vertical velocity eases toward, so a
 	# swimmer floats up instead of sinking. 0 = no buoyancy, the player's own swim_sink_speed applies.
 	var swim_float_speed: float
+	# Freeze ray (roadmap N3.2): true => a FROZEN crust of this liquid is only held while a freeze beam ends on it, and thaws
+	# (WaterBasin.thaw()) a few physics frames after the last hit. False => it stays frozen until a laser melts it.
+	var frozen_is_temporary: bool
 
 	func _init(p_creep_speed: float, p_bounce_restitution: float, p_slope_slide_friction: float,
 			p_push_force_per_tile_volume: float, p_color_base: Color, p_is_hazardous: bool,
 			p_is_gas: bool, p_lifetime: float, p_ripple_speed: float = 0.0,
 			p_ripple_damping: float = 0.0, p_ripple_strength: float = 0.0, p_weight_per_tile_volume: float = 0.0,
-			p_swim_float_speed: float = 0.0) -> void:
+			p_swim_float_speed: float = 0.0, p_frozen_is_temporary: bool = false) -> void:
 		creep_speed = p_creep_speed
 		bounce_restitution = p_bounce_restitution
 		slope_slide_friction = p_slope_slide_friction
@@ -104,6 +107,7 @@ class LiquidProfile:
 		ripple_strength = p_ripple_strength
 		weight_per_tile_volume = p_weight_per_tile_volume
 		swim_float_speed = p_swim_float_speed
+		frozen_is_temporary = p_frozen_is_temporary
 
 const PARTICLE_LIFETIME := 20.0
 	# Shared safety-net lifetime for every non-gas liquid (an enclosed non-basin span, a particle
@@ -154,7 +158,8 @@ static func profile(type: LiquidType) -> LiquidProfile:
 			true, false, PARTICLE_LIFETIME,
 			22.0, 2, 1.2,             # ripple: viscous — slow waves (~1/4 of water's speed), heavily damped, barely stirred
 			3.0,                      # weight_per_tile_volume: molten metal, heavier than water but under solid metal's 4
-			60.0)                     # swim_float_speed: strongly buoyant, so a player in slag drifts up toward the surface (and an escape) faster than water's slow sink
+			60.0,                     # swim_float_speed: strongly buoyant, so a player in slag drifts up toward the surface (and an escape) faster than water's slow sink
+			true)                     # frozen_is_temporary: frozen slag holds only while a freeze beam is on it; frozen water stays until a laser melts it
 		_profiles[LiquidType.STEAM] = LiquidProfile.new(
 			0.0, 0.0, 0.0, 0.0,        # unused — is_gas below skips every code path that would read these
 			Color(0.9, 0.9, 0.92, 0.5), # color_base — pale, translucent

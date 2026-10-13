@@ -70,6 +70,7 @@ var _launch_timer: float = 0.0
 var _attack_timer: float = 0.0   # counts down through the jab lunge
 var _recoil_timer: float = 0.0   # counts down through the post-jab grace window
 var _dead: bool = false
+var _chill := ChillState.new()  # the shared chill model; runtime only (see apply_chill())
 
 var _player: Node2D
 
@@ -110,12 +111,15 @@ func load_state(d: Dictionary) -> void:
 	sprite.flip_h = d.get("flip_h", sprite.flip_h)
 	sprite.play(RECHARGE_ANIM if _phase == Phase.RECHARGING else FLY_ANIM)
 	velocity = Vector2.ZERO
+	_chill.reset(sprite)
 	reset_physics_interpolation()
 
 
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
+	_chill.update(delta)
+	_chill.apply_tint_to(sprite)
 	if _player == null or not is_instance_valid(_player):
 		# player.gd joins group "player" in its own _ready(), so a Stingbot above the Player in the level tree finds
 		# nothing in its _ready(): look again each frame until it is there (and after a respawn frees the old one).
@@ -151,14 +155,14 @@ func _process_airborne(delta: float) -> void:
 
 	if _attack_timer > 0.0:
 		_attack_timer -= delta
-		velocity = (_player.global_position - global_position).normalized() * _attack_lunge_speed
+		velocity = (_player.global_position - global_position).normalized() * _attack_lunge_speed * _chill.speed_scale()
 		if _attack_timer <= 0.0:
 			_recoil_timer = _recoil_duration
 		return
 
 	if _recoil_timer > 0.0:
 		_recoil_timer -= delta
-		velocity = (global_position - _player.global_position).normalized() * _recoil_speed
+		velocity = (global_position - _player.global_position).normalized() * _recoil_speed * _chill.speed_scale()
 		return
 
 	# Hover on whichever diagonal side of the player it's currently on, recomputed every
@@ -172,14 +176,14 @@ func _process_airborne(delta: float) -> void:
 		velocity = Vector2.ZERO
 		_attack_timer = _attack_duration
 	else:
-		velocity = to_target.normalized() * _fly_speed
+		velocity = to_target.normalized() * _fly_speed * _chill.speed_scale()
 		if absf(velocity.x) > 0.5:
 			sprite.flip_h = velocity.x < 0.0
 
 
 func _start_landing() -> void:
 	_phase = Phase.LANDING
-	velocity = Vector2(0.0, _landing_descend_speed)
+	velocity = Vector2(0.0, _landing_descend_speed * _chill.speed_scale())
 
 
 func _process_landing() -> void:
@@ -189,7 +193,7 @@ func _process_landing() -> void:
 		velocity = Vector2.ZERO
 		sprite.play(RECHARGE_ANIM)
 	else:
-		velocity = Vector2(0.0, _landing_descend_speed)
+		velocity = Vector2(0.0, _landing_descend_speed * _chill.speed_scale())
 
 
 func _process_recharging(delta: float) -> void:
@@ -203,10 +207,22 @@ func _process_recharging(delta: float) -> void:
 
 func _process_launching(delta: float) -> void:
 	_launch_timer -= delta
-	velocity = Vector2(0.0, -_launch_ascend_speed)
+	velocity = Vector2(0.0, -_launch_ascend_speed * _chill.speed_scale())
 	if _launch_timer <= 0.0:
 		_phase = Phase.AIRBORNE
 		_flight_timer = flight_time
+
+
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by a FreezeTurret's beam that ends on
+## this body. `_chill` is the shared ChillState model: it slows the speeds below by `ChillState.MIN_SCALE` at full chill and
+## turns the sprite blue over `ChillState.TINT_RISE_TIME` (`self_modulate`, so the hit flash on `modulate` is untouched).
+## Runtime only, never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill.apply(strength)
+
+
+func get_chill() -> float:
+	return _chill.level
 
 
 func _play_hit_feedback() -> void:

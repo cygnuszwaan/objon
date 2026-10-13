@@ -84,6 +84,7 @@ var _elapsed := 0.0  # seconds in the current state
 var _duration := 0.0  # how long this state lasts (0 = WALK, which ends on a wall or ledge instead)
 var _flip_t := 0.0  # 0 upright .. 1 on its back: drives the art's roll
 var _dead := false
+var _chill := ChillState.new()  # the shared chill model; runtime only (see apply_chill())
 var _ledge_shift := DEFAULT_WIDTH + 1.0  # px the body is shifted forward for the ledge test: its width plus 1
 var _hit_flash_tween: Tween
 
@@ -115,11 +116,13 @@ func _apply_facing() -> void:
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint() or _dead:
 		return
+	_chill.update(delta)
+	_chill.apply_tint_to(art)
 	if not is_on_floor():
 		velocity.y += float(ProjectSettings.get_setting("physics/2d/default_gravity")) * delta
 	_elapsed += delta
 	_update_state()
-	velocity.x = speed * _facing if _state == State.WALK else 0.0
+	velocity.x = speed * _facing * _chill.speed_scale() if _state == State.WALK else 0.0
 	move_and_slide()
 	_after_move()
 	_poll_player()
@@ -251,11 +254,22 @@ func load_state(d: Dictionary) -> void:
 	_duration = d.get("duration", 0.0)
 	_flip_t = d.get("flip", 1.0 if _is_flipped() else 0.0)
 	velocity = Vector2.ZERO
+	_chill.reset(art)
 	_apply_facing()
 	_apply_pose()
 	reset_physics_interpolation()
 
 # --- damage and death ------------------------------------------------------------------------
+
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by a FreezeTurret's beam that ends on
+## this body. `_chill` is the shared ChillState model: it slows its trundle speed by `ChillState.MIN_SCALE` at full chill and
+## turns `art` blue over `ChillState.TINT_RISE_TIME` (`self_modulate`, so the hit flash on `modulate` is untouched).
+## Runtime only, never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill.apply(strength)
+
+func get_chill() -> float:
+	return _chill.level
 
 ## Kick contract. Upright: the kick flips it, no damage. On its back (or righting): costs `health` points. Returns 0
 ## until there is a scoring system.

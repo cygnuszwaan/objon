@@ -244,6 +244,10 @@ const FROST_DECAY_PER_SEC := 1.0
 const BEAM_GRACE_FRAMES := 2
 	# A beam hit this many physics frames ago or less still counts as on (the laser receiver's LIT_FRAMES), so the order the
 	# turret and this basin are processed in never matters.
+const THAW_GRACE_FRAMES := 4
+	# A temporary frozen crust (frozen slag, LiquidProfile.frozen_is_temporary) thaws once this many physics frames have
+	# passed since a freeze beam last ended on it (or since it formed, while the beam is first finding the new collision):
+	# long enough that the order the turret and this basin run in never matters, short enough to read as "as soon as".
 const FROZEN_STAND_TOLERANCE := 3.0
 	# px: how far a player's feet may be above or below a frozen crust's collision top and still count as standing on it
 	# (what the electrified-crust hazard asks).
@@ -507,6 +511,7 @@ var _frost: float = 0.0  # seconds of freeze-beam contact so far; runtime only, 
 var _frost_hit_frame: int = -1000
 var _heat: float = 0.0  # seconds of laser contact on a frozen crust so far; runtime only
 var _heat_hit_frame: int = -1000
+var _freeze_hold_frame: int = -1000  # physics frame a freeze beam last ended on a temporary frozen crust (or it formed); runtime only
 var _embedded: bool = false
 	# Runtime only. True from a freeze that found the player inside the crust band or under the surface until the player is
 	# above the crust's top face: the crust body ignores the player (add_collision_exception_with()) for that long, the player
@@ -671,6 +676,17 @@ func _ready() -> void:
 ## liquid is settled, and the crust's two stored faces. Structure (floor rows, walls, capacity) always comes
 ## from the scene. Flowing particles are not part of a basin and are not restored.
 func save_state() -> Dictionary:
+	if is_temporary_frozen():
+		# A temporary freeze is held by a beam and is never checkpointed: it is saved as the liquid it was (the band the
+		# crust holds returned to the pool), so a restore cannot drop anyone through a crust that nothing is holding.
+		return {
+			"liquid_type": int(liquid_type),
+			"fill_volume": minf(fill_volume + crust_volume, _capacity_volume),
+			"has_crust": false,
+			"crust_top_row": 0.0,
+			"crust_bottom_row": 0.0,
+			"crust_frozen": false,
+		}
 	return {
 		"liquid_type": int(liquid_type),
 		"fill_volume": fill_volume,
@@ -691,6 +707,7 @@ func load_state(d: Dictionary) -> void:
 	crust_frozen = has_crust and bool(d.get("crust_frozen", false))
 	_frost = 0.0  # frost, heat, the embedded latch and electrification are runtime only: a restore comes back calm
 	_heat = 0.0
+	_freeze_hold_frame = Engine.get_physics_frames()
 	_electrified_left = 0.0
 	_release_embedded()
 	fill_volume = clampf(d.get("fill_volume", 0.0), 0.0, _max_fill_volume())
@@ -707,6 +724,9 @@ class CrustBody extends StaticBody2D:
 	func on_laser_hit(_point: Vector2, _direction: Vector2) -> void:
 		if basin != null and is_instance_valid(basin) and basin.has_method(&"on_crust_laser_hit"):
 			basin.on_crust_laser_hit()
+	func on_freeze_hit(_point: Vector2, _direction: Vector2) -> void:
+		if basin != null and is_instance_valid(basin) and basin.has_method(&"on_crust_freeze_hit"):
+			basin.on_crust_freeze_hit()
 
 func _ensure_crust_body() -> void:
 	# One StaticBody2D + CollisionPolygon2D pair, created once here and reused for this basin's whole
@@ -1129,6 +1149,7 @@ func freeze() -> bool:
 	crust_frozen = true
 	_frost = 0.0
 	_heat = 0.0
+	_freeze_hold_frame = Engine.get_physics_frames()  # the beam that froze it has THAW_GRACE_FRAMES to find the new crust
 	_latch_embedded()
 	Audio.play_at(&"interactive/basin_freeze", _basin_centre_at(get_crust_top_world_y()))
 	_update_process_state()
@@ -1147,6 +1168,18 @@ func on_crust_laser_hit() -> void:
 	_update_physics_state()
 	if _heat >= melt_time:
 		thaw()
+
+## True while a FROZEN crust that needs the beam to hold it is on this basin: the liquid's profile says its frozen crust is
+## temporary (slag). Frozen water is not: it stays until a laser melts it.
+func is_temporary_frozen() -> bool:
+	return is_frozen_crust() and LiquidConstants.profile(liquid_type).frozen_is_temporary
+
+## The freeze ray's contact with a frozen crust, forwarded by the crust body (CrustBody.on_freeze_hit(), once per physics
+## frame the beam ends on it). A temporary frozen crust is held for as long as this keeps arriving and thaws
+## THAW_GRACE_FRAMES frames after it stops (see _physics_process()); any other crust ignores it.
+func on_crust_freeze_hit() -> void:
+	if is_temporary_frozen():
+		_freeze_hold_frame = Engine.get_physics_frames()
 
 ## Reverses a frozen crust: the crust and its collision are removed and the band of liquid it held is returned (clamped
 ## to capacity), so the basin is an ordinary crust-free basin again. No steam, no particles. Only a frozen crust thaws;
@@ -1269,7 +1302,7 @@ func _poll_electric_crust() -> void:
 func _needs_physics() -> bool:
 	if Engine.is_editor_hint():
 		return false
-	return _frost > 0.0 or _heat > 0.0 or _embedded or (is_frozen_crust() and _electrified_left > 0.0)
+	return _frost > 0.0 or _heat > 0.0 or _embedded or is_temporary_frozen() or (is_frozen_crust() and _electrified_left > 0.0)
 
 func _update_physics_state() -> void:
 	set_physics_process(_needs_physics())
@@ -1284,6 +1317,8 @@ func _physics_process(delta: float) -> void:
 		_tick_embedded(delta)
 	if is_frozen_crust() and _electrified_left > 0.0:
 		_poll_electric_crust()
+	if is_temporary_frozen() and frames - _freeze_hold_frame > THAW_GRACE_FRAMES:
+		thaw()  # no freeze beam has ended on the crust for a moment: it lets go (frozen slag is molten slag again)
 	if not _needs_physics():
 		set_physics_process(false)
 
@@ -1678,8 +1713,26 @@ func convert_to_crust(_amount: float = 0.0) -> float:
 	_crust_cool_t = 0.0  # the new crust plays its cooling frames
 	queue_redraw()
 	_rebuild_crust_collision()
+	_lift_blocks_onto_crust()
 	_clear_ripple()  # the liquid's top is now hidden under solid crust; nothing left to ripple
 	return 0.0
+
+## A crust forms exactly where blocks float: a buoyant block rides with most of its body under the surface, i.e. inside the
+## new slab. Every block whose centre is in or above the slab and that overlaps it over a crust column is lifted straight up
+## until its lowest point rests on the crust's collision top (MeltableBlock.lift_clear_of_crust(); the actors riding it go
+## with it), for both kinds of crust. A block whose centre is already below the slab (sunk on the seabed, or hanging under it)
+## is left where it is. Thawing needs no counterpart: with the crust gone the block falls in and floats again.
+func _lift_blocks_onto_crust() -> void:
+	if Engine.is_editor_hint() or not has_crust or not is_inside_tree():
+		return
+	for node in get_tree().get_nodes_in_group(&"water_solid"):
+		if node.has_method(&"lift_clear_of_crust"):
+			node.lift_clear_of_crust(self)
+
+## Public form of the column test the player's embedded latch uses: whether the world rect overlaps a column of this basin
+## that carries crust.
+func is_rect_over_crust(rect: Rect2) -> bool:
+	return _rect_over_crust(rect)
 
 func _detect_width_by_wall_scan() -> int:
 	# Auto width detection for width_tiles == WIDTH_AUTO: scans rightward from this node's own column

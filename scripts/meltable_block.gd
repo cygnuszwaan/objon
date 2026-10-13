@@ -146,6 +146,7 @@ const RIDER_SUPPORT_TOLERANCE := 0.5 ## px: slack when deciding the block plus r
 const SUPPORT_LATCH_FRAMES := 12 ## physics frames a body floor (plank, block) keeps counting as supporting the centre of mass after the contact report loses its second corner.
 const SURF_SHOVE_PLAYER_WEIGHT := 2.0 ## The surfer's weight against the block's mass when working out what a shove costs it (mirrors RotatingBody.player_weight).
 const DISSOLVE_TIME := 0.2 ## seconds a dissolving block (see dissolve()) takes to fade out.
+const CRUST_LIFT_MARGIN := 0.1 ## px: how far clear of a new crust's collision top a lifted block is set, so it doesn't start in contact.
 const HOLD_TILT_MARGIN := 0.08 ## rad: a rotating block may lean this much more than the surface under it and still be held.
 
 @export var size_tiles: Vector2i = Vector2i(1, 1):
@@ -308,6 +309,45 @@ func load_state(d: Dictionary) -> void:
 	_launch_pending = false
 	reset_physics_interpolation()
 	queue_redraw()
+
+## Crust contract (called by a WaterBasin the moment a crust forms, see WaterBasin._lift_blocks_onto_crust()): the new slab
+## occupies the surface band where a floating block rides, so a block whose centre is in or above that band, and whose
+## bounds overlap it over a crust column, is lifted straight up until its lowest point rests on the crust's collision top.
+## Anything standing on it (`_actors_in_band()`, the player included) is lifted by the same amount. A block whose centre is
+## already below the band, or one clear of it, is untouched. Applied as a teleport inside the next `_integrate_forces()`,
+## like a restore, with its own horizontal motion kept. Returns how far it was lifted (0 = untouched).
+func lift_clear_of_crust(basin: Node) -> float:
+	if _melted or basin == null or not basin.has_method(&"get_crust_collision_top_world_y"):
+		return 0.0
+	var top: float = basin.get_crust_collision_top_world_y()
+	var bottom: float = basin.get_crust_bottom_world_y()
+	if global_position.y >= bottom:
+		return 0.0
+	var low := -INF
+	var high := INF
+	var left := INF
+	var right := -INF
+	for corner in _corners_world():
+		low = maxf(low, corner.y)
+		high = minf(high, corner.y)
+		left = minf(left, corner.x)
+		right = maxf(right, corner.x)
+	if low <= top or high >= bottom:
+		return 0.0  # wholly above the slab, or wholly below it
+	if not basin.is_rect_over_crust(Rect2(left, high, right - left, low - high)):
+		return 0.0
+	var lift := low - top + CRUST_LIFT_MARGIN
+	for rider in _actors_in_band(-1.0, 4.0):
+		rider.global_position.y -= lift
+	_pending_pos = global_position + Vector2(0.0, -lift)
+	_pending_angle = rotation
+	_pending_av = angular_velocity if allow_rotation else 0.0
+	global_position = _pending_pos
+	_pending_teleport = true
+	_vy = 0.0
+	_written_vy = 0.0
+	linear_velocity.y = 0.0
+	return lift
 
 ## Beam contract: anything with on_laser_hit(point, direction) is told it's being lit.
 func on_laser_hit(_point: Vector2, _direction: Vector2) -> void:

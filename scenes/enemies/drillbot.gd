@@ -63,6 +63,7 @@ var _facing: int = 1          # 1 = right (default), -1 = left
 var _origin_x: float
 var _dwelling: bool = false
 var _dead: bool = false
+var _chill := ChillState.new()  # the shared chill model; runtime only (see apply_chill())
 var _ledge_shift: float = FALLBACK_BODY_WIDTH + 1.0  # free patrol: how far the body is shifted forward for the ledge test (its width plus 1)
 var _drill_overhang: float = 0.0  # free patrol: how far the drill's tip sticks out past the body collider's front edge, so the wall probe reaches the tip
 
@@ -127,6 +128,7 @@ func load_state(d: Dictionary) -> void:
 	_health = d.get("health", _health)
 	_dwelling = false
 	velocity = Vector2.ZERO
+	_chill.reset(sprite)
 	_update_facing()
 	reset_physics_interpolation()
 
@@ -172,6 +174,8 @@ func _mirrored_points(base_points: PackedVector2Array) -> PackedVector2Array:
 func _physics_process(delta: float) -> void:
 	if _dead:
 		return
+	_chill.update(delta)
+	_chill.apply_tint_to(sprite)
 
 	if not is_on_floor():
 		velocity.y += float(ProjectSettings.get_setting("physics/2d/default_gravity")) * delta
@@ -179,7 +183,7 @@ func _physics_process(delta: float) -> void:
 	if _dwelling:
 		velocity.x = 0.0
 	else:
-		velocity.x = _speed * _facing
+		velocity.x = _speed * _facing * _chill.speed_scale()
 		if patrol_distance > 0.0:
 			var traveled: float = global_position.x - _origin_x
 			if (_facing == 1 and traveled >= patrol_distance) or (_facing == -1 and traveled <= -patrol_distance):
@@ -305,6 +309,18 @@ func _play_hit_feedback() -> void:
 		var jitter := Vector2(randf_range(-HIT_SHAKE_STRENGTH, HIT_SHAKE_STRENGTH), randf_range(-HIT_SHAKE_STRENGTH, HIT_SHAKE_STRENGTH))
 		_hit_shake_tween.tween_property(sprite, "position", _base_sprite_position + jitter, step_duration)
 	_hit_shake_tween.tween_property(sprite, "position", _base_sprite_position, step_duration)
+
+
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by a FreezeTurret's beam that ends on
+## this body. `_chill` is the shared ChillState model: it slows the speeds below by `ChillState.MIN_SCALE` at full chill and
+## turns the sprite blue over `ChillState.TINT_RISE_TIME` (`self_modulate`, so the hit flash on `modulate` is untouched).
+## Runtime only, never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill.apply(strength)
+
+
+func get_chill() -> float:
+	return _chill.level
 
 
 func take_damage(amount: int = 1) -> int:

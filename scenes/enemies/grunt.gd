@@ -108,6 +108,7 @@ var _edge_turned := false  # the pause it is in began with a wall/ledge turn, so
 var _prev_hammer_angle := 0.0  # last frame's angle: where this frame's sweep starts
 var _hammer_angle := 0.0  # degrees, art-local (facing right); 0 = upright, positive = forward
 var _dead := false
+var _chill := ChillState.new()  # the shared chill model; runtime only (see apply_chill())
 var _player: Node2D
 var _hit_flash_tween: Tween
 
@@ -139,6 +140,8 @@ func _apply_facing() -> void:
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint() or _dead:
 		return
+	_chill.update(delta)
+	_chill.apply_tint_to(art)
 	_resolve_player()
 	if not is_on_floor():
 		velocity.y += float(ProjectSettings.get_setting("physics/2d/default_gravity")) * delta
@@ -216,12 +219,12 @@ func _update_state() -> void:
 func _desired_vx() -> float:
 	match _state:
 		State.WALK:
-			return wander_speed * _facing
+			return wander_speed * _facing * _chill.speed_scale()
 		State.CHASE:
 			# stands at a ledge rather than walking off it (a wall stops it through the move itself)
 			if _ledge_ahead():
 				return 0.0
-			return chase_speed * _facing
+			return chase_speed * _facing * _chill.speed_scale()
 	return 0.0
 
 ## After the move: a wall or a ledge turns a wanderer round. A chaser does neither, it just stops (see above).
@@ -359,10 +362,21 @@ func load_state(d: Dictionary) -> void:
 		_elapsed = d.get("elapsed", 0.0)
 		_duration = d.get("duration", 1.0)
 	_swing_hit = false
+	_chill.reset(art)
 	_apply_facing()
 	reset_physics_interpolation()
 
 # --- damage and death ------------------------------------------------------------------------
+
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by a FreezeTurret's beam that ends on
+## this body. `_chill` is the shared ChillState model: it slows its walk and chase speed by `ChillState.MIN_SCALE` at full chill and
+## turns `art` blue over `ChillState.TINT_RISE_TIME` (`self_modulate`, so the hit flash on `modulate` is untouched).
+## Runtime only, never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill.apply(strength)
+
+func get_chill() -> float:
+	return _chill.level
 
 ## Kick contract: `amount` is honoured here (Drillbot's ignores it). Returns 0 until there is a scoring system.
 func take_damage(amount: int = 1) -> int:

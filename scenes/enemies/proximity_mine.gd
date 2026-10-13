@@ -76,6 +76,7 @@ var _elapsed := 0.0  # seconds since it armed
 var _duration := 0.0  # the fuse it is running (fuse_time, or the shorter chain fuse)
 var _blink_phase := 0.0
 var _exploded := false
+var _chill := ChillState.new()  # the shared chill model; runtime only (see apply_chill())
 var _player: Node2D
 
 @onready var art: Node2D = $ProximityMineArt
@@ -98,6 +99,8 @@ func _refresh_art() -> void:
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint() or _exploded:
 		return
+	_chill.update(delta)
+	_chill.apply_tint_to(art)
 	if not is_on_floor():
 		velocity.y += float(ProjectSettings.get_setting("physics/2d/default_gravity")) * delta
 	var speed_before := velocity.x
@@ -208,6 +211,16 @@ func _apply_pose() -> void:
 
 # --- kick and laser contracts ----------------------------------------------------------------
 
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by a FreezeTurret's beam that ends on
+## this body. `_chill` is the shared ChillState model: it scales the speed a kick sends it sliding at by
+## `ChillState.MIN_SCALE` at full chill (its fuse and slide friction are not scaled) and turns `art` blue over `ChillState.TINT_RISE_TIME` (`self_modulate`, so the hit flash on `modulate` is untouched).
+## Runtime only, never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill.apply(strength)
+
+func get_chill() -> float:
+	return _chill.level
+
 ## Kick / laser contract: arms it, never damages it (a kick calls this and then `kicked()`).
 func take_damage(_amount: int = 1) -> int:
 	arm()
@@ -217,7 +230,7 @@ func take_damage(_amount: int = 1) -> int:
 func kicked(direction: float) -> void:
 	if _exploded or kick_speed <= 0.0:
 		return
-	velocity.x = signf(direction) * kick_speed
+	velocity.x = signf(direction) * kick_speed * _chill.speed_scale()
 	Audio.play_at(&"enemies/mine_kick", global_position, 2.0)
 
 # --- checkpoint ------------------------------------------------------------------------------
@@ -235,6 +248,7 @@ func load_state(d: Dictionary) -> void:
 	_duration = 0.0
 	_blink_phase = 0.0
 	velocity = Vector2.ZERO
+	_chill.reset(art)
 	_apply_pose()
 	reset_physics_interpolation()
 

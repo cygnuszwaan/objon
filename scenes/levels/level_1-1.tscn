@@ -110,7 +110,7 @@ tile_set = SubResource("TileSet_0w3yt")
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
 
 [node name="Red" parent="Tilemaps/ConductorLayers" index="0"]
-tile_map_data = PackedByteArray("AAAXAE4AAAAFAAAAAAAXAE0AAAAFAAAAAAAXAEwAAAAFAAAAAAAXAEsAAAAFAAAAAAAXAEoAAAAGAAAAAAAYAEoAAAAIAAAAAAAZAEoAAAAIAAAAAAAaAEoAAAAIAAAAAAAbAEoAAAAEAAAAAAAbAEsAAAAFAAAAAAA=")
+tile_map_data = PackedByteArray("AAAYAE4AAAAIAAAAAAAZAE4AAAAIAAAAAAAaAE4AAAAIAAAAAAAbAE4AAAAIAAAAAAAcAE4AAAAIAAAAAAAXAE4AAAAGAAAAAAAdAE4AAAAEAAAAAAA=")
 
 [node name="Blue" parent="Tilemaps/ConductorLayers" index="3"]
 tile_map_data = PackedByteArray("AAAYAFAAAAAFAAMAAAAYAFEAAAAFAAMAAAAYAFIAAAAFAAMAAAAYAFMAAAAJAAMAAAAZAFMAAAAIAAMAAAAaAFMAAAAIAAMAAAAbAFMAAAAIAAMAAAA=")
@@ -140,13 +140,15 @@ position = Vector2(328, 1272)
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
 [node name="FreezeTurret" parent="." unique_id=1147850276 instance=ExtResource("13_7n46g")]
-position = Vector2(392, 1216)
+position = Vector2(560, 1272)
+scale = Vector2(-1, 1)
 draw_placeholder = false
 
 [node name="Mirror" parent="." unique_id=1989718227 instance=ExtResource("12_rljw2")]
-position = Vector2(432, 1216)
+position = Vector2(464, 1272)
 toggle_between_aims = true
-aim_1_degrees = -90.0
+aim_0_degrees = 90.0
+aim_1_degrees = 180.0
 
 [node name="WaterBasin" parent="." unique_id=1689376223 instance=ExtResource("15_yjlda")]
 z_index = -1

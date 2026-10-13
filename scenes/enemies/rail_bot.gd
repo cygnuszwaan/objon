@@ -92,6 +92,7 @@ const RAIL_WIDTH := 2.0
 var _health: int = 1
 var _powered := true
 var _dead := false
+var _chill := ChillState.new()  # the shared chill model; runtime only (see apply_chill())
 var _offset := 0.0  # distance along the rail, px
 var _dir := 1.0
 var _pause_left := 0.0
@@ -130,6 +131,8 @@ func _get_configuration_warnings() -> PackedStringArray:
 func _physics_process(delta: float) -> void:
 	if Engine.is_editor_hint() or _dead:
 		return
+	_chill.update(delta)  # before the powered check: an unpowered bot's hue still fades
+	_chill.apply_tint_to(art)
 	_poll_contact()  # before the powered check: a stopped bot still hurts
 	if not _powered:
 		return
@@ -178,7 +181,7 @@ func _advance(delta: float) -> void:
 	if _pause_left > 0.0:
 		_pause_left -= delta
 		return
-	_offset += _dir * speed * delta
+	_offset += _dir * speed * _chill.speed_scale() * delta
 	if mode == Mode.LOOP:
 		_offset = fposmod(_offset, length)
 	elif _offset >= length:
@@ -269,11 +272,22 @@ func load_state(d: Dictionary) -> void:
 	_health = d.get("health", _health)
 	_powered = d.get("powered", _powered)
 	_drip_clock = 0.0
+	_chill.reset(art)
 	_place()
 	_apply_pose()
 	reset_physics_interpolation()
 
 # --- damage and death ------------------------------------------------------------------------
+
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by a FreezeTurret's beam that ends on
+## this body. `_chill` is the shared ChillState model: it slows its speed along the rail (the drip timer and the end pause are not scaled) by `ChillState.MIN_SCALE` at full chill and
+## turns `art` blue over `ChillState.TINT_RISE_TIME` (`self_modulate`, so the hit flash on `modulate` is untouched).
+## Runtime only, never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill.apply(strength)
+
+func get_chill() -> float:
+	return _chill.level
 
 ## Kick / laser / mine-blast contract. Returns 0 until there is a scoring system.
 func take_damage(amount: int = 1) -> int:
