@@ -17,6 +17,7 @@ var _air_kick := false  # the current KICKING one-shot was started airborne: it 
 
 var speed: float = 150.0
 
+@export var step_height: float = 4.0  # px: the tallest step the player walks up without jumping (a quarter of a 16 px tile); 0 turns it off. Needs slope_snap_length >= step_height, which settles the body back down onto the step
 @export var slope_snap_length: float = 8.0
 	# CharacterBody2D.floor_snap_length defaults to 1px, which is far too small for this game:
 	# walking down a slope moves the body horizontally first, leaving the floor up to
@@ -1067,6 +1068,8 @@ func _physics_process(delta: float) -> void:
 		_update_skim_floor()  # before the move: the floor has to be there for this frame's motion to meet it
 		if is_surfing:
 			_surf_bowl_sweep(delta)  # before the move, so a bowled body can't stop this frame's motion
+		else:
+			_try_step_up(delta)  # before the move: a wall of up to step_height is stepped onto instead of stopping the walk
 		move_and_slide()
 		_lead_rising_rigid_floor(delta)
 		_update_skim_effects()
@@ -1157,6 +1160,35 @@ func _physics_process(delta: float) -> void:
 # --- conveyor belts ---------------------------------------------------------------------------
 # Belts are duck-typed like take_hit()/take_damage() below: a conveyor_belt.gd body exposes
 # get_conveyor_speed() and doesn't know or care that the rider is specifically the player.
+# --- small steps -------------------------------------------------------------------------------
+## Walks up a step of at most `step_height` px without a jump. Runs just before move_and_slide(), only for an ordinary
+## grounded walk (not climbing, hanging, swimming, surfing or rising). If this frame's horizontal motion would run into a
+## wall (a surface too steep to walk, so slopes are left to move_and_slide()), the body is lifted by step_height; the lift is
+## kept only if the lifted body can then move the full horizontal distance and has ground under it within step_height of
+## the lift. move_and_slide()'s floor snap (slope_snap_length) settles it back down onto the step surface at the end of
+## the move. A taller wall, a gap or a ceiling in the way leaves the body where it was, so it is stopped as before.
+func _try_step_up(delta: float) -> void:
+	if step_height <= 0.0 or is_climbing or is_hanging or is_swimming or is_surfing or not is_on_floor() or velocity.y < 0.0:
+		return
+	var dx := velocity.x * delta
+	if absf(dx) < 0.01:
+		return
+	var motion := Vector2(dx, 0.0)
+	var hit := KinematicCollision2D.new()
+	if not test_move(global_transform, motion, hit):
+		return
+	if hit.get_angle(up_direction) <= floor_max_angle:
+		return  # a slope the body can walk: not a step
+	var lifted := global_transform.translated(Vector2(0.0, -step_height))
+	if test_move(global_transform, Vector2(0.0, -step_height)):
+		return  # a ceiling is in the way of the lift
+	if test_move(lifted, motion):
+		return  # still blocked at step_height: a wall, not a step
+	var moved := lifted.translated(motion)
+	if not test_move(moved, Vector2(0.0, step_height + 1.0)):
+		return  # nothing to stand on past the lift
+	global_position.y -= step_height
+
 # --- slippery floors ---------------------------------------------------------------------------
 # Duck-typed contract, same style as get_conveyor_speed(): any body with is_slippery() -> bool that
 # the player is standing on makes the floor slippery (IceBlock does). Uses a short downward test_move
