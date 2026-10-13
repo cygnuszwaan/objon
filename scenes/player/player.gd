@@ -163,6 +163,12 @@ const POINTS_POPUP: PackedScene = preload("res://scenes/effects/points_popup.tsc
 	# where the "+N" feedback spawns, relative to the player's origin (above the head; the art then rises on its own).
 
 const ELECTRIC_CONTACT_DAMAGE := 1
+const CHILL_MIN_SCALE := 0.5
+	# Walk and swim speed scale at full chill (the freeze ray, or an embedded frozen crust). One constant for both sources and
+	# both gaits for now. Always above zero: chill slows, it never roots the player, so the beam can always be left.
+const CHILL_DECAY_TIME := 0.5
+	# s: chill rises at once to the strongest source this frame and fades linearly to nothing over this long after the last one
+	# (the shape of surf wetness), so a step out of the beam is felt for a moment.
 	# The same, for water a spark has electrified (WaterBasin.is_electrified()). Untuned placeholder.
 
 const SLAG_CONTACT_DAMAGE := 1
@@ -208,6 +214,8 @@ const UNEMBED_CLEARANCE := 0.5  # px of gap left between a crust's underside and
 var _stuck_log_timer: float = 0.0
 var _stuck_log_pos: Vector2 = Vector2.INF
 var _skip_buffered_jump := false  # set when a hang's own jump (rail, catwalk or crust underside) was this press, so the same frame's buffered-jump consume is skipped
+var _chill: float = 0.0  # 0..1, smoothed; runtime only, never saved (see apply_chill())
+var _chill_input: float = 0.0  # the strongest strength received since _update_chill() last ran
 var _crust_pass_body: PhysicsBody2D = null  # the crust body the player is jumping up through (a collision exception while set); see _update_crust_pass()
 var hang_regrab_lockout: float = 0.3  # prevents an instant re-grab right after dropping/jumping off
 var time_since_airborne: float = 0.0  # seconds since is_on_floor() last true; reset to 0 while grounded
@@ -677,6 +685,7 @@ func _physics_process(delta: float) -> void:
 	_update_hurt_invincibility(delta)
 	_update_surf_shove_exceptions(delta)  # runs in every state: the surf may have ended while a shoved block still overlaps
 	_update_crust_pass()  # runs in every state: a hit mid-pass must still clear the exception once the body is out of the crust
+	_update_chill(delta)  # runs in every state, so the chill fades while hurt or hanging too
 
 	# Hurt, dead, and dance all get the same minimal branch instead of being threaded through the
 	# normal flow: everything below (jump buffer, crouch, climb...) runs on raw input every
@@ -843,15 +852,16 @@ func _physics_process(delta: float) -> void:
 		# plain accumulation).
 		var swim_up := Input.is_action_pressed("climb_up") or Input.is_action_pressed("jump")
 		var swim_down := Input.is_action_pressed("crouch")
+		var swim_chill := _chill_scale()  # chilled swimming is slower both ways (the passive sink is left alone)
 		if swim_up and not swim_down:
-			velocity.y = -swim_up_speed
+			velocity.y = -swim_up_speed * swim_chill
 		elif swim_down and not swim_up:
-			velocity.y = swim_speed
+			velocity.y = swim_speed * swim_chill
 		else:
 			# nothing held, or up+down cancel each other out (same as the original swim_input == 0
 			# case) — either way, ease toward the passive sink target.
 			velocity.y = move_toward(velocity.y, _swim_passive_target(), swim_gravity * delta)
-		velocity.x = input_dir * swim_speed
+		velocity.x = input_dir * swim_speed * swim_chill
 	else:
 		# --- gravity ---
 		if not is_on_floor():
@@ -968,6 +978,8 @@ func _physics_process(delta: float) -> void:
 	# to input * speed. _slide_vx is that own velocity, kept apart from velocity.x because velocity.x
 	# also gets the conveyor and water pushes added below each frame; it's refreshed from every branch
 	# so stepping onto ice from a normal floor carries the momentum along.
+	var chill_scale := _chill_scale()  # 1 unless chilled; walk and sneak speed follow it (a surf and a launch's carried momentum are exempt: they never read it)
+	var walk_speed := speed * chill_scale
 	var slippery := is_on_floor() and not is_climbing and not is_hanging and not is_swimming and _floor_is_slippery()
 	if is_on_wall() and _slide_vx * get_wall_normal().x < 0.0:
 		_slide_vx = 0.0  # ran into a wall: don't keep "sliding" into it and then take ages to reverse
@@ -989,7 +1001,7 @@ func _physics_process(delta: float) -> void:
 		# Crouched: creep at sneak_speed when left/right is held (_can_sneak()), otherwise rooted. The stand-up and the
 		# ground kick stay rooted, except that a stand-up that starts in the air (sneaked off an edge) keeps the creep
 		# velocity instead of stopping dead; a crouch-jump from a standstill has _slide_vx 0, so it is unchanged.
-		var sneak_target := input_dir * sneak_speed if _can_sneak() else 0.0
+		var sneak_target := input_dir * sneak_speed * chill_scale if _can_sneak() else 0.0
 		if one_shot_action == OneShotAction.UNCROUCHING and not is_on_floor():
 			sneak_target = clampf(_slide_vx, -sneak_speed, sneak_speed)
 		if slippery:
@@ -1000,9 +1012,9 @@ func _physics_process(delta: float) -> void:
 	elif slippery:
 		var rate := ice_accel if input_dir != 0.0 else ice_friction
 		# capped at walk speed so momentum from anything faster doesn't turn into a 600px skate
-		velocity.x = move_toward(clampf(_slide_vx, -speed, speed), input_dir * speed, rate * delta)
+		velocity.x = move_toward(clampf(_slide_vx, -speed, speed), input_dir * walk_speed, rate * delta)
 	else:
-		velocity.x = input_dir * speed
+		velocity.x = input_dir * walk_speed
 	if not is_climbing and not is_hanging and not is_swimming:
 		_slide_vx = velocity.x  # BEFORE the pushes below are added
 
@@ -1261,7 +1273,9 @@ func _water_surface_depth() -> float:
 	if basin == null:
 		return -INF
 	var probe := Vector2(collision_shape.global_position.x, collision_shape.global_position.y + swim_probe_offset_y)
-	return probe.y - basin.get_liquid_surface_world_y()
+	# The embedded player (a frozen crust formed around them, see WaterBasin.freeze()) measures against the crust's top face
+	# instead, so the crust band counts as water for them: they swim up through it and leave swimming at the top.
+	return probe.y - basin.get_swim_surface_world_y(self)
 
 func _swim_pose_fits(x_nudge: float) -> bool:
 	# Would the collider, rotated to the horizontal swim pose (and shifted by x_nudge), overlap any solid?
@@ -1535,6 +1549,8 @@ func load_state(d: Dictionary) -> void:
 
 ## Called by Game after the snapshot has been applied: a hard teleport onto the checkpoint at full health.
 func respawn_at(pos: Vector2) -> void:
+	_chill = 0.0
+	_chill_input = 0.0
 	_end_crust_pass()
 	_cancel_cue()
 	global_position = pos
@@ -1569,6 +1585,24 @@ func _dead_animation_length() -> float:
 # convention above rather than a group check, so a jump pad doesn't need to know or care that
 # "player" is the group name — and by the same token nothing else (drillbot, stingbot) responds to
 # one unless it grows a launch() of its own.
+## Chill contract (duck-typed, `has_method("apply_chill")`): called every physics frame by whatever is chilling the player
+## (a FreezeTurret's beam, a WaterBasin's frozen crust around an embedded player), with a strength 0..1. Overlapping sources
+## take the strongest, never the sum. Chill rises at once and fades over CHILL_DECAY_TIME; at full strength walk and sneak
+## speed and swim speed are scaled by CHILL_MIN_SCALE. Surfing and a launch's carried momentum (jump pad, swing release) never
+## read it, so they are exempt. It is never saved: a restore comes back unchilled.
+func apply_chill(strength: float) -> void:
+	_chill_input = maxf(_chill_input, clampf(strength, 0.0, 1.0))
+
+func _update_chill(delta: float) -> void:
+	_chill = maxf(_chill_input, _chill - delta / CHILL_DECAY_TIME)
+	_chill_input = 0.0
+
+func _chill_scale() -> float:
+	return lerpf(1.0, CHILL_MIN_SCALE, _chill)
+
+func get_chill() -> float:
+	return _chill
+
 func launch(vector: Vector2) -> void:
 	if is_dead or is_dancing:
 		return
@@ -2199,6 +2233,8 @@ func _unembed_from_crust() -> void:
 			continue
 		if hit.collider == _crust_pass_body:
 			continue  # the body is jumping up through this crust on purpose (see _update_crust_pass())
+		if basin.is_player_embedded():
+			continue  # a frozen crust formed around the player: they swim up through it (WaterBasin.get_swim_surface_world_y())
 		var underside := _crust_underside_under_body(basin)
 		if underside == -INF or collision_shape.global_position.y <= underside or top_y >= underside:
 			continue

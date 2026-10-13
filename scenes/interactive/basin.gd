@@ -232,6 +232,22 @@ const CRUST_COLOR := Color(0.35, 0.32, 0.3, 1.0)
 	# "safe solid ground," not "which liquid used to be here." Placeholder pending a real art pass,
 	# same as BODY_COLOR_BY_TYPE above.
 
+# --- Frozen crust (the freeze ray, roadmap N3.2) ---------------------------------------------------
+const FROZEN_CRUST_SKIN_PATH := "res://sprites/liquids/spsh_freezing.png"
+	# Cooling art of a FROZEN crust: the same frames as the slag/water crust art in another palette (liquid blue to pale
+	# ice), read through the same LiquidSkin fringe cut. Used for both liquids. A missing file falls back to the liquid's
+	# own crust art, and with none at all to FROZEN_CRUST_COLOR.
+const FROZEN_CRUST_COLOR := Color(0.62, 0.82, 0.95, 1.0)
+const FROST_DECAY_PER_SEC := 1.0
+	# Seconds of frost (freeze ray) or heat (laser on a frozen crust) lost per second once the beam has left. Frost builds
+	# at one second per second of beam, so a target loses what it gained at the same rate. Not authored: tuned here.
+const BEAM_GRACE_FRAMES := 2
+	# A beam hit this many physics frames ago or less still counts as on (the laser receiver's LIT_FRAMES), so the order the
+	# turret and this basin are processed in never matters.
+const FROZEN_STAND_TOLERANCE := 3.0
+	# px: how far a player's feet may be above or below a frozen crust's collision top and still count as standing on it
+	# (what the electrified-crust hazard asks).
+
 @export var liquid_type: LiquidConstants.LiquidType = LiquidConstants.LiquidType.WATER
 	# Which liquid this basin holds — determines what add_volume()/fill_volume actually mean for this
 	# basin, what BODY_COLOR_BY_TYPE draws it as, and what a particle's OWN LiquidConstants.LiquidType
@@ -343,6 +359,14 @@ const CRUST_COLOR := Color(0.35, 0.32, 0.3, 1.0)
 ## How long one spark's zap keeps the pool electrified, in seconds. A later spark restarts the countdown rather than
 ## adding to it. Placeholder pending tuning against a rail bot's `drip_interval` (1.6 s by default).
 @export_range(0.1, 5.0, 0.05, "or_greater") var electrified_time: float = 1.0
+## Freeze ray (roadmap N3.2), opt-in: a FreezeTurret's beam freezes this basin's liquid (water or slag) where it crosses
+## it, but only if this is on. Authored only: runtime code reads it. `freeze()` itself does not check it.
+@export var freezable: bool = false
+## Seconds of sustained freeze beam on this basin before it freezes (a beam that leaves loses its frost at
+## FROST_DECAY_PER_SEC). Authored only.
+@export_range(0.05, 30.0, 0.05, "or_greater", "suffix:s") var freeze_time: float = 2.0
+## Seconds of sustained laser on a FROZEN crust before the whole crust thaws (a reaction crust is never melted). Authored only.
+@export_range(0.05, 30.0, 0.05, "or_greater", "suffix:s") var melt_time: float = 2.0
 ## How far, in px, the drawn liquid and crust extend behind each wall column (rounded down to whole 4px strips, capped at one tile). Lets a wall sprite keep transparent padding on its open face without a gap showing between it and the settled liquid. Drawing only: collision, queries and the polygon shape queries are unchanged.
 @export_range(0.0, 16.0, 1.0) var wall_overlap_px: float = 8.0
 @export var debug_check_body: bool = false  ## Runtime diagnostic: warns whenever the old polygon form of the liquid body would have failed to triangulate (see _draw_settled_body()). Off = no cost.
@@ -476,6 +500,17 @@ var crust_volume: float:
 			return 0.0
 		return maxf(0.0, _volume_for_surface_row(crust_top_row) - _volume_for_surface_row(crust_bottom_row))
 
+var crust_frozen: bool = false
+	# True when `has_crust` is a FROZEN crust (formed by freeze(), not by the water/slag reaction). Saved. A frozen crust has
+	# its own skin, a laser thaws it (thaw()), and an arc or spark can electrify it; a reaction crust does none of these.
+var _frost: float = 0.0  # seconds of freeze-beam contact so far; runtime only, rises while the beam is on, decays after
+var _frost_hit_frame: int = -1000
+var _heat: float = 0.0  # seconds of laser contact on a frozen crust so far; runtime only
+var _heat_hit_frame: int = -1000
+var _embedded: bool = false
+	# Runtime only. True from a freeze that found the player inside the crust band or under the surface until the player is
+	# above the crust's top face: the crust body ignores the player (add_collision_exception_with()) for that long, the player
+	# swims through the band as if it were water (get_swim_surface_world_y()), and is chilled while in it.
 var _crust_body: StaticBody2D = null
 	# Runtime-only walkable collision for this basin's crust (see _ensure_crust_body()/
 	# _rebuild_crust_collision() below) — null in the editor and for the entire life of any basin
@@ -573,6 +608,7 @@ var _ripple_strip_wet := PackedByteArray()
 	# the liquid currently covers. Ripples travel only through wet strips, so a dry hump reflects them.
 static var _skins: Dictionary = {}        # LiquidType -> LiquidSkin, only for types whose art file exists
 static var _crust_skins: Dictionary = {}  # LiquidType -> LiquidSkin
+static var _frozen_crust_skin: LiquidSkin = null  # the frozen crust's art, shared by both liquids; null if its file is missing
 static var _skins_loaded: bool = false
 var _skin_time: float = 0.0       # seconds on the liquid skin's animation clock
 var _skin_frame: int = 0
@@ -590,6 +626,7 @@ func _ready() -> void:
 		_world_tilemap = get_node_or_null(world_tilemap_path) as TileMapLayer
 	_rebuild()
 	set_process(false)  # _process only runs while a ripple, a skin animation or a crust cooling needs it
+	set_physics_process(false)  # _physics_process only runs while frost, heat, an embedded player or an electrified frozen crust needs it
 	if Engine.is_editor_hint():
 		set_notify_transform(true)
 		# Otherwise moving/dragging this node in the 2D viewport changes global_position with
@@ -640,6 +677,7 @@ func save_state() -> Dictionary:
 		"has_crust": has_crust,
 		"crust_top_row": crust_top_row,
 		"crust_bottom_row": crust_bottom_row,
+		"crust_frozen": crust_frozen,
 	}
 
 ## Overwrites whatever _ready() seeded (including an authored pre-fill). The crust is set first because the
@@ -650,6 +688,11 @@ func load_state(d: Dictionary) -> void:
 	has_crust = d.get("has_crust", false)
 	crust_top_row = d.get("crust_top_row", 0.0)
 	crust_bottom_row = d.get("crust_bottom_row", 0.0)
+	crust_frozen = has_crust and bool(d.get("crust_frozen", false))
+	_frost = 0.0  # frost, heat, the embedded latch and electrification are runtime only: a restore comes back calm
+	_heat = 0.0
+	_electrified_left = 0.0
+	_release_embedded()
 	fill_volume = clampf(d.get("fill_volume", 0.0), 0.0, _max_fill_volume())
 	_crust_cool_t = INF  # a restored crust is already cold: no cooling replay
 	_surface_vy_frame = -1000  # the surface jumped: restart the surface-speed estimate
@@ -657,13 +700,23 @@ func load_state(d: Dictionary) -> void:
 	_clear_ripple()
 	queue_redraw()
 
+## The crust's StaticBody2D. Its only job beyond collision is to be a laser target: the beam ends on it and tells it so,
+## and it forwards the hit to its basin (a frozen crust heats toward a thaw; a reaction crust just ignores it).
+class CrustBody extends StaticBody2D:
+	var basin: Node = null
+	func on_laser_hit(_point: Vector2, _direction: Vector2) -> void:
+		if basin != null and is_instance_valid(basin) and basin.has_method(&"on_crust_laser_hit"):
+			basin.on_crust_laser_hit()
+
 func _ensure_crust_body() -> void:
 	# One StaticBody2D + CollisionPolygon2D pair, created once here and reused for this basin's whole
 	# lifetime — _rebuild_crust_collision() below only ever replaces the CollisionPolygon2D's own
 	# `polygon` arrays, never recreates the nodes themselves. Runtime-only (called from _ready()'s
 	# non-editor branch), same as every other physics-relevant setup in this file — no crust collision
 	# exists in the editor, only the debug-draw preview (see _draw_settled_body()).
-	_crust_body = StaticBody2D.new()
+	var body := CrustBody.new()
+	body.basin = self
+	_crust_body = body
 	_crust_body.name = "CrustBody"
 	_crust_body.add_to_group("crust")
 		# Roadmap 6.1: lets player.gd tell crust apart from ground. Deliberately NOT "catwalk" (lasers, water and steam
@@ -1004,27 +1057,235 @@ func is_hazardous_now() -> bool:
 
 ## A spark at `world_point` (the lowest point of the ball) reports where it is; if that touches this basin's settled
 ## water surface the pool is electrified for `electrified_time` and true is returned (the spark is spent). Refused,
-## so the spark carries on as it always did, when: `conducts_sparks` is off; the liquid is hazardous already (slag);
-## the basin holds no liquid over that column; a crust seals the liquid (the spark lands on the crust, a solid); or the
-## point is still above the surface. A strike while already electrified restarts the countdown.
+## so the spark carries on as it always did, when: `conducts_sparks` is off; the liquid is hazardous already (slag, frozen
+## or not); the basin holds no liquid over that column; a REACTION crust seals the liquid (the spark lands on the crust, a
+## solid); or the point is still above the surface. A FROZEN crust over water is the exception: it conducts, so a strike
+## at or below its top face over a column that carries crust electrifies the basin, and while it lasts the crust's top
+## hurts a player standing on it (see _poll_electric_crust()). A strike while already electrified restarts the countdown.
 func try_electrify_at(world_point: Vector2) -> bool:
-	if Engine.is_editor_hint() or not conducts_sparks or has_crust or _world_tilemap == null:
+	if Engine.is_editor_hint() or not conducts_sparks or _world_tilemap == null:
+		return false
+	if has_crust and not crust_frozen:
 		return false
 	if LiquidConstants.profile(liquid_type).is_hazardous:
 		return false
 	var col := _world_tilemap.local_to_map(_world_tilemap.to_local(world_point)).x
-	if not has_liquid_at_column(col):
-		return false
-	if world_point.y < get_liquid_surface_world_y() - ELECTRIC_REACH:
+	var surface_y: float
+	if has_crust:
+		if not _crust_at_column(col):
+			return false
+		surface_y = get_crust_top_world_y()
+	else:
+		if not has_liquid_at_column(col):
+			return false
+		surface_y = get_liquid_surface_world_y()
+	if world_point.y < surface_y - ELECTRIC_REACH:
 		return false
 	_electrified_left = maxf(_electrified_left, electrified_time)
 	_zap_x = world_point.x
 	_zap_age = 0.0
-	disturb(world_point.x, ELECTRIC_SPLASH_VELOCITY, 10.0)
-	Audio.play_at(&"interactive/basin_zap", Vector2(world_point.x, get_liquid_surface_world_y()))
+	if not has_crust:
+		disturb(world_point.x, ELECTRIC_SPLASH_VELOCITY, 10.0)
+	Audio.play_at(&"interactive/basin_zap", Vector2(world_point.x, surface_y))
 	set_process(true)
+	_update_physics_state()
 	queue_redraw()
 	return true
+
+# --- Freeze ray (roadmap N3.2) -----------------------------------------------------------------------
+
+## True while a FROZEN crust (formed by freeze()) is on this basin. A reaction crust is not.
+func is_frozen_crust() -> bool:
+	return has_crust and crust_frozen
+
+## Whether the freeze ray can act on this basin now: opted in (`freezable`), holds liquid and has no crust.
+func can_freeze() -> bool:
+	return freezable and not has_crust and fill_volume > 0.0 and _footprint_width > 0 and not Engine.is_editor_hint()
+
+## The freeze ray's per-frame contact (WaterManager.freeze_along_beam()). Builds frost by `delta` seconds, and freezes the
+## basin when it reaches `freeze_time`. Returns true on the frame it freezes. Frost decays on its own once the beam leaves.
+func add_frost(delta: float) -> bool:
+	if not can_freeze():
+		return false
+	_frost_hit_frame = Engine.get_physics_frames()
+	_frost = minf(_frost + delta, freeze_time)
+	_update_physics_state()
+	if _frost >= freeze_time:
+		return freeze()
+	return false
+
+## Freezes the settled liquid into a FROZEN crust: the same slab as the reaction crust (top face at the liquid surface,
+## CRUST_THICKNESS_TILES thick, the liquid between the faces becomes crust, the liquid under it stays), but with no
+## opposite liquid, no steam, its own skin, meltable by a laser and electrifiable. Valid for a crust-free basin that holds
+## liquid (water or slag, electrified or not; an electrified pool keeps its remaining time on the crust). A player inside
+## the new crust or under the surface of this basin is latched as embedded (_latch_embedded()) so it is never sealed in.
+## Returns true if the crust formed. Does not check `freezable` (that gates the ray, not the call).
+func freeze() -> bool:
+	if Engine.is_editor_hint() or has_crust or fill_volume <= 0.0 or _footprint_width <= 0:
+		return false
+	convert_to_crust(0.0)
+	if not has_crust:
+		return false
+	crust_frozen = true
+	_frost = 0.0
+	_heat = 0.0
+	_latch_embedded()
+	Audio.play_at(&"interactive/basin_freeze", _basin_centre_at(get_crust_top_world_y()))
+	_update_process_state()
+	_update_physics_state()
+	queue_redraw()
+	return true
+
+## The laser's contact with a frozen crust, forwarded by the crust body (CrustBody.on_laser_hit(), once per physics frame
+## the beam ends on it). Builds heat; at `melt_time` the whole crust thaws. A reaction crust ignores it (and the beam just
+## stops on it, as always).
+func on_crust_laser_hit() -> void:
+	if not is_frozen_crust():
+		return
+	_heat_hit_frame = Engine.get_physics_frames()
+	_heat += get_physics_process_delta_time()
+	_update_physics_state()
+	if _heat >= melt_time:
+		thaw()
+
+## Reverses a frozen crust: the crust and its collision are removed and the band of liquid it held is returned (clamped
+## to capacity), so the basin is an ordinary crust-free basin again. No steam, no particles. Only a frozen crust thaws;
+## a reaction crust never thins. Returns true if it thawed.
+func thaw() -> bool:
+	if not is_frozen_crust():
+		return false
+	var band := crust_volume  # before the faces stop counting
+	has_crust = false
+	crust_frozen = false
+	fill_volume = minf(fill_volume + band, _max_fill_volume())
+	_crust_cool_t = INF
+	_frost = 0.0
+	_heat = 0.0
+	_release_embedded()
+	_rebuild_crust_collision()  # no crust: clears the body's shapes
+	_clear_ripple()
+	_surface_vy_frame = -1000  # the surface jumped: restart the surface-speed estimate
+	Audio.play_at(&"interactive/basin_thaw", _basin_centre_at(get_liquid_surface_world_y()))
+	_update_process_state()
+	_update_physics_state()
+	queue_redraw()
+	return true
+
+func _basin_centre_at(world_y: float) -> Vector2:
+	return Vector2(global_position.x + _tile_size.x * resolved_width_tiles * 0.5, world_y)
+
+## Whether this interior column carries crust (its own seabed lies below the crust's top face; a dry hump never does).
+func _crust_at_column(map_col: int) -> bool:
+	return has_crust and is_column_in_range(map_col) and get_column_seabed_world_y(map_col) > get_crust_top_world_y()
+
+func _find_player() -> Node2D:
+	var player := get_tree().get_first_node_in_group(&"player") as Node2D
+	return player if player != null and is_instance_valid(player) else null
+
+## The player's collider as a world rect (a swimming player's collider is rotated, so the shape's rect is transformed).
+func _player_rect(player: Node) -> Rect2:
+	var shape_node := player.get(&"collision_shape") as CollisionShape2D
+	if shape_node == null or shape_node.shape == null:
+		return Rect2((player as Node2D).global_position, Vector2.ZERO)
+	return shape_node.global_transform * shape_node.shape.get_rect()
+
+## Whether the world rect overlaps a column that carries crust, horizontally (the crust's own x extent).
+func _rect_over_crust(rect: Rect2) -> bool:
+	if not has_crust or _footprint_width <= 0 or _tile_size.x <= 0.0:
+		return false
+	var first := _origin_cell.x + floori((rect.position.x - global_position.x) / _tile_size.x)
+	var last := _origin_cell.x + floori((rect.end.x - 0.001 - global_position.x) / _tile_size.x)
+	for col in range(first, last + 1):
+		if _crust_at_column(col):
+			return true
+	return false
+
+## Latches the player as embedded if it is inside the new crust or submerged in this basin's liquid under it: some part of
+## its collider is below the crust's collision top over a column that carries crust. The crust body then ignores the player
+## until _tick_embedded() sees it above the top face. Set once, at the freeze; a player who arrives later meets solid crust.
+func _latch_embedded() -> void:
+	_embedded = false
+	var player := _find_player()
+	if player == null or _crust_body == null:
+		return
+	var rect := _player_rect(player)
+	if _rect_over_crust(rect) and rect.end.y > get_crust_collision_top_world_y() + 0.5:
+		_embedded = true
+		_crust_body.add_collision_exception_with(player as PhysicsBody2D)
+
+func _release_embedded() -> void:
+	if not _embedded:
+		return
+	_embedded = false
+	var player := _find_player()
+	if player != null and _crust_body != null and is_instance_valid(_crust_body):
+		_crust_body.remove_collision_exception_with(player as PhysicsBody2D)
+	queue_redraw()  # the cooling frame held back for the embedded player shows now
+	_update_process_state()
+
+## True while the freeze that formed this crust has left the player embedded (see _latch_embedded()).
+func is_player_embedded() -> bool:
+	return _embedded
+
+## The surface the swim check measures depth against for `body`: the liquid surface, except for the embedded player, for
+## whom it is the crust's top face (so the player swims up through the crust band as if it were water, and leaves swimming
+## at the top, where the crust turns solid under it). Read by the player's `_water_surface_depth()`.
+func get_swim_surface_world_y(body: Node) -> float:
+	if _embedded and body != null and body.is_in_group(&"player") and has_crust:
+		return minf(get_liquid_surface_world_y(), get_crust_top_world_y())
+	return get_liquid_surface_world_y()
+
+## Each physics frame while embedded: ends the latch once the player's centre is above the crust's top face (the swim
+## check's own exit line, so the crust turns solid as the player leaves the water) or has left the crust's columns, and
+## chills the player while any of it overlaps the band.
+func _tick_embedded(_delta: float) -> void:
+	var player := _find_player()
+	if player == null or not has_crust:
+		_release_embedded()
+		return
+	var rect := _player_rect(player)
+	var centre_y := rect.get_center().y
+	if centre_y < get_crust_top_world_y() or not _rect_over_crust(rect):
+		_release_embedded()
+		return
+	if rect.end.y > get_crust_top_world_y() and rect.position.y < get_crust_bottom_world_y() and player.has_method(&"apply_chill"):
+		player.apply_chill(1.0)
+
+## While a frozen crust is electrified, a player standing on its top is hurt, polled every physics frame (the crusher's
+## pattern: take_hit()'s i-frames pace it, so a player who stays is hit again the moment they can be). Standing on it is
+## feet within FROZEN_STAND_TOLERANCE of the collision top, on the floor, over a column that carries crust. A player in or
+## under the crust is hurt by the electrified liquid through the swim check instead (is_hazardous_now()).
+func _poll_electric_crust() -> void:
+	var player := _find_player()
+	if player == null or not player.has_method(&"take_hit") or not player.has_method(&"is_on_floor"):
+		return
+	if not player.is_on_floor():
+		return
+	var rect := _player_rect(player)
+	if absf(rect.end.y - get_crust_collision_top_world_y()) > FROZEN_STAND_TOLERANCE or not _rect_over_crust(rect):
+		return
+	player.take_hit(int(player.get(&"ELECTRIC_CONTACT_DAMAGE")), (player as Node2D).global_position)
+
+func _needs_physics() -> bool:
+	if Engine.is_editor_hint():
+		return false
+	return _frost > 0.0 or _heat > 0.0 or _embedded or (is_frozen_crust() and _electrified_left > 0.0)
+
+func _update_physics_state() -> void:
+	set_physics_process(_needs_physics())
+
+func _physics_process(delta: float) -> void:
+	var frames := Engine.get_physics_frames()
+	if _frost > 0.0 and frames - _frost_hit_frame > BEAM_GRACE_FRAMES:
+		_frost = maxf(_frost - FROST_DECAY_PER_SEC * delta, 0.0)
+	if _heat > 0.0 and frames - _heat_hit_frame > BEAM_GRACE_FRAMES:
+		_heat = maxf(_heat - FROST_DECAY_PER_SEC * delta, 0.0)
+	if _embedded:
+		_tick_embedded(delta)
+	if is_frozen_crust() and _electrified_left > 0.0:
+		_poll_electric_crust()
+	if not _needs_physics():
+		set_physics_process(false)
 
 func get_surface_row() -> float:
 	# The basin's OUTER surface as a fractional tilemap row — the line a particle has to reach to be
@@ -1814,6 +2075,8 @@ func _seabed_world_y(local_col: int) -> float:
 
 func _load_skins() -> void:
 	_skins_loaded = true
+	if ResourceLoader.exists(FROZEN_CRUST_SKIN_PATH):
+		_frozen_crust_skin = LiquidSkin.new(load(FROZEN_CRUST_SKIN_PATH) as Texture2D, 0.0, true)  # fringe cut: see LiquidSkin
 	for type in SKIN_BY_TYPE:
 		var entry: Dictionary = SKIN_BY_TYPE[type]
 		if ResourceLoader.exists(entry["path"]):
@@ -1837,12 +2100,19 @@ func _crust_skin_art() -> LiquidSkin:
 		return null
 	if not _skins_loaded:
 		_load_skins()
+	if crust_frozen and _frozen_crust_skin != null:
+		return _frozen_crust_skin
 	return _crust_skins.get(liquid_type, _crust_skins.get(LiquidConstants.LiquidType.SLAG))
 
 func _crust_frame(skin: LiquidSkin) -> int:
+	# The last frame is the cold, settled crust. While the player is embedded in a freshly frozen crust the cooling holds on the
+	# frame before it, and the last frame shows once the crust has gone solid for the player (_release_embedded() redraws).
+	var last := skin.frame_count - 1
+	if _embedded:
+		last = maxi(last - 1, 0)
 	if _crust_cool_t >= CRUST_COOL_TIME:
-		return skin.frame_count - 1
-	return mini(int(_crust_cool_t / CRUST_COOL_TIME * skin.frame_count), skin.frame_count - 1)
+		return last
+	return mini(int(_crust_cool_t / CRUST_COOL_TIME * skin.frame_count), last)
 
 func _liquid_hidden_by_crust() -> bool:
 	# True while the liquid touches the crust's underside: it has no exposed surface of its own, so the skin
@@ -1926,6 +2196,9 @@ func _draw() -> void:
 		_draw_editor_debug_bounds()
 	else:
 		_draw_settled_body()
+		if _electrified_left > 0.0 and is_frozen_crust():
+			# A frozen crust conducts: the flash runs along its top face, drawn after the crust art so it is not covered.
+			_draw_electric_layer(get_crust_top_world_y(), get_crust_bottom_world_y(), false)
 
 func _draw_editor_debug_bounds() -> void:
 	if not debug_draw_bounds or _world_tilemap == null or floor_rows.is_empty():
@@ -1992,19 +2265,23 @@ func _draw_electric() -> void:
 	# no randomness is stored and a pause freezes it.
 	if _liquid_hidden_by_crust():
 		return
+	_draw_electric_layer(get_liquid_surface_world_y(), INF, true)
+
+func _draw_electric_layer(top_y: float, bottom_cap_y: float, rippled: bool) -> void:
+	# One flash layer (the tint, the surface line, the arcs and the strike's bolt) along a surface: the liquid's rippled surface,
+	# or a frozen crust's flat top face (tinted down to its bottom face).
 	var fade := clampf(_electrified_left / ELECTRIC_FADE_TIME, 0.0, 1.0)
 	var step := int(_zap_age * ELECTRIC_FLICKER_HZ)
 	var on := step % 2 == 0
 	var spacing := _tile_size.x / float(LiquidConstants.RIPPLE_SUBDIVISIONS)
 	var tint := Color(ELECTRIC_GLOW.r, ELECTRIC_GLOW.g, ELECTRIC_GLOW.b, (0.30 if on else 0.14) * fade)
 	var line_color := Color(ELECTRIC_CORE.r, ELECTRIC_CORE.g, ELECTRIC_CORE.b, (1.0 if on else 0.55) * fade)
-	var top_y := get_liquid_surface_world_y()
 	var tops: Array[Vector2] = []  # (x of the strip's left edge, its rippled top y)
 	var bolt := clampf(1.0 - _zap_age / 0.2, 0.0, 1.0)
 	var bolt_top := Vector2.INF
-	for run_variant in _collect_runs(top_y, INF):
+	for run_variant in _collect_runs(top_y, bottom_cap_y):
 		var run_cols: Array[int] = run_variant
-		for strip in _run_strips(run_cols, top_y, INF, true):
+		for strip in _run_strips(run_cols, top_y, bottom_cap_y, rippled):
 			var depth := minf(strip.z - strip.y, ELECTRIC_TINT_DEPTH_TILES * _tile_size.y)
 			if depth <= 0.0:
 				continue
@@ -2100,7 +2377,7 @@ func _draw_settled_body() -> void:
 			local_points.resize(world_points.size())
 			for i in range(world_points.size()):
 				local_points[i] = to_local(world_points[i])
-			draw_colored_polygon(local_points, CRUST_COLOR)
+			draw_colored_polygon(local_points, FROZEN_CRUST_COLOR if crust_frozen else CRUST_COLOR)
 		return
 	var frame := _crust_frame(crust_skin)
 	var crust_bottom := roundf(get_crust_bottom_world_y())  # both faces on whole pixels: the 0.75-tile crust is exactly the art's 12 rows

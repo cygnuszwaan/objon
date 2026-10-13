@@ -344,6 +344,26 @@ region = Rect2(0, 128, 16, 16)
 atlas = ExtResource("13_cnsyf")
 region = Rect2(0, 144, 16, 16)
 
+[sub_resource type="AtlasTexture" id="AtlasTexture_sneak0"]
+atlas = ExtResource("17_sneak")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sneak1"]
+atlas = ExtResource("17_sneak")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sneak2"]
+atlas = ExtResource("17_sneak")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sneak3"]
+atlas = ExtResource("17_sneak")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_sneak4"]
+atlas = ExtResource("17_sneak")
+region = Rect2(0, 64, 16, 16)
+
 [sub_resource type="AtlasTexture" id="AtlasTexture_p0anf"]
 atlas = ExtResource("16_myrg7")
 region = Rect2(0, 0, 16, 16)
@@ -375,26 +395,6 @@ region = Rect2(0, 96, 16, 16)
 [sub_resource type="AtlasTexture" id="AtlasTexture_qxlpa"]
 atlas = ExtResource("16_myrg7")
 region = Rect2(0, 112, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_sneak0"]
-atlas = ExtResource("17_sneak")
-region = Rect2(0, 0, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_sneak1"]
-atlas = ExtResource("17_sneak")
-region = Rect2(0, 16, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_sneak2"]
-atlas = ExtResource("17_sneak")
-region = Rect2(0, 32, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_sneak3"]
-atlas = ExtResource("17_sneak")
-region = Rect2(0, 48, 16, 16)
-
-[sub_resource type="AtlasTexture" id="AtlasTexture_sneak4"]
-atlas = ExtResource("17_sneak")
-region = Rect2(0, 64, 16, 16)
 
 [sub_resource type="SpriteFrames" id="SpriteFrames_x7p2l"]
 animations = [{
@@ -498,35 +498,6 @@ animations = [{
 "loop": 0,
 "name": &"crouch",
 "speed": 30.0
-}, {
-"frames": [{
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak0")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak1")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak2")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak3")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak4")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak3")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak2")
-}, {
-"duration": 1.0,
-"texture": SubResource("AtlasTexture_sneak1")
-}],
-"loop": true,
-"name": &"sneak",
-"speed": 8.0
 }, {
 "frames": [{
 "duration": 1.0,
@@ -734,6 +705,35 @@ animations = [{
 "loop": 1,
 "name": &"run",
 "speed": 15.0
+}, {
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak4")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak3")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_sneak1")
+}],
+"loop": 1,
+"name": &"sneak",
+"speed": 8.0
 }, {
 "frames": [{
 "duration": 1.0,

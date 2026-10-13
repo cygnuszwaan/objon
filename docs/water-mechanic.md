@@ -402,7 +402,7 @@ runtime (`fill_volume <= 0` and no crust — whether never filled, or drained ba
 fluid-agnostic: `WaterManager._try_absorb()` overwrites `liquid_type` with whatever arrives first, and
 from then on the basin is committed to that type exactly as an authored one would be, until it's
 drained empty again. Plus the crust state below; see "Crust" for that model —
-`convert_to_crust()` is the only thing that creates it; a crust never grows or thins afterwards.
+`convert_to_crust()` (the water/slag reaction) and `freeze()` (the freeze ray) are the only things that create it; a reaction crust never grows or thins afterwards, and a frozen crust (`crust_frozen`) is only ever removed whole by `thaw()`. See Frozen crust in `liquid-system.md` for freezing, thawing, electrification and the embedded player.
 
 ### Crust
 

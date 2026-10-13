@@ -1328,6 +1328,25 @@ func boil_along_beam(points: PackedVector2Array, delta: float) -> int:
 		boiled += 1
 	return boiled
 
+# --- freeze ray (roadmap N3.2) ---------------------------------------------------------------------
+
+## The freeze turret's call. `points` is the beam polyline (world space, LaserBeam.Result.points). Every basin that is
+## `freezable` (WaterBasin.can_freeze(): opted in, holds liquid, no crust) and has liquid the beam crosses gains `delta`
+## seconds of frost (WaterBasin.add_frost()), and freezes when it has `freeze_time` of it. Liquid is not a collider, so the
+## beam passes through it as it does for boiling. Returns how many basins the beam is on.
+func freeze_along_beam(points: PackedVector2Array, delta: float) -> int:
+	if points.size() < 2 or delta <= 0.0:
+		return 0
+	var touched := 0
+	for basin in _basins:
+		if not is_instance_valid(basin) or not basin.can_freeze():
+			continue
+		if _beam_liquid_crossing(points, basin.get_body_polygon_world()).is_empty():
+			continue
+		basin.add_frost(delta)
+		touched += 1
+	return touched
+
 ## The first point along `points` that is inside one of `polygons`, nudged BOIL_ENTRY_NUDGE px further along the beam;
 ## empty when the beam never touches them. A beam that starts inside counts from its first point.
 func _beam_liquid_crossing(points: PackedVector2Array, polygons: Array[PackedVector2Array]) -> PackedVector2Array:

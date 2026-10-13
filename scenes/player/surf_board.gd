@@ -9,9 +9,12 @@ const DECK := Color(0.95, 0.78, 0.25)
 const EDGE := Color(0.55, 0.32, 0.12)
 
 func _draw() -> void:
+	var boardOffset := Vector2(0, -2)
 	var board := PackedVector2Array([
 		Vector2(-11.0, 0.5), Vector2(8.0, 0.5), Vector2(11.5, -0.5), Vector2(8.0, 2.5), Vector2(-9.0, 2.5), Vector2(-11.0, 1.5),
 	])
+	for i in range(board.size()):
+			board[i] += boardOffset
 	draw_colored_polygon(board, DECK)
 	draw_polyline(board + PackedVector2Array([board[0]]), EDGE, 0.75)
-	draw_line(Vector2(-6.0, 1.5), Vector2(7.0, 1.5), EDGE, 0.5)
+	draw_line(Vector2(-6.0, 1.5) + boardOffset, Vector2(7.0, 1.5) + boardOffset, EDGE, 0.5)

@@ -69,6 +69,7 @@ const PLANNED: Array[StringName] = [
 	&"traps/crusher_retract",
 	&"traps/crusher_jam",             # a metal block stalling a crusher: the jam latching (once per latch), at the spike
 	&"traps/laser_boil",              # a laser starting to boil a pool (once per start of contact, per turret), at the turret
+	&"traps/freeze_hum",             # LOOP, attached to the freeze turret (Audio.make_loop)
 	&"traps/arc_fire",               # an arc turret firing an arc, at the muzzle
 	&"traps/arc_reflect",            # an arc bouncing off a mirror, at the mirror
 	&"traps/arc_fizzle",             # an arc spent on a wall or the player, at the point
@@ -99,10 +100,14 @@ const PLANNED: Array[StringName] = [
 	&"enemies/railbot_drip",          # a rail bot letting a spark drop, at the nozzle
 	&"enemies/railbot_hit",           # a rail bot taking a hit without being destroyed, at the bot
 	&"interactive/basin_zap",         # a spark reaching a basin's water and electrifying it, at the surface
+	&"interactive/basin_freeze",       # a basin freezing into a frozen crust (the freeze ray's dwell completing), at the crust's top face
+	&"interactive/basin_thaw",         # a frozen crust thawing under a laser, at the liquid surface
 	&"interactive/mirror_rotate",
 	&"interactive/laser_receiver_on",   # a laser receiver powering (the beam reached it), at the receiver
 	&"interactive/bullet_target_hit",    # a cannon bullet hitting a bullet target (every hit), at the target
 	&"interactive/laser_receiver_off",  # a laser receiver losing power (after its hold time), at the receiver
+	&"interactive/freeze_receiver_on",   # a freeze receiver powering (the beam stayed on it for its dwell time), at the receiver
+	&"interactive/freeze_receiver_off",  # a freeze receiver losing power (after its hold time), at the receiver
 	&"interactive/arc_receiver_on",       # an arc receiver powering (an arc struck it), at the receiver
 	&"interactive/arc_receiver_off",      # an arc receiver losing power (its hold time ran out after the last arc), at the receiver
 	&"interactive/button_press",       # button turning on (also each press of a toggle button)

@@ -47,10 +47,10 @@ const CLOSED_TOP := false       # also wall off the top edge
 const SIZE_X := 14.0            # typical horizontal size of a mass (tiles)
 const SIZE_Y := 6.0             # typical vertical size (smaller = flatter islands)
 const THRESHOLD := 0.1          # higher = less solid overall
-const LAYER_PERIOD := 13.0      # rows between stacked layers of islands
-const LAYER_STRENGTH := 0.4     # 0 = no banding, higher = clearer layers
-const TOP_BIAS := -0.05         # density added at the top (negative = sparse sky)
-const BOTTOM_BIAS := 0.4        # density added at the bottom (positive = solid ground)
+const LAYER_PERIOD := 20.0      # rows between stacked layers of islands
+const LAYER_STRENGTH := 0.2     # 0 = no banding, higher = clearer layers
+const TOP_BIAS := -0.2         # density added at the top (negative = sparse sky)
+const BOTTOM_BIAS := 0.3        # density added at the bottom (positive = solid ground)
 
 # ---- Shape: tunnels and caves ------------------------------------------------
 const TUNNEL_SIZE_X := 22.0
@@ -58,10 +58,10 @@ const TUNNEL_SIZE_Y := 14.0
 const TUNNEL_WIDTH := 0.10      # 0 = no tunnels; larger = wider and more of them
 
 # ---- Cleanup -----------------------------------------------------------------
-const SMOOTH_PASSES := 2        # blob smoothing; 0 keeps the raw noise
+const SMOOTH_PASSES := 4        # blob smoothing; 0 keeps the raw noise
 const MIN_ISLAND := 14          # loose solid pieces smaller than this are removed
 const MIN_POCKET := 8           # sealed-off air pockets smaller than this are filled
-const SLOPE_CHANCE := 0.6       # chance a possible ramp is built (0 = no slopes at all)
+const SLOPE_CHANCE := 0.2       # chance a possible ramp is built (0 = no slopes at all)
 const MAX_RAMP_RISE := 6        # tallest ramp, in tiles of height (a taller wall keeps its top)
 const RAMP_2X1_CHANCE := 0.5    # share of ramps that are gentle 2-wide-per-tile-of-rise slopes
 								# (the rest are 45 degree 1x1 slopes)

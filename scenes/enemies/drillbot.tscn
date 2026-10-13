@@ -82,6 +82,7 @@ size = Vector2(6, 5)
 [node name="Drillbot" type="CharacterBody2D" unique_id=1754501852]
 collision_mask = 2
 script = ExtResource("1_563hv")
+patrol_distance = 0.0
 
 [node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=1481186365]
 position = Vector2(-8, -8)

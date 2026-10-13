@@ -1,0 +1,66 @@
+[gd_scene load_steps=11 format=3]
+
+[ext_resource type="Script" path="res://scenes/traps/freeze/freeze_turret.gd" id="1_turret"]
+[ext_resource type="Texture2D" path="res://sprites/traps/freeze.png" id="2_beam"]
+[ext_resource type="Texture2D" path="res://sprites/traps/freezeturret.png" id="2_body"]
+[ext_resource type="Texture2D" path="res://sprites/traps/freezehit.png" id="3_hit"]
+[ext_resource type="Script" path="res://scenes/interactive/power_target.gd" id="9_pwrtgt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_body"]
+size = Vector2(16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_f0"]
+atlas = ExtResource("2_body")
+region = Rect2(0, 0, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_f1"]
+atlas = ExtResource("2_body")
+region = Rect2(0, 16, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_f2"]
+atlas = ExtResource("2_body")
+region = Rect2(0, 32, 16, 16)
+
+[sub_resource type="AtlasTexture" id="AtlasTexture_f3"]
+atlas = ExtResource("2_body")
+region = Rect2(0, 48, 16, 16)
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_freeze"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f0")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f1")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f2")
+}, {
+"duration": 1.0,
+"texture": SubResource("AtlasTexture_f3")
+}],
+"loop": true,
+"name": &"default",
+"speed": 5.0
+}]
+
+[node name="FreezeTurret" type="Node2D"]
+script = ExtResource("1_turret")
+beam_texture = ExtResource("2_beam")
+hit_texture = ExtResource("3_hit")
+
+[node name="Body" type="StaticBody2D" parent="."]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Body"]
+shape = SubResource("RectangleShape2D_body")
+
+[node name="Muzzle" type="Marker2D" parent="."]
+position = Vector2(8, 0)
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="."]
+sprite_frames = SubResource("SpriteFrames_freeze")
+
+[node name="PowerTarget" type="Node2D" parent="."]
+script = ExtResource("9_pwrtgt")
