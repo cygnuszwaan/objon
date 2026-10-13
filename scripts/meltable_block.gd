@@ -158,6 +158,8 @@ const SUPPORT_LATCH_FRAMES := 12 ## physics frames a body floor (plank, block) k
 const SURF_SHOVE_PLAYER_WEIGHT := 2.0 ## The surfer's weight against the block's mass when working out what a shove costs it (mirrors RotatingBody.player_weight).
 const DISSOLVE_TIME := 0.2 ## seconds a dissolving block (see dissolve()) takes to fade out.
 const CRUST_LIFT_MARGIN := 0.1 ## px: how far clear of a new crust's collision top a lifted block is set, so it doesn't start in contact.
+const STEAM_PROBE_DEPTH := 4.0 ## px: thickness of the band under the block's underside that the steam lift reads (see _apply_steam_lift()).
+const STEAM_PROBE_OVERLAP := 1.0 ## px of that band that overlaps the block's own underside (a steam particle dies the frame it touches it).
 const HOLD_TILT_MARGIN := 0.08 ## rad: a rotating block may lean this much more than the surface under it and still be held.
 
 @export var size_tiles: Vector2i = Vector2i(1, 1):
@@ -186,6 +188,12 @@ const HOLD_TILT_MARGIN := 0.08 ## rad: a rotating block may lean this much more 
 @export_range(0.1, 1.0) var chain_push_slowdown: float = 0.75 ## Speed multiplier for each further walk-pushable block ahead of this one in a pushed chain.
 @export_group("Launch")
 @export_range(0.0, 2.0, 0.05) var launch_weight_exponent: float = 1.0 ## A jump pad's launch vector is divided by mass^this: 0 = weight ignored, 1 = inversely proportional (a 1x1 metal block, mass 4, gets a quarter of the speed and about a 16th of the height), 2 = steeper still. Mass is per 16px tile times the block's area, so a bigger block lifts less. An unkickable block (shunt_speed <= 0) is launched all the same.
+@export_group("Steam")
+@export var steam_lift_accel: float = 0.0 ## px/s^2 of upward push a full steam column gives a block of density 1 (per-tile mass; 0 = steam does nothing: the default for ice and metal; carbon_fiber_block.tscn sets it). The acceleration is this divided by the block's effective density (its mass per tile plus `steam_rider_load` per rider), so it beats gravity (900) only for a light block: 800 lifts carbon fiber (density 0.5: 1600) and leaves a 1x1 ice block (density 1: 800) on the floor.
+@export_range(0, 16) var steam_lift_max_area: int = 4 ## Largest block (size_tiles.x * size_tiles.y) steam lifts; a bigger one gets no lift at all (4 = up to 2x2, or 4x1).
+@export var steam_rider_load: float = 0.25 ## Density added to the block, per actor standing on it, when working out the steam lift (the player weighs 2 for a see-saw; steam sees a lighter 0.25, so a rider slows a block but does not ground it). Two riders on a carbon fiber block ground it.
+@export var steam_max_rise: float = 80.0 ## px/s: the fastest steam raises a block (the steam's own rise speed, LiquidConstants.STEAM_RISE_SPEED). A full column rises it at this; thinner steam at a share of it.
+@export var steam_drag: float = 6.0 ## 1/s (scaled by the lift): while in steam, an upward speed beyond what the steam gives is damped toward it.
 @export_group("Surf")
 @export_range(0.0, 1.0, 0.05) var surf_shove_transfer: float = 0.5 ## Fraction of a surfer's speed the block takes as its own motion (divided by sqrt(mass), so a heavy block takes less). 0 still gives it the kick speed.
 @export var surf_shove_max_speed: float = 200.0 ## px/s cap on the motion a shove gives (on ice 200 slides about 18 tiles at slide_friction 70).
@@ -240,6 +248,8 @@ var _floor_tilt: float = 0.0 ## rad: tilt of the flattest floor contact when tha
 var _floor_v: Vector2 = Vector2.ZERO ## velocity of the world body under the block at its contact (both axes: a tilting plank moves the surface vertically too)
 var _belt_speed: float = 0.0 ## speed of the conveyor under the block
 var _rider_count: int = 0
+var _steam_lift: float = 0.0 ## 0..1: the steam under the block lately (WaterManager.get_steam_lift(): instant rise, linear decay). Runtime scratch, never saved; a restore restarts it at 0.
+var _steam_loop ## Audio.LoopPlayer for the steam hiss while lifted; created in _ready() only for a block with steam_lift_accel > 0
 var _written_vy: float = 0.0 ## velocity.y as last written by _physics_process(); a rider's reaction on a rising block is measured against it
 var _rider_on_top: bool = false ## an actor touches the block's top face (previous step)
 var _roof_hit: bool = false ## a non-actor body touches the block's top face (a ceiling over the block)
@@ -277,6 +287,9 @@ func _ready() -> void:
 		add_to_group(&"saveable")
 	_configure_body()
 	_water_manager = get_tree().get_first_node_in_group(&"water_manager") as WaterManager
+	if steam_lift_accel > 0.0:
+		_steam_loop = Audio.make_loop(&"interactive/steam_lift_loop")
+		add_child(_steam_loop)
 
 ## Engine-side setup, in code so every subclass scene gets it from the one place.
 func _configure_body() -> void:
@@ -329,6 +342,7 @@ func load_state(d: Dictionary) -> void:
 	_last_lit_frame = -1000
 	_launch_pending = false
 	_walk_pushed = false
+	_steam_lift = 0.0  # steam isn't saved: the reading restarts and the column rebuilds
 	reset_physics_interpolation()
 	queue_redraw()
 
@@ -719,6 +733,7 @@ func _physics_process(delta: float) -> void:
 	velocity = Vector2(_own_vx, _vy)
 	_buoyancy_alpha = 0.0
 	_apply_forces(delta, _rider_count)
+	_apply_steam_lift(delta)  # after the subclass hook, so gravity, buoyancy and liquid drag are already in `velocity`
 	if _on_floor:
 		if Engine.get_physics_frames() - _last_walk_push_frame > WALK_PUSH_GRACE_FRAMES:  # a block being walked along isn't braked under the player
 			velocity.x = move_toward(velocity.x, 0.0, slide_friction * delta)
@@ -761,6 +776,53 @@ func _physics_process(delta: float) -> void:
 ## _submerged_fraction(), _buoyant_accel(), _integrate_gravity().
 func _apply_forces(delta: float, _riders: int) -> void:
 	_integrate_gravity(GRAVITY, delta)
+
+## Steam lift (roadmap N3.4). A block with `steam_lift_accel` > 0 and an area within `steam_lift_max_area` reads the steam
+## in a thin band hugging its underside (not its bounds: a steam particle dies on the first solid it meets, this block
+## included, so the column ends at the underside) through WaterManager.get_steam_lift(), keeping its own smoothed value
+## in `_steam_lift`. The reading `l` (0..1) pushes it up by `steam_lift_accel * l / density`, density being its mass per
+## tile plus `steam_rider_load` per rider standing on it; gravity (and buoyancy) were integrated before this, so what
+## remains is the net. The rise speed the steam can give is `steam_max_rise` scaled by how far that push is past gravity
+## compared with a full column's (0 when it does not beat gravity, so a block that steam cannot lift is only slowed in
+## its fall): the block accelerates up to it and no further, and an upward speed beyond it (a launch, a thinning
+## column) is damped toward it at `steam_drag * l` per second. Thin steam therefore gives a slow rise or a hover.
+## Acceleration only: a restore restarts the reading at 0 and never throws a block. A walker or enemy is never read.
+func _apply_steam_lift(delta: float) -> void:
+	if steam_lift_accel <= 0.0 or _water_manager == null or size_tiles.x * size_tiles.y > steam_lift_max_area:
+		_steam_lift = 0.0
+	else:
+		_steam_lift = _water_manager.get_steam_lift(_steam_probe_rect(), _steam_lift, delta)
+	if _steam_loop != null:
+		_steam_loop.volume_db = linear_to_db(maxf(_steam_lift, 0.01)) if _steam_lift > 0.01 else -80.0
+		if _steam_lift > 0.01:
+			_steam_loop.start()
+		else:
+			_steam_loop.stop_loop()
+	if _steam_lift <= 0.0:
+		return
+	var density := maxf(mass / float(size_tiles.x * size_tiles.y), 0.01) + _rider_count * steam_rider_load
+	var full_push := steam_lift_accel / density
+	var push := full_push * _steam_lift
+	var rise := 0.0
+	if full_push > GRAVITY:
+		rise = steam_max_rise * clampf((push - GRAVITY) / (full_push - GRAVITY), 0.0, 1.0)
+		if velocity.y < -rise:  # already rising faster than the steam gives (a launch, a thinning column): drag toward it
+			velocity.y = lerpf(velocity.y, -rise, 1.0 - exp(-steam_drag * _steam_lift * delta))
+			return
+	if velocity.y > -rise:
+		velocity.y = maxf(velocity.y - push * delta, -rise)
+
+## World rect of the band the steam lift reads: the block's footprint width (its rotated corners' x span) and a thin
+## strip at its lowest point.
+func _steam_probe_rect() -> Rect2:
+	var low_x := INF
+	var high_x := -INF
+	var lowest := -INF
+	for corner in _corners_world():
+		low_x = minf(low_x, corner.x)
+		high_x = maxf(high_x, corner.x)
+		lowest = maxf(lowest, corner.y)
+	return Rect2(low_x, lowest - STEAM_PROBE_OVERLAP, high_x - low_x, STEAM_PROBE_DEPTH + STEAM_PROBE_OVERLAP)
 
 ## Subclass hook: true while the block is in molten slag (heats it at 1 / slag_melt_time).
 func _touching_slag() -> bool:

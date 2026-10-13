@@ -14,6 +14,7 @@ script = ExtResource("1_carbon")
 walk_push_speed = 75.0
 brittle = true
 float_depth_fraction = 0.6
+steam_lift_accel = 800.0
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="."]
 shape = SubResource("ConvexPolygonShape2D_carbon")

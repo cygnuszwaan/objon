@@ -99,7 +99,7 @@ tile_map_data = PackedByteArray("AAAoAB0AAAAAAAAAAAAoABwAAAAAAAAAAAAoABsAAAAAAAA
 tile_set = ExtResource("5_rljw2")
 
 [node name="Catwalks" type="TileMapLayer" parent="Tilemaps" unique_id=639006999 groups=["catwalk"]]
-tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAAUAE0AAAABAAAAAAAVAE0AAAACAAAAAAAWAE0AAAACAAAAAAAXAE0AAAACAAAAAAAYAE0AAAACAAAAAAAZAE0AAAACAAAAAAAaAE0AAAACAAAAAAAbAE0AAAACAAAAAAAcAE0AAAACAAAAAAAdAE0AAAACAAAAAAAeAE0AAAACAAAAAAAfAE0AAAACAAAAAAAgAE0AAAADAAAAAAA=")
+tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAAUAE0AAAABAAAAAAAVAE0AAAACAAAAAAAWAE0AAAACAAAAAAAXAE0AAAACAAAAAAAYAE0AAAACAAAAAAAZAE0AAAACAAAAAAAaAE0AAAACAAAAAAAbAE0AAAACAAAAAAAcAE0AAAACAAAAAAAdAE0AAAACAAAAAAAeAE0AAAACAAAAAAAfAE0AAAACAAAAAAAgAE0AAAACAAAAAAAhAE0AAAACAAAAAAAiAE0AAAACAAAAAAAjAE0AAAACAAAAAAAkAE0AAAACAAAAAAAlAE0AAAACAAAAAAAmAE0AAAACAAAAAAAnAE0AAAACAAAAAAAoAE0AAAACAAAAAAApAE0AAAACAAAAAAAqAE0AAAACAAAAAAArAE0AAAACAAAAAAAsAE0AAAADAAAAAAA=")
 tile_set = SubResource("TileSet_0w3yt")
 
 [node name="PoweredCatwalkLayer" parent="Tilemaps" unique_id=1013901616 instance=ExtResource("7_s474h")]
@@ -122,11 +122,10 @@ latch_mode = 1
 
 [node name="WaterManager" type="Node2D" parent="." unique_id=1297838409 groups=["water_manager"]]
 script = ExtResource("7_aghq8")
-kill_y = 1024.0
 
 [node name="Player" parent="." unique_id=61703917 instance=ExtResource("8_y0ep0")]
 z_index = 1
-position = Vector2(328, 1272)
+position = Vector2(544, 1272)
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 
@@ -168,8 +167,8 @@ color = 1
 latch_mode = 1
 
 [node name="WaterFaucet" parent="." unique_id=2073519985 instance=ExtResource("17_y0ep0")]
-position = Vector2(448, 1328)
-debug_toggle_key = 0
+position = Vector2(600, 1256)
+debug_toggle_key = 79
 
 [node name="Button2" parent="." unique_id=2051358522 instance=ExtResource("16_aghq8")]
 position = Vector2(392, 1272)
@@ -181,7 +180,8 @@ position = Vector2(424, 1248)
 rotation = 1.5707964
 
 [node name="CarbonFiberBlock" parent="." unique_id=633922248 instance=ExtResource("18_ujeiy")]
-position = Vector2(536, 1272)
+position = Vector2(616, 1216)
+size_tiles = Vector2i(2, 1)
 
 [node name="WaterBasin2" parent="." unique_id=1692332547 instance=ExtResource("15_yjlda")]
 z_index = -1
