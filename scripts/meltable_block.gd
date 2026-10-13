@@ -661,7 +661,7 @@ func _scan_contacts(state: PhysicsDirectBodyState2D) -> void:
 		var point := state.get_contact_local_position(i)
 		var collider := state.get_contact_collider_object(i)
 		var body := collider as CollisionObject2D  # null for tiles
-		var is_actor := body != null and (body.collision_layer & 2) == 0
+		var is_actor := _is_actor_body(body)
 		if absf(normal.y) > FLOOR_NORMAL_Y and point.y > centre.y:
 			_on_floor = true
 			if is_actor:
@@ -959,6 +959,13 @@ func _upright_residual() -> float:
 		return 0.0
 	return global_rotation - roundi(global_rotation / (PI * 0.5)) * PI * 0.5
 
+## Whether `body` is an actor, a walker that is not part of the world: by the layer convention a body on layer 1 and not on
+## layer 2 (null, a tile, is not). A basin's crust body is the one world solid on layer 1 alone (`WaterBasin.crust_collision_layer`),
+## so it is named here (group "crust") and counts as world: read as an actor, a floor contact is dropped before it reaches the
+## floor slope, support extent, hold or `is_slippery()` scan, and the block on a crust is never held or slippery.
+func _is_actor_body(body: CollisionObject2D) -> bool:
+	return body != null and (body.collision_layer & 2) == 0 and not body.is_in_group(&"crust")
+
 ## Actors (layer-1-only bodies) overlapping a thin band as wide as the block, whose centre is
 ## `center_y_from_top` below the block's top edge (-1 = just above the top face, size.y + 1 = just below the
 ## bottom face), `band_height` tall. A query rather than anyone's floor contact, because a swimming player's
@@ -977,7 +984,7 @@ func _actors_in_band(center_y_from_top: float, band_height: float) -> Array[Phys
 	var actors: Array[PhysicsBody2D] = []
 	for hit in get_world_2d().direct_space_state.intersect_shape(_rider_query, 8):
 		var body := hit.collider as PhysicsBody2D
-		if body != null and (body.collision_layer & 2) == 0 and not seen.has(body.get_instance_id()) \
+		if _is_actor_body(body) and not seen.has(body.get_instance_id()) \
 				and not (_ignoring_hanger and body == _player):  # a hanging player is on the side wall, not a rider
 			seen[body.get_instance_id()] = true
 			actors.append(body)

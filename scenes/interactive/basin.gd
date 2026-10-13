@@ -768,20 +768,22 @@ func _ensure_crust_body() -> void:
 
 func _rebuild_crust_collision() -> void:
 	# Rebuilds every CollisionPolygon2D child of _crust_body — called whenever the crust's geometry changes
-	# (only from convert_to_crust(); draining liquid never touches crust geometry, so it never needs this). Built as one simple, guaranteed-convex quad PER wet
-	# interior column, rather than reusing get_crust_polygon_world()'s single merged multi-column
-	# polygon (the rendering shape, still used unchanged by _draw_settled_body()). A merged run's
-	# stepped bottom edge is a genuinely CONCAVE polygon whenever neighboring columns' seabed heights
-	# differ, and Godot's CollisionPolygon2D decomposes its `polygon` via
-	# Geometry2D.decompose_many_polygons_in_convex — which can fail outright ("Convex decomposing
-	# failed!") on some concave/near-degenerate shapes, silently leaving the body with NO collision
-	# shapes at all rather than an error the player can see: this, not polygon thinness, was the
-	# actual cause of the player falling through a nearly-full basin's crust (see
-	# CRUST_THICKNESS_TILES's own comment for the separate, also-real swim-probe issue that fix
-	# addresses). A single rectangle per column can never hit that failure mode — four points, always
-	# a simple, already-convex quad — at the cost of one CollisionPolygon2D node per wet column
-	# instead of one per contiguous run, which is a non-issue since this only runs on a reaction
-	# event, not every frame.
+	# (only from convert_to_crust(); draining liquid never touches crust geometry, so it never needs this).
+	# Built from RECTANGLES ONLY, never from get_crust_polygon_world()'s merged multi-column polygon (the
+	# rendering shape, still used unchanged by _draw_settled_body()). A merged run's stepped bottom edge is a
+	# genuinely CONCAVE polygon whenever neighboring columns' seabed heights differ, and Godot's
+	# CollisionPolygon2D decomposes its `polygon` via Geometry2D.decompose_many_polygons_in_convex — which can
+	# fail outright ("Convex decomposing failed!") on some concave/near-degenerate shapes, silently leaving the
+	# body with NO collision shapes at all rather than an error the player can see: this, not polygon
+	# thinness, was the actual cause of the player falling through a nearly-full basin's crust (see
+	# CRUST_THICKNESS_TILES's own comment for the separate, also-real swim-probe issue that fix addresses). A
+	# rectangle is four points, always a simple, already-convex quad, so it can never hit that failure mode.
+	# Each run of adjacent wet columns gets ONE full-width slab from the crust's collision top down to the
+	# shallowest bottom in the run, plus a rectangle under it for each column that reaches deeper. Separate
+	# per-column quads put a seam in the walking surface every tile, and a rigid block sliding over it (a
+	# kicked or pushed block, see MeltableBlock) catches its leading corner on the next quad's edge: the
+	# solver halves its speed and pops it off the floor. The slab has no seam in the surface; the seams that
+	# remain are below it, where nothing touches. Runs only on a reaction event, not every frame.
 	if _crust_body == null:
 		return
 	for child in _crust_body.get_children():
@@ -790,23 +792,40 @@ func _rebuild_crust_collision() -> void:
 		return
 	var top_y := get_crust_collision_top_world_y()
 	var bottom_cap_y := get_crust_bottom_world_y()
+	var run: Array[Vector2] = []  # (left x, bottom y) of each wet column in the current run of adjacent wet columns
 	for local_col in range(1, resolved_width_tiles - 1):
 		var col_bottom_y: float = minf(
 			global_position.y + (seabed_floor_rows[local_col] - _origin_cell.y) * _tile_size.y,
 			bottom_cap_y)
 		if col_bottom_y <= top_y:
-			continue  # a dry hump — this column's own floor sits above the crust boundary entirely
-		var col_left_x := global_position.x + local_col * _tile_size.x
-		var col_right_x := col_left_x + _tile_size.x
-		var world_points := PackedVector2Array([
-			Vector2(col_left_x, top_y),
-			Vector2(col_right_x, top_y),
-			Vector2(col_right_x, col_bottom_y),
-			Vector2(col_left_x, col_bottom_y),
-		])
-		var shape := CollisionPolygon2D.new()
-		shape.polygon = _to_local_polygon(world_points)
-		_crust_body.add_child(shape)
+			_add_crust_run(run, top_y)  # a dry hump — this column's own floor sits above the crust boundary entirely, and ends the run
+			run.clear()
+			continue
+		run.append(Vector2(global_position.x + local_col * _tile_size.x, col_bottom_y))
+	_add_crust_run(run, top_y)
+
+## One run of adjacent wet columns (see _rebuild_crust_collision()): a slab across the whole run down to its shallowest
+## bottom, then a rectangle below the slab for every column whose bottom is deeper.
+func _add_crust_run(run: Array[Vector2], top_y: float) -> void:
+	if run.is_empty():
+		return
+	var slab_bottom_y := INF
+	for column in run:
+		slab_bottom_y = minf(slab_bottom_y, column.y)
+	_add_crust_rect(run[0].x, run[run.size() - 1].x + _tile_size.x, top_y, slab_bottom_y)
+	for column in run:
+		if column.y > slab_bottom_y:
+			_add_crust_rect(column.x, column.x + _tile_size.x, slab_bottom_y, column.y)
+
+func _add_crust_rect(left_x: float, right_x: float, top_y: float, bottom_y: float) -> void:
+	var shape := CollisionPolygon2D.new()
+	shape.polygon = _to_local_polygon(PackedVector2Array([
+		Vector2(left_x, top_y),
+		Vector2(right_x, top_y),
+		Vector2(right_x, bottom_y),
+		Vector2(left_x, bottom_y),
+	]))
+	_crust_body.add_child(shape)
 
 func _to_local_polygon(world_points: PackedVector2Array) -> PackedVector2Array:
 	# CollisionPolygon2D.polygon is in the shape's OWN parent's local space, not world space —

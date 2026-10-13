@@ -1194,6 +1194,7 @@ func _try_step_up(delta: float) -> void:
 	global_position.y -= step_height
 
 # --- walking into a block ----------------------------------------------------------------------
+const WALK_PUSH_PROBE := 3.0  # px: how far ahead the walk push looks for a block. It must exceed the distance a pushed block opens in one tick (its cap 75 px/s is 1.25 px), or the probe misses a block that has just moved away, the push lapses and the wall check below zeroes _slide_vx
 # Duck-typed contract: a body with walk_shoved(direction, walk_speed) -> float (MeltableBlock) is asked, while the player
 # stands and walks into its side, how fast it can be pushed: it returns the speed it took, or -1 to refuse (ice and metal
 # always do, so walking still can't move them; a wall or a refusing block in front of a carbon fiber block does too).
@@ -1207,7 +1208,7 @@ func _can_walk_push(input_dir: float) -> bool:
 func _walk_push_limited(vx: float) -> float:
 	var dir := signf(vx)
 	var hit := KinematicCollision2D.new()
-	if dir == 0.0 or not test_move(global_transform, Vector2(dir, 0.0), hit):
+	if dir == 0.0 or not test_move(global_transform, Vector2(dir * WALK_PUSH_PROBE, 0.0), hit):
 		return vx
 	var normal := hit.get_normal()
 	if absf(normal.x) < 0.7 or normal.x * dir > 0.0:
