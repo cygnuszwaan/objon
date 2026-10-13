@@ -4,7 +4,7 @@ Planned additions that close gaps found while writing the level-design reference
 
 **Always attach the patch.** The user has no access to the session's sandbox. Every session that changes the repository ends by attaching its result as a patch (`git diff` against the starting commit, saved as `<item id>.patch`, for example `n3.4.patch`) to its final reply, not just describing the changes. Test scaffolding and files Godot regenerates (`.import`, `.godot/`) are left out of the patch.
 
-Covers: Phase 3 (Reach of existing systems: Steam lifts blocks; Steam tips the see-saw); Not on the roadmap
+Covers: Phase 3 (Reach of existing systems: Steam tips the see-saw); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -16,21 +16,9 @@ Covers: Phase 3 (Reach of existing systems: Steam lifts blocks; Steam tips the s
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 3 extends steam to blocks and to the see-saw. Within a phase the order is by value; N3.4 is tuned against the carbon fiber block, which is the block steam is meant to lift.
+Phases run from least to most invasive. Phase 3 extends steam to the see-saw. Within a phase the order is by value.
 
 ## Phase 3: Reach of existing systems
-
-### N3.4 Steam lifts blocks (S to M)
-
-Built, awaiting in-editor confirmation; see Status in `meltable-blocks.md`. As built: lift scales with per-tile density (not total mass) and a hard `steam_lift_max_area` (4) instead of the `steam_lift_mass_exponent`; a rider adds `steam_rider_load` (0.25) to the density; the rise is capped at 80 px/s and damped toward a speed proportional to the lift.
-
-**Gap.** Only a surfing player reads steam, so a column is useless to a block. The old sketch holds: `WaterManager.get_steam_lift(rect, previous, delta)` is already stateless and takes a rect.
-
-**Sketch.** `MeltableBlock` gains `steam_lift_accel` (default 0 = off, so ice and metal are unchanged until a level opts in; `carbon_fiber_block.tscn` sets it) and `steam_lift_mass_exponent` (k). Each physics frame a block with a non-zero value reads `get_steam_lift()` over a rect **hugging its underside** (about 4 px deep, its rotated footprint's width), not over its bounds: a steam particle dies on the first solid it meets (a block in `water_solid` included), so the column ends at the block's underside and a bounds query would read nothing above it. It adds an upward acceleration of `steam_lift_accel × lift / mass^k` into `velocity` inside `_apply_forces()` (the block's own force hook, so buoyancy and liquid drag still apply), with the block keeping its own smoothed reading (`previous`, `delta`) like the surfer. Lift reads 0..1 of how much of the underside steam covers, so thin steam hovers the block and a full column carries it up to the column top (about 8 tiles) or a ceiling. Tune `steam_lift_accel` so a full column beats gravity (900) for carbon fiber at mass 0.5 per tile by a margin, and does not for a 1×1 ice block even if opted in; the exponent sets how much a bigger block loses. Steam does not move enemies or walkers (a Player export for walkers stays out of scope: it changes what steam is for and should be a per-theme decision).
-
-**Rules to keep.** The manager keeps no per-caller state (the same rule as the steam lift query); the block's smoothed lift is a runtime variable, not saved, and a restore restarts it at 0. The lift is acceleration, never a teleport, so a restore never throws a block. A block lifted into a ceiling or onto a see-saw plank behaves as any block there does. Steam is not saved, so after a restore a column rebuilds over about one lifetime and a block that was riding it falls until it does.
-
-**Touches.** `meltable-blocks.md`, `liquid-system.md` (Steam lift query: a second caller), `player-surf.md` (Steam lift: now one of two readers), `level-design.md` (Liquids: Steam, Gaps: "Steam is a surf-only mechanic"), `puzzles.md`.
 
 ### N3.5 Steam tips the see-saw (S to M)
 
