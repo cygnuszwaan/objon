@@ -20,6 +20,7 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 | Swing hang | airborne near a swing bar | Left/right pumps; jump releases with the bar's velocity; crouch drops. |
 | Rail hang | airborne near a grabbable rail | Flat rail: brachiate. Steep rail (>10°): slide. Jump or crouch to leave. |
 | Swim | in water or slag | Slag is buoyant and hurts every frame. Electrified water hurts. Kick/crouch/grabs are disabled while swimming. |
+| **Chill** | in a freeze beam, or inside a frozen crust that formed around you | Walk, sneak and swim speed fall to **half** at full chill (instant on, fades over 0.5 s after the last source). It never hurts and never removes control, so the beam can always be left. The surf and a launch's momentum (pad, swing release) are **not** slowed; jump height, ladders and rails are not either. Overlapping sources don't stack. Every enemy is slowed the same way (see Enemies). |
 | **Surf** | crouch + kick on the floor | The big one. See below. Kick again to dismount. |
 | Jump pads | touch | Launch you (the surf survives a pad). |
 
@@ -55,7 +56,7 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 | **Catwalk** tile (or body in group `catwalk`) | one-way (jump up through, stand on top) | yes (side + underside) | **passes** | **passes** (falls through) | Keep on its own tile layer in group `catwalk`. A **powered catwalk layer** makes a run of it appear and vanish. |
 | **Ladder** tile | none | n/a | passes | passes | Own tilemap layer. A **powered ladder layer** makes a run of it appear and vanish. |
 | **Spike** tile | none (hurts) | no | passes | passes | Four orientations. Damage polled every frame. A tile can't be powered: paint it on a **powered spike layer** to switch it. |
-| **Crust** (basin) | yes, walkable | underside only (over a void) | blocks | blocks | Forms when water meets slag. |
+| **Crust** (basin) | yes, walkable | underside only (over a void) | blocks | blocks | Forms when water meets slag (a **reaction crust**, permanent), or when a freeze beam freezes a `freezable` basin (a **frozen crust**: slippery, and a laser can thaw it). |
 | **High-friction / ice tile** (`surf_friction`) | yes | yes | blocks | blocks | Per-tile surf friction multiplier. A tile value above 1 is mud, below 1 is slick. |
 
 **Tile-level tools to remember**
@@ -140,14 +141,15 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 
 - **Water particles** flow, creep, and fall through catwalks. Moving particles shove the player a bit and are carried by moving solids. Water on a see-saw adds load.
 - **Slag particles/pools** burn the player on contact (each frame of submersion or touch). Buoyant to swim in.
-- **Basin** (`WaterBasin`): a hand-sized container sampled from the tiles under it. Authored: `liquid_type`, `initial_fill_depth_below_surface`, `boilable`, `conducts_sparks`, `electrified_time`. Fills from particles and **spills over its shorter wall into the next basin** (basins chain without adjacency data).
+- **Basin** (`WaterBasin`): a hand-sized container sampled from the tiles under it. Authored: `liquid_type`, `initial_fill_depth_below_surface`, `boilable`, `conducts_sparks`, `electrified_time`, `freezable`, `freeze_time`, `melt_time`. Fills from particles and **spills over its shorter wall into the next basin** (basins chain without adjacency data).
 - **Faucet**: `flow_rate`, `liquid_type`, powered = open. Placed on a basin's interior floor tile, it's a **drain** (removes liquid, leaves any crust hanging over the void). Elsewhere it's a **source**.
-- **Crust**: opposite liquids meeting in a basin solidify a 0.75-tile slab across the wet columns and emit **steam**. It never grows or thins. Walkable, laser-opaque, hangable from beneath where a drain has left a void. Same-liquid arriving on top just rests on it. Opposite liquid arriving on it evaporates into steam.
+- **Crust**: opposite liquids meeting in a basin solidify a 0.75-tile slab across the wet columns and emit **steam**. This **reaction crust** never grows or thins and nothing removes it (a laser is simply stopped by it). Walkable, laser-opaque, hangable from beneath where a drain has left a void. Same-liquid arriving on top just rests on it. Opposite liquid arriving on it evaporates into steam.
 - **Steam**: rises 80 px/s in a narrow cone, about 8 tiles tall, stops at ceilings. **Only the surfing player feels it** (up to 1,500 px/s² of lift). It lifts the board off the floor once it exceeds gravity.
 - **Skim**: a surfer at 180+ px/s on a still, non-hazardous, crust-free basin rides the surface on a temporary floor. Slower, slag, or electrified water: swim or sink instead.
 - **Laser boiling**: `boils_water` on the turret *and* `boilable` on the basin. Drains it and makes steam. Slag is never boiled.
-- **Electrified water**: a spark (rail bot) or arc touching a crust-free water basin electrifies the whole pool for `electrified_time`. Hurts a submerged player and kills skimming. Nothing else reads it.
-- **Basin sensor**: a power source reading fill fraction, crust, or one column's depth, optionally filtered to water/slag.
+- **Frozen crust**: a `freezable` basin (default off) that holds water **or slag** and has no crust freezes after `freeze_time` (2 s) of a freeze beam on its liquid. Frost decays 1 s per second once the beam leaves, so a short touch is forgotten. It forms the same 0.75-tile slab, with **no steam**, and the liquid under it stays (so a drain can still open a void for the underside hang). It is walkable, laser-opaque, a basin sensor reads it as CRUST, and it is **slippery underfoot** (ice-rink acceleration; the surf's friction is unchanged, and a surfer rides it at any speed, the opposite of a skim). It differs from a reaction crust in three ways. **A laser thaws it**: `melt_time` (2 s) of laser on the crust, then it reverses its cooling animation, stays solid until the first frame and the whole slab goes (never a hole), the liquid band returning with no steam; if the laser leaves, the thaw backs off and the crust cools again. **Frozen slag is temporary**: it is held only while the beam stays on it (a few frames of grace) and thaws backwards when the beam leaves; a freeze still short of its last frame does the same, even on water. A fully frozen water crust stays until a laser melts it. **It conducts**: see Electrified water. A player inside the band when it forms is **embedded**: the crust ignores them (set once, at the freeze), they are chilled and swim up through it, and it is solid for them once they are above it. The freeze is non-lethal and seals nobody in.
+- **Electrified water**: a spark (rail bot) or arc touching a crust-free water basin electrifies the whole pool for `electrified_time`. Hurts a submerged player and kills skimming. Nothing else reads it. A strike on a **frozen crust over water** electrifies it too (frozen slag never): while it lasts the **top of the crust hurts a player standing on it** (airborne is safe; a submerged or embedded player is hurt by the liquid as before), paced by i-frames. An electrified pool that freezes keeps its remaining time on the crust.
+- **Basin sensor**: a power source reading fill fraction, crust, or one column's depth, optionally filtered to water/slag. CRUST reads a frozen crust too, so over a `freezable` basin it can fall again when the crust thaws.
 - **Wet floor**: flowing water over the floor raises surf top speed to 800 and cuts friction. It decays 0.4 s after leaving the water.
 
 ### Beams and projectiles: laser, arc, cannon, mirror
@@ -163,7 +165,8 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | Lights/triggers | **laser receiver** | **arc receiver**, electrifies water | **bullet target** |
 | Boils water | optional | no | no |
 
-- **Laser turret**: aim = instance rotation. Powered = beam on. `damage`, `boils_water`.
+- **Laser turret**: aim = instance rotation. Powered = beam on. `damage`, `boils_water`. It also thaws a frozen crust (see Frozen crust).
+- **Freeze turret**: aim = instance rotation, powered = beam on, `start_enabled`, `invert`. The cold of the family: a continuous beam on the same solver as the laser (reflects off mirrors, passes catwalks and glass, stopped by solids, doors, blocks, enemies, the player, a crust and mirror backs) whose effect is **cumulative**, so the dwell lives on the target, never the turret. It **never hurts**. It freezes a `freezable` basin (`freeze_time`), powers a **freeze receiver** (`dwell_time`), chills the player and any enemy it ends on, and does nothing to blocks, ice or metal (they are plain shields, with no lifespan).
 - **Arc turret**: `fire_interval` 2 s, `phase_offset`, `arc_speed`, `arc_range`. Powered = firing (a rising edge fires one at once). The telegraph is a growing glow in the last 0.45 s.
 - **Cannon**: `fire_rate`. Powered = firing (rising edge fires one at once). Aim = rotation. The housing is a standable solid.
 - **Mirror**: one checkbox per instance, `toggle_between_aims`, picks how it turns; the Inspector shows only that mode's fields. `rotate_time`, `kick_rotates`, `bullet_rotates` (off by default) and `invert` apply to both. Solid to the player. A mirror's back and edge block beams. Can ride a moving platform.
@@ -216,6 +219,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 | **Button** | pressed by player or any block (not enemies/liquid) | `latch_mode` MOMENTARY / TOGGLE / TIMED (`duration`); colour is art-only |
 | **Speed trap** | a *surfer* crosses its line at ≥ `threshold_speed` (450) | `hold_time` (5 s, 0 = latched), `require_surfing` |
 | **Laser receiver** | lit by a beam; stays on `hold_time` (0.3 s) after | the flicker bridge |
+| **Freeze receiver** | the freeze beam has stayed on it for `dwell_time` (1 s; 0 = at once); stays on while lit and `hold_time` (0.3 s) after | frost builds 1 s per second of beam and decays 1 s per second without, so a sweep across does nothing and a beam that leaves and returns keeps what is left; opaque, lit on any face |
 | **Arc receiver** | hit by an arc | `latch_mode`; MOMENTARY pulse 2.5 s, TIMED 5 s, TOGGLE |
 | **Bullet target** | hit by a cannon bullet | `latch_mode`; MOMENTARY pulse 0.3 s, TIMED 5 s, TOGGLE |
 | **Weight plate** | summed weight ≥ `threshold` (2) | `hold_time` 0.15 s, `player_weight` 2, `enemy_weight_scale` 1 (0 = ignore enemies); counts stacked blocks, enemies and riders up to 3 deep |
@@ -262,6 +266,7 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 |---|---|---|
 | Door | open | invert = starts open |
 | Laser turret | beam on | |
+| Freeze turret | beam on | non-lethal; `invert` = on while unpowered |
 | Arc turret / Cannon | firing | rising edge fires immediately |
 | Conveyor | running | |
 | Faucet | open | drain or source by placement |
@@ -289,8 +294,8 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 - **Finish**: unlocks at `required_gem_percent` (default 100) of the level's gems, optionally AND/OR a wired button (`require_all`). Plays the exit dance and the level-complete overlay. `next_level` overrides the next row in the catalog.
 
 **What a restore keeps and drops** (it matters for puzzles):
-- Kept: button/receiver state, door frame, blocks (position, melt progress), enemies, mirrors, see-saw angle, platform phase, basin fill and crust, crusher state and jam.
-- Dropped: liquid particles in flight, bullets, arcs, sparks, steam, drop-platform state, electrification. A basin mid-overflow comes back settled; a dangerous state restores harmless.
+- Kept: button/receiver state, door frame, blocks (position, melt progress), enemies, mirrors, see-saw angle, platform phase, basin fill and crust (a frozen crust comes back cold, slippery and meltable), crusher state and jam.
+- Dropped: liquid particles in flight, bullets, arcs, sparks, steam, drop-platform state, electrification, frost and heat, chill, the embedded latch. A basin mid-overflow comes back settled; a dangerous state restores harmless. A freeze still in progress, and frozen slag held by a beam, come back as the plain liquid; a freeze receiver comes back full if it was powered, else empty, and the live beam takes over.
 
 ## Interaction matrix
 
@@ -298,10 +303,11 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 
 | Actor ↓ | Ice block | Metal block | Water pool | Slag pool | Player | Enemies | Mirror | Door/solid |
 |---|---|---|---|---|---|---|---|---|
-| **Laser** | melts → water | melts → slag | optional boil (needs flags) | not boiled | damage/frame | 1 dmg/0.5 s | reflects | stopped |
-| **Arc** | – | – | electrifies | – | damage | – (passes) | reflects | stopped |
+| **Laser** | melts → water | melts → slag | optional boil (needs flags); thaws a frozen crust over it | not boiled; thaws a frozen crust over it | damage/frame | 1 dmg/0.5 s | reflects | stopped |
+| **Freeze ray** | stopped, no effect | stopped, no effect | freezes a `freezable` basin after `freeze_time` → frozen crust | freezes it, **held only while the beam stays** | chills (half speed), no damage | chills, no damage | reflects | stopped |
+| **Arc** | – | – | electrifies (also through a frozen crust over it) | – | damage | – (passes) | reflects | stopped |
 | **Bullet** | – | – | – | – | damage | – | turns or flips it (opt-in) | stopped |
-| **Spark** | – | – | electrifies | – | damage | – | – | – |
+| **Spark** | – | – | electrifies (also through a frozen crust over it) | – | damage | – | – | – |
 | **Kick** | slides it | slides it (short) | – | – | – | damage / flips crawler / arms mine | turns 45° (step) or flips aim (toggle) | – |
 | **Surf** | shoves (long) | shoves (short) | skims if ≥180 | burns/ends surf | – | bowls | – | breaks barrier |
 | **Crusher** | **shatters** | **jams crusher** | – | – | damage | – | – | – |
@@ -319,15 +325,16 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 **What presses what**
 - Button: player + blocks. Weight plate: player (standing) + blocks + enemies on the floor (+ stacked riders, through a block or an enemy). See-saw load: player + blocks + liquid (+ enemies when `enemy_weight_scale` is above 0). Speed trap: only a surfer. Zone sensor: any body of an enabled kind inside it (player, enemies, blocks), whatever it weighs.
 - Logic nodes and the camera cue's pass-through press nothing: they read other sources' levels and edges, and only a device's `sources` (or another logic node) reads them.
-- Receivers are lit by beam/arc/bullet *specifically*. A laser does nothing to an arc receiver and vice versa.
+- Receivers are lit by beam/arc/bullet/freeze ray *specifically*. A laser does nothing to an arc receiver or a freeze receiver, and vice versa.
 
 ## Gaps, limits and gotchas
 
 **Things you can't do (yet)**
 - **Spikes switch per layer, not per tile**: a tile can't carry a `PowerTarget`, so independent groups of spikes are separate layers, and a spike with its own timing (a warning, a stroke) must be a node (e.g. a crusher or sawwheel).
-- **Only catwalks, ladders and spikes can be switched as terrain.** Ground and glass can't (the basin scans, the water manager and the laser's world lookup assume one `world_tilemap`), so a wall or floor that appears is a door, a drop platform or a crust.
+- **Only catwalks, ladders and spikes can be switched as terrain.** Ground and glass can't (the basin scans, the water manager and the laser's world lookup assume one `world_tilemap`), so a wall or floor that appears is a door, a drop platform or a crust (a frozen crust is the one the player can summon with a beam and take away with a laser).
 - **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
 - **A mirror has two powered aims at most** (toggle mode); more positions need step mode (one step per rising edge) or several mirrors.
+- **The freeze ray freezes only `freezable` basins and powers only freeze receivers.** It does not freeze blocks, doors or the player; chill is a slowdown, not a stop. Chill is a flat half speed, not a dial.
 - **No lever object**; no keys or carryable items; no pickup that persists to other levels.
 - **No ranged attack for the player** and **no dodge**; every enemy interaction is a kick, a stomp, a surf, or an environmental trick.
 - **An enemy presses a weight plate (and, if the plank opts in, tips a see-saw, and so can drive a catapult's drop) but never a button, and a see-saw never throws one**; it can also power a zone sensor (`count_enemies`). Liquid opens a door only through a basin sensor.
@@ -337,6 +344,12 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **A level editor is a stretch goal**, and not built.
 
 **Things that are traps for the designer**
+- **`freezable` is off by default**: a basin the beam crosses does nothing until it is set. Check `freeze_time` against how long the beam really rests there (a mirror in motion, a shadow from a passing enemy).
+- **Frozen slag is a held bridge, not a latch**: it thaws within a few frames of the beam leaving, and a water crust interrupted before its last frame reverses too. Only a fully frozen water crust stays, and a laser still removes it. A CRUST sensor over a `freezable` basin is a resettable latch, where one over a reaction crust is permanent.
+- **A frozen crust is slippery**: a platform of it over a pit or spikes needs run-up room and a stopping place, since a walker keeps momentum on it. A surfer is not affected.
+- **The beam is opaque to bodies**: a grunt, a Stingbot or the player standing in the beam ends it there and shadows whatever is behind, so a freeze receiver behind a patrol goes dark and loses frost 1 s per second. A laser on a frozen crust or the beam on a reaction crust just stops.
+- **Chill is a slowdown only**: a Rail bot slows on its rail but its drip clock does not, so it drips closer together; a Stingbot's lunge and recoil are slowed as well as its flight.
+- **Checkpoint mid-freeze**: a freeze that has not finished comes back as plain liquid with no frost, and a player who was embedded comes back unchilled and unembedded; put the checkpoint before the beam is switched on.
 - **A weight plate in an enemy's lane counts the enemy**: the plate is a flush ribbon with no collider, so grunts, crawlers and drillbots walk across it and press it for the crossing plus `hold_time`; set `enemy_weight_scale` to 0 on a plate meant only for the player and blocks. A Stingbot counts only while landed, and a mine counts even when dormant.
 - **Catwalk layers**: keep catwalks on their own layer in group `catwalk` (a mixed layer breaks brachiating and the surface checks). A powered bridge is its own layer, kept off the static one.
 - **Checkpoint on a bridge**: a restore re-derives a powered layer from its source, so a bridge whose source is off blinks once and retracts under a player respawned on it. Put the checkpoint on ground.

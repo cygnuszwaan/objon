@@ -31,8 +31,4 @@ State is a single `enum State` + `match`, decided each frame from physics realit
 - **A tile-boundary rounding gotcha**: mapping a raw collision contact point to a tile cell with `local_to_map()` can round a boundary-exact point into the wrong (adjacent) cell depending on which side was hit. Nudge the point a half-pixel inward along the collision normal before mapping.
 - **A non-looping one-shot `AnimatedSprite2D` animation left with Loop ON never fires `animation_finished`**, silently soft-locking whatever state depends on it — check Loop is off for every one-shot animation (`hurt`, `dead`, etc; `_ready()` warns if it isn't for the ones that matter).
 
-## Status
-
-Chill, and the embedded-player swim through a frozen crust: built (N3.2), not yet confirmed in-editor.
-
 Reads with: `player-surf.md` (the surf state, its bowl sweep, water and conveyor rules), `liquid-system.md` (swim, hazardous liquid, steam; `water-mechanic.md` has the full constant list), `rotating-bodies.md` (the swing hang, ledge-grabbable bodies), `meltable-blocks.md` (kicked blocks, slippery floors, rising rigid floors), `platforms-conveyors.md` (hanging on a moving platform, conveyors, jump pads), `saving-levels-ui.md` (death and respawn, checkpoints, gems and win, the health bar).
