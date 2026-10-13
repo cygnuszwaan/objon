@@ -34,7 +34,7 @@ const SOUND_DISSOLVE := &"interactive/dispenser_dissolve"
 const DISSOLVE_VOLUME_DB := -8.0 ## the retirement is meant to be quiet.
 const DEFAULT_SPAWN_OFFSET := Vector2(0.0, TILE) ## local spawn point when the scene has no SpawnPoint marker.
 
-@export var block_scene: PackedScene: ## Root must be a MeltableBlock (ice_block.tscn or metal_block.tscn).
+@export var block_scene: PackedScene: ## Root must be a MeltableBlock (ice_block.tscn, metal_block.tscn or carbon_fiber_block.tscn).
 	set(value):
 		block_scene = value
 		update_configuration_warnings()
@@ -199,7 +199,7 @@ func get_config_warnings() -> PackedStringArray:
 	else:
 		var probe := block_scene.instantiate()
 		if not probe is MeltableBlock:
-			out.append("block_scene's root must be a MeltableBlock (ice_block.tscn or metal_block.tscn).")
+			out.append("block_scene's root must be a MeltableBlock (ice_block.tscn, metal_block.tscn or carbon_fiber_block.tscn).")
 		if probe != null:
 			probe.free()
 	if get_node_or_null("PowerTarget") == null:

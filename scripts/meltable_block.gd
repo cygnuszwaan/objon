@@ -43,11 +43,22 @@ extends RigidBody2D
 ## buffered, then applied in _physics_process() after everything else has edited `velocity` and just before it is
 ## written to linear_velocity, so it wins over gravity, floor friction and the held-block vertical zero.
 ##
+## Material flags (exports, set per scene): `brittle` (ice, carbon fiber) means a bullet or a crusher's spike breaks the block
+## (_break_apart(): ice bursts through its melt path, carbon fiber dissolves); `absorbs_bullets` (metal) means a bullet is
+## consumed with a ping and the block is unharmed. Both are read by on_bullet_hit(), the optional contract bullet.gd calls;
+## shatter() reads `brittle` through _shatters_when_crushed().
+##
+## Walk push: walk_shoved(direction, walk_speed) -> float is the optional contract the player calls while walking into the
+## block's side. A block with `walk_push_speed` 0 (ice, metal) returns -1 and refuses, so actors still never move it by walking;
+## a block with a speed takes own motion of at most that, and a chain of such blocks moves together, slower per block
+## (`chain_push_slowdown`), refusing if anything else (a tile, any other body, a block that refuses) is in front. A walk-pushed block
+## coasts only while its floor is slippery (is_slippery()): on any other floor it stops once the push ends.
+##
 ## Jam: jams_crusher() -> bool is the duck-typed contract the Crusher sweeps its stroke for (metal: true, so it stalls the
 ## piston and latches the crusher jammed; ice and the base class: false).
 ##
 ## Shatter: shatter() is the duck-typed contract the Crusher's spike calls on a block it touches. A block whose
-## _shatters_when_crushed() is true (ice) goes through _melt() at once, the same path as a full melt (its melt sound,
+## _shatters_when_crushed() is true (`brittle`) goes through _melt() at once, the same path as a full melt (its melt sound,
 ## its liquid burst, freeing itself), not a separate delete; any other block ignores it.
 ##
 ## Surf shove: surf_shoved(direction, surf_speed) -> float is the optional surf contract player.gd's bowl sweep reads
@@ -167,6 +178,12 @@ const HOLD_TILT_MARGIN := 0.08 ## rad: a rotating block may lean this much more 
 @export var cool_rate: float = 0.5 ## Progress lost per second while neither lit nor touching slag.
 @export var shunt_speed: float = 100.0 ## px/s a kick sends the block sliding at (0 = can't be kicked).
 @export var slide_friction: float = 70.0 ## px/s^2 the slide decays by while on the floor.
+@export_group("Material")
+@export var brittle: bool = false ## A bullet breaks it and a crusher's spike shatters it (see _break_apart()). Ice and carbon fiber set it in their scenes.
+@export var absorbs_bullets: bool = false ## A bullet is consumed on contact with a ping and the block is unharmed (metal sets it in its scene).
+@export_group("Walk push")
+@export var walk_push_speed: float = 0.0 ## px/s cap on the speed a walking player can push this block at (0 = can't be pushed by walking: the default for ice and metal).
+@export_range(0.1, 1.0) var chain_push_slowdown: float = 0.75 ## Speed multiplier for each further walk-pushable block ahead of this one in a pushed chain.
 @export_group("Launch")
 @export_range(0.0, 2.0, 0.05) var launch_weight_exponent: float = 1.0 ## A jump pad's launch vector is divided by mass^this: 0 = weight ignored, 1 = inversely proportional (a 1x1 metal block, mass 4, gets a quarter of the speed and about a 16th of the height), 2 = steeper still. Mass is per 16px tile times the block's area, so a bigger block lifts less. An unkickable block (shunt_speed <= 0) is launched all the same.
 @export_group("Surf")
@@ -227,6 +244,10 @@ var _written_vy: float = 0.0 ## velocity.y as last written by _physics_process()
 var _rider_on_top: bool = false ## an actor touches the block's top face (previous step)
 var _roof_hit: bool = false ## a non-actor body touches the block's top face (a ceiling over the block)
 var _riders_free_above: bool = true ## every rider has room to be carried up this tick (no ceiling over it)
+var _front_query: PhysicsShapeQueryParameters2D ## reused by _bodies_in_front()
+var _floor_slippery: bool = false ## the floor under the block answers is_slippery() true (a frozen crust, an ice block), from the last contact scan
+var _walk_pushed: bool = false ## a walking player moved the block and the push may not have ended; see _end_walk_push()
+var _last_walk_push_frame: int = -1000
 var _launch_pending: bool = false ## launch() buffered a vector; applied (once) in _physics_process()
 var _launch_vector: Vector2 = Vector2.ZERO ## the buffered launch, already scaled by weight
 var _pending_teleport: bool = false ## load_state() asked for a position; applied inside _integrate_forces()
@@ -307,6 +328,7 @@ func load_state(d: Dictionary) -> void:
 	melt_progress = clampf(d.get("melt_progress", 0.0), 0.0, 1.0)
 	_last_lit_frame = -1000
 	_launch_pending = false
+	_walk_pushed = false
 	reset_physics_interpolation()
 	queue_redraw()
 
@@ -358,6 +380,7 @@ func kicked(direction: float) -> void:
 	if _melted or shunt_speed <= 0.0:
 		return
 	_own_vx = signf(direction) * shunt_speed
+	_walk_pushed = false
 	Audio.play_at(_shunt_sound(), global_position)
 
 ## Launch contract (jump_pad.gd calls launch(vector) on anything that has it): buffers the vector, scaled down by weight,
@@ -379,7 +402,99 @@ func launch(vector: Vector2) -> void:
 func shatter() -> void:
 	if _melted or not _shatters_when_crushed():
 		return
-	_melt()
+	_break_apart()
+
+## Bullet contract (bullet.gd calls on_bullet_hit(point, direction) on any body it overlaps that has it; true = the bullet
+## is consumed). `absorbs_bullets` first: consumed with a ping, the block unharmed. Then `brittle`: consumed and the block
+## breaks. Anything else lets the bullet fly on, as before.
+func on_bullet_hit(point: Vector2, _direction: Vector2) -> bool:
+	if _melted:
+		return false
+	if absorbs_bullets:
+		Audio.play_at(&"interactive/metal_ping", point)
+		return true
+	if brittle:
+		_break_apart()
+		return true
+	return false
+
+## Walk-push contract (player.gd calls walk_shoved(direction, walk_speed) while a standing, walking player presses into the
+## block's side): returns the speed the block took (the player is slowed to it) or -1.0 to refuse. Refuses when
+## `walk_push_speed` is 0, when melted, and when anything but another walk-pushable block is on the far face (found with
+## a shape query, see _bodies_in_front()).
+func walk_shoved(direction: float, walk_speed: float) -> float:
+	var dir := signf(direction)
+	if dir == 0.0:
+		return -1.0
+	var allowed := _walk_push_limit(dir, 0)
+	if allowed <= 0.0:
+		return -1.0
+	var taken := minf(allowed, absf(walk_speed))
+	_walk_push_apply(dir, taken, 0)
+	return taken
+
+const WALK_PUSH_MAX_CHAIN := 8 ## blocks: a longer chain refuses (also a guard against a loop of contacts)
+const WALK_PUSH_GRACE_FRAMES := 2 ## physics frames without a push before it counts as ended
+const WALK_PUSH_PROBE_DEPTH := 4.0 ## px: thickness of the band checked in front of a pushed block (1 px of it overlaps the block's own face)
+
+## The speed this block, and the chain in front of it, can be pushed at, or -1.0 if it refuses.
+func _walk_push_limit(dir: float, depth: int) -> float:
+	if _melted or walk_push_speed <= 0.0 or depth >= WALK_PUSH_MAX_CHAIN:
+		return -1.0
+	var limit := walk_push_speed
+	for body in _bodies_in_front(dir):
+		if not (body is MeltableBlock):
+			return -1.0  # a tile, an enemy or any other body in front: a wall
+		var ahead: float = (body as MeltableBlock)._walk_push_limit(dir, depth + 1)
+		if ahead <= 0.0:
+			return -1.0
+		limit = minf(limit, ahead * chain_push_slowdown)
+	return limit
+
+## Gives this block and every block in front of it the pushed speed.
+func _walk_push_apply(dir: float, speed: float, depth: int) -> void:
+	if signf(_own_vx) != dir or absf(_own_vx) < speed:
+		if Engine.get_physics_frames() - _last_walk_push_frame > WALK_PUSH_GRACE_FRAMES:
+			Audio.play_at(_walk_push_sound(), global_position)
+		_own_vx = dir * speed
+	_walk_pushed = true
+	_last_walk_push_frame = Engine.get_physics_frames()
+	if depth >= WALK_PUSH_MAX_CHAIN:
+		return
+	for body in _bodies_in_front(dir):
+		if body is MeltableBlock:
+			(body as MeltableBlock)._walk_push_apply(dir, speed, depth + 1)
+
+## Bodies (layers 1|2, not this block) within a few px of the block's face on side `dir`, found by a thin shape query
+## rather than the contact scan, because a block resting flush against another reports no contact. The band stops short
+## of the corners and the bottom, so the floor and the chamfers are never in it.
+func _bodies_in_front(dir: float) -> Array[Node]:
+	if _front_query == null:
+		_front_query = PhysicsShapeQueryParameters2D.new()
+		_front_query.collision_mask = 3
+		_front_query.shape = RectangleShape2D.new()
+		_front_query.exclude = [get_rid()]
+	var size := _upright_size()
+	var residual := _upright_residual()
+	(_front_query.shape as RectangleShape2D).size = Vector2(WALK_PUSH_PROBE_DEPTH, maxf(size.y - 4.0, 1.0))
+	_front_query.transform = Transform2D(residual, global_position + Vector2(dir * (size.x * 0.5 + WALK_PUSH_PROBE_DEPTH * 0.5 - 1.0), 0.0).rotated(residual))
+	var seen := {}
+	var out: Array[Node] = []
+	for hit in get_world_2d().direct_space_state.intersect_shape(_front_query, 8):
+		var body := hit.collider as Node
+		if body != null and not seen.has(body.get_instance_id()):
+			seen[body.get_instance_id()] = true
+			out.append(body)
+	return out
+
+## The push has ended (no walker pressing for WALK_PUSH_GRACE_FRAMES). On a floor that is not slippery the block stops
+## with it; on a slippery floor, in the air or in liquid its own motion carries on and decays as usual.
+func _end_walk_push() -> void:
+	if not _walk_pushed or Engine.get_physics_frames() - _last_walk_push_frame <= WALK_PUSH_GRACE_FRAMES:
+		return
+	_walk_pushed = false
+	if _on_floor and not _floor_slippery:
+		velocity.x = 0.0
 
 ## Surf contract (optional, read by player.gd's bowl sweep): `direction` is the way the surfer travels (-1/+1). Gives
 ## the block its own motion that way and returns the surf speed the shove cost, or -1.0 to refuse (the block then
@@ -396,6 +511,7 @@ func surf_shoved(direction: float, surf_speed: float) -> float:
 	if signf(_own_vx) == dir:
 		given = maxf(given, absf(_own_vx))  # never slows a block that is already sliding the same way
 	_own_vx = dir * given
+	_walk_pushed = false
 	Audio.play_at(_shunt_sound(), global_position)
 	return clampf(given * mass / (mass + SURF_SHOVE_PLAYER_WEIGHT), 0.0, surf_speed)
 
@@ -534,6 +650,7 @@ func _scan_contacts(state: PhysicsDirectBodyState2D) -> void:
 	_floor_slope = INF
 	_support_min_x = INF
 	_support_max_x = -INF
+	_floor_slippery = false
 	var centre := state.transform.origin
 	var tilt := 0.0  # tilt from the nearest 90 degrees: actor contacts are classified in the block's upright frame
 	if allow_rotation:
@@ -552,6 +669,8 @@ func _scan_contacts(state: PhysicsDirectBodyState2D) -> void:
 			var contact_av := 0.0  # the floor body's angular velocity, if it reports one (RotatingBody, a rigid block)
 			if collider != null and collider.has_method("get_angular_velocity"):
 				contact_av = collider.get_angular_velocity()
+			if collider != null and collider.has_method("is_slippery") and collider.is_slippery():
+				_floor_slippery = true
 			var slope := atan2(absf(normal.x), absf(normal.y))
 			if slope < _floor_slope:
 				var up := normal if normal.y < 0.0 else -normal  # the face normal pointing up, whichever way the engine reports it
@@ -601,13 +720,16 @@ func _physics_process(delta: float) -> void:
 	_buoyancy_alpha = 0.0
 	_apply_forces(delta, _rider_count)
 	if _on_floor:
-		velocity.x = move_toward(velocity.x, 0.0, slide_friction * delta)
+		if Engine.get_physics_frames() - _last_walk_push_frame > WALK_PUSH_GRACE_FRAMES:  # a block being walked along isn't braked under the player
+			velocity.x = move_toward(velocity.x, 0.0, slide_friction * delta)
 		var floor_vy := _floor_v.y if carry_assist else 0.0
 		if velocity.y > floor_vy and _is_held():
 			# Held by static friction: at rest relative to the floor, not the world. Matching the floor's vertical
 			# velocity (a tilting plank, a lift) keeps the contact from pressing into the block each frame; that
 			# frictionless, tilted push has a downhill part the solver would add to _own_vx and creep it off.
 			velocity.y = floor_vy
+
+	_end_walk_push()
 
 	if _launch_pending:  # after every other edit of `velocity`, so nothing above can cancel it
 		_launch_pending = false
@@ -935,9 +1057,14 @@ func dissolve() -> void:
 func jams_crusher() -> bool:
 	return false
 
-## Subclass hook: true if a crusher's spike shatters this block (see shatter()). Off in the base class.
+## True if a crusher's spike shatters this block (see shatter()): the `brittle` flag.
 func _shatters_when_crushed() -> bool:
-	return false
+	return brittle
+
+## How a brittle block breaks (a bullet, a crusher's spike). The base class goes through the ordinary melt path, so it
+## plays its melt sound and spawns the same liquid burst (ice); a subclass without liquid overrides it (carbon fiber).
+func _break_apart() -> void:
+	_melt()
 
 ## Subclass hooks for what the block melts into and how it sounds.
 func _melt_liquid_type() -> int:
@@ -948,6 +1075,10 @@ func _melt_sound() -> StringName:
 
 func _shunt_sound() -> StringName:
 	return &"interactive/ice_shunt"
+
+## Sound of a walking player starting to push the block. Defaults to the kick sound.
+func _walk_push_sound() -> StringName:
+	return _shunt_sound()
 
 # --- editor / drawing ------------------------------------------------------------------------------
 

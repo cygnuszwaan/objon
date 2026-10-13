@@ -39,6 +39,7 @@ var jump_buffer_timer: float = 0.0
 
 var _pending_launch: Vector2 = Vector2.ZERO
 var _has_pending_launch: bool = false
+var _walk_push_active: bool = false  # a block took this frame's walk push (see _walk_push_limited()); read next frame by the wall check that zeroes _slide_vx
 var _slide_vx: float = 0.0  # the player's OWN horizontal velocity (no conveyor/water push), carried frame to frame so a slippery floor can build/decay it
 	# set by launch() (jump pads); consumed once near the end of this frame's velocity math in
 	# _physics_process, rather than written to velocity directly inside launch() itself — see the
@@ -976,8 +977,9 @@ func _physics_process(delta: float) -> void:
 	var chill_scale := _chill_scale()  # 1 unless chilled; walk and sneak speed follow it (a surf and a launch's carried momentum are exempt: they never read it)
 	var walk_speed := speed * chill_scale
 	var slippery := is_on_floor() and not is_climbing and not is_hanging and not is_swimming and _floor_is_slippery()
-	if is_on_wall() and _slide_vx * get_wall_normal().x < 0.0:
-		_slide_vx = 0.0  # ran into a wall: don't keep "sliding" into it and then take ages to reverse
+	if is_on_wall() and _slide_vx * get_wall_normal().x < 0.0 and not _walk_push_active:
+		_slide_vx = 0.0  # ran into a wall: don't keep "sliding" into it and then take ages to reverse (a block that took last frame's push is not a wall)
+	_walk_push_active = false
 	if _air_carry_active and (is_on_floor() or is_climbing or is_hanging or is_swimming or (one_shot_action != OneShotAction.NONE and not (_air_kick and one_shot_action == OneShotAction.KICKING))):
 		if is_surfing and is_on_floor():
 			_surf_touchdown()  # landed on the board: the carried velocity becomes the ground surf speed again, and a clean landing pays out
@@ -1010,6 +1012,8 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(clampf(_slide_vx, -speed, speed), input_dir * walk_speed, rate * delta)
 	else:
 		velocity.x = input_dir * walk_speed
+	if _can_walk_push(input_dir):
+		velocity.x = _walk_push_limited(velocity.x)  # a block that takes the push slows the walk to its own speed
 	if not is_climbing and not is_hanging and not is_swimming:
 		_slide_vx = velocity.x  # BEFORE the pushes below are added
 
@@ -1188,6 +1192,34 @@ func _try_step_up(delta: float) -> void:
 	if not test_move(moved, Vector2(0.0, step_height + 1.0)):
 		return  # nothing to stand on past the lift
 	global_position.y -= step_height
+
+# --- walking into a block ----------------------------------------------------------------------
+# Duck-typed contract: a body with walk_shoved(direction, walk_speed) -> float (MeltableBlock) is asked, while the player
+# stands and walks into its side, how fast it can be pushed: it returns the speed it took, or -1 to refuse (ice and metal
+# always do, so walking still can't move them; a wall or a refusing block in front of a carbon fiber block does too).
+# Not a held state, so _interrupt_current_action() needs nothing. A crouched or sneaking player never pushes, and neither
+# does one who is surfing, hanging, climbing, swimming, in a one-shot action or carrying launch momentum.
+func _can_walk_push(input_dir: float) -> bool:
+	return input_dir != 0.0 and signf(velocity.x) == signf(input_dir) and is_on_floor() and not is_crouching \
+			and one_shot_action == OneShotAction.NONE and not is_climbing and not is_hanging and not is_swimming \
+			and not is_surfing and not _air_carry_active and not _has_pending_launch
+
+func _walk_push_limited(vx: float) -> float:
+	var dir := signf(vx)
+	var hit := KinematicCollision2D.new()
+	if dir == 0.0 or not test_move(global_transform, Vector2(dir, 0.0), hit):
+		return vx
+	var normal := hit.get_normal()
+	if absf(normal.x) < 0.7 or normal.x * dir > 0.0:
+		return vx  # not a face the player is walking into
+	var collider := hit.get_collider()
+	if collider == null or not collider.has_method(&"walk_shoved"):
+		return vx
+	var taken: float = collider.walk_shoved(dir, absf(vx))
+	if taken < 0.0:
+		return vx
+	_walk_push_active = true
+	return dir * minf(absf(vx), taken)
 
 # --- slippery floors ---------------------------------------------------------------------------
 # Duck-typed contract, same style as get_conveyor_speed(): any body with is_slippery() -> bool that

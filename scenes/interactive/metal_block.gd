@@ -24,6 +24,9 @@ extends MeltableBlock
 ## about GRAVITY / water_drag, capped at MAX_FALL_SPEED). The same coefficients damp sideways motion, so a
 ## kicked block in liquid stops quickly.
 ##
+## Bullets: `absorbs_bullets` is true in metal_block.tscn, so a cannon bullet is consumed with a ping and the block is unharmed
+## (MeltableBlock.on_bullet_hit()): a metal block is a bullet shield.
+##
 ## Placeholder art: grey steel that glows orange and sags toward transparency as melt_progress rises.
 
 @export_group("Liquid drag")

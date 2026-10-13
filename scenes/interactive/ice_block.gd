@@ -23,6 +23,9 @@ extends MeltableBlock
 ## never rides an actor and MeltableBlock's shove guard discards sideways contact pushes), so removing
 ## _apply_underside_push() makes floating blocks immovable by swimming. A wide block is only sampled at its
 ## centre.
+##
+## Brittle (`brittle` true in ice_block.tscn): a crusher's spike or a cannon bullet breaks it through the ordinary melt path
+## (see MeltableBlock.shatter() and on_bullet_hit()), so it bursts into water.
 
 const ART := preload("res://sprites/interactive/ice.png") ## 16x112: frame 0 = solid block, frames 1-6 = melting.
 const FRAME_COUNT := 7
@@ -84,10 +87,6 @@ func _apply_underside_push(delta: float) -> void:
 ## a block resting on crust over slag is safe). See MeltableBlock._touching_liquid().
 func _touching_slag() -> bool:
 	return _touching_liquid(LiquidConstants.LiquidType.SLAG)
-
-## A crusher's spike shatters ice through the ordinary melt path (see MeltableBlock.shatter()).
-func _shatters_when_crushed() -> bool:
-	return true
 
 func _melt_liquid_type() -> int:
 	return LiquidConstants.LiquidType.WATER

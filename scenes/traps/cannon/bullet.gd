@@ -7,7 +7,8 @@ extends Area2D
 ## Bullet contract (optional, on any body the mask sees): `on_bullet_hit(point: Vector2, direction: Vector2)
 ## -> bool`. `point` is the bullet's position, `direction` its normalized travel direction. Returning true
 ## means the body took the bullet: it detonates like any other impact. Returning false lets it fly on,
-## so a body can opt out at runtime (Mirror with `bullet_rotates` off). Mirror implements it today.
+## so a body can opt out at runtime (Mirror with `bullet_rotates` off). Mirror, the bullet target and MeltableBlock implement it
+## (a metal block absorbs the bullet unharmed; an ice or carbon fiber block breaks and consumes it).
 ##
 ## `direction` is set by Cannon right after instancing, before add_child — it does not
 ## need to be normalized. `speed` is an internal tuneable, not exported; the cannon has no

@@ -142,6 +142,9 @@ const PLANNED: Array[StringName] = [
 	&"interactive/dispenser_spawn",     # a block dispenser making a block, at the spawn point
 	&"interactive/dispenser_blocked",   # a rising edge dropped because the spawn area is occupied, at the spawn point
 	&"interactive/dispenser_dissolve",  # the oldest block fading out to make room for a new one (played quietly), at the spawn point
+	&"interactive/carbon_shunt",         # a carbon fiber block kicked or walk-pushed (a light scrape), at the block
+	&"interactive/carbon_break",         # a carbon fiber block shattering under a bullet or a crusher spike, at the block
+	&"interactive/metal_ping",           # a metal block absorbing a cannon bullet, at the bullet
 ]
 
 # Registry, filled by _scan_audio()
