@@ -1,0 +1,13 @@
+https://github.com/cygnuszwaan/objon
+
+Open the above repo, or clone it via your sandbox (network access is enabled).
+
+
+Build session:
+
+Read objon.md and docs/roadmap.md, then build N1.1. Ask me about any open decision first.
+
+
+After testing:
+
+Read objon.md. N1.1 is verified in-editor, complete Stage 2 for N1.1. I'd like you to propose your own concept additions to docs/puzzles.md​ that this item now allows for.

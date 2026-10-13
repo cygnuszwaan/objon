@@ -12,10 +12,10 @@
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_spike_layer.tscn" id="8_7n46g"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="8_y0ep0"]
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_ladder_layer.tscn" id="9_rljw2"]
-[ext_resource type="PackedScene" uid="uid://divuey832521a" path="res://scenes/interactive/mirror.tscn" id="12_rljw2"]
 [ext_resource type="PackedScene" path="res://scenes/traps/freeze/freeze_turret.tscn" id="13_7n46g"]
 [ext_resource type="PackedScene" uid="uid://cpe7wi8c5xsb" path="res://scenes/interactive/basin.tscn" id="15_yjlda"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/button.tscn" id="16_aghq8"]
+[ext_resource type="PackedScene" uid="uid://cc8lsru56yplm" path="res://scenes/traps/laser/laser_turret.tscn" id="17_ujeiy"]
 [ext_resource type="PackedScene" uid="uid://c5wi5y102o0ve" path="res://scenes/interactive/faucet.tscn" id="17_y0ep0"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8dks1"]
@@ -98,7 +98,7 @@ tile_map_data = PackedByteArray("AAAoAB0AAAAAAAAAAAAoABwAAAAAAAAAAAAoABsAAAAAAAA
 tile_set = ExtResource("5_rljw2")
 
 [node name="Catwalks" type="TileMapLayer" parent="Tilemaps" unique_id=639006999 groups=["catwalk"]]
-tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAA=")
+tile_map_data = PackedByteArray("AAAnABsAAAABAAAAAAAoABsAAAACAAAAAAApABsAAAADAAAAAAAUAE0AAAABAAAAAAAVAE0AAAACAAAAAAAWAE0AAAACAAAAAAAXAE0AAAACAAAAAAAYAE0AAAACAAAAAAAZAE0AAAACAAAAAAAaAE0AAAACAAAAAAAbAE0AAAACAAAAAAAcAE0AAAACAAAAAAAdAE0AAAACAAAAAAAeAE0AAAACAAAAAAAfAE0AAAACAAAAAAAgAE0AAAADAAAAAAA=")
 tile_set = SubResource("TileSet_0w3yt")
 
 [node name="PoweredCatwalkLayer" parent="Tilemaps" unique_id=1013901616 instance=ExtResource("7_s474h")]
@@ -110,10 +110,14 @@ tile_set = SubResource("TileSet_0w3yt")
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("6_yjlda")]
 
 [node name="Red" parent="Tilemaps/ConductorLayers" index="0"]
-tile_map_data = PackedByteArray("AAAYAE4AAAAIAAAAAAAZAE4AAAAIAAAAAAAaAE4AAAAIAAAAAAAbAE4AAAAIAAAAAAAcAE4AAAAIAAAAAAAXAE4AAAAGAAAAAAAdAE4AAAAEAAAAAAA=")
+tile_map_data = PackedByteArray("AAAYAE4AAAAIAAAAAAAZAE4AAAAIAAAAAAAaAE4AAAAEAAAAAAAXAE4AAAAGAAAAAAA=")
 
 [node name="Blue" parent="Tilemaps/ConductorLayers" index="3"]
-tile_map_data = PackedByteArray("AAAYAFAAAAAFAAMAAAAYAFEAAAAFAAMAAAAYAFIAAAAFAAMAAAAYAFMAAAAJAAMAAAAZAFMAAAAIAAMAAAAaAFMAAAAIAAMAAAAbAFMAAAAIAAMAAAA=")
+tile_map_data = PackedByteArray("AAAYAFAAAAAFAAEAAAAYAFEAAAAFAAEAAAAYAFIAAAAFAAEAAAAYAFMAAAAJAAEAAAAZAFMAAAAIAAEAAAAaAFMAAAAIAAEAAAAbAFMAAAAIAAEAAAAVAE4AAAAFAAMAAAAVAE0AAAAGAAMAAAAWAE0AAAAIAAMAAAAXAE0AAAAIAAMAAAAYAE0AAAAIAAMAAAAZAE0AAAAIAAMAAAAaAE0AAAAIAAMAAAAbAE0AAAAIAAMAAAAcAE0AAAAIAAMAAAAdAE0AAAAIAAMAAAAeAE0AAAAEAAMAAAAeAE4AAAAFAAMAAAA=")
+
+[node name="Button" parent="Tilemaps/ConductorLayers" unique_id=942149642 instance=ExtResource("16_aghq8")]
+position = Vector2(344, 1272)
+latch_mode = 1
 
 [node name="WaterManager" type="Node2D" parent="." unique_id=1297838409 groups=["water_manager"]]
 script = ExtResource("7_aghq8")
@@ -140,20 +144,13 @@ position = Vector2(328, 1272)
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
 [node name="FreezeTurret" parent="." unique_id=1147850276 instance=ExtResource("13_7n46g")]
-position = Vector2(560, 1272)
-scale = Vector2(-1, 1)
+position = Vector2(488, 1264)
+rotation = 1.5707964
 draw_placeholder = false
-
-[node name="Mirror" parent="." unique_id=1989718227 instance=ExtResource("12_rljw2")]
-position = Vector2(464, 1272)
-toggle_between_aims = true
-aim_0_degrees = 90.0
-aim_1_degrees = 180.0
 
 [node name="WaterBasin" parent="." unique_id=1689376223 instance=ExtResource("15_yjlda")]
 z_index = -1
 position = Vector2(384, 1280)
-liquid_type = 1
 world_tilemap_path = NodePath("../Tilemaps/Ground")
 floor_row_override_enabled = Array[bool]([false, false, false, false, false, false, false, false, false])
 floor_row_overrides = Array[int]([0, 0, 0, 0, 0, 0, 0, 0, 0])
@@ -165,7 +162,7 @@ seabed_floor_rows = Array[float]([80.125, 83.125, 83.125, 83.125, 83.125, 83.125
 spill_column = 0
 
 [node name="Button" parent="." unique_id=763080562 instance=ExtResource("16_aghq8")]
-position = Vector2(376, 1272)
+position = Vector2(368, 1272)
 color = 1
 latch_mode = 1
 
@@ -174,7 +171,12 @@ position = Vector2(448, 1328)
 
 [node name="Button2" parent="." unique_id=2051358522 instance=ExtResource("16_aghq8")]
 position = Vector2(392, 1272)
+color = 2
 latch_mode = 1
+
+[node name="LaserTurret" parent="." unique_id=81752479 instance=ExtResource("17_ujeiy")]
+position = Vector2(424, 1264)
+rotation = 1.5707964
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

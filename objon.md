@@ -89,7 +89,7 @@ Callers test with `has_method()` or a group, never a class name. Implementers li
 | `get_surf_friction_scale() -> float` | IceBlock (or a tile's `surf_friction` data) | the surf's floor probe | `player-surf.md` (Surface friction) |
 | `get_load_weight() -> float` | Grunt, Drillbot, Stingbot, Tread crawler, Proximity mine (0 while dying or off the floor) | Weight plate, see-saw (through group `"enemy"`) | `enemies.md` (Enemy weight) |
 | `get_surf_speed()` | Player (public getter) | the bowl threshold, the speed trap | `player-surf.md` |
-| `is_slippery() -> bool` | IceBlock | the player's floor probe | `player.md` (Slippery floors) |
+| `is_slippery() -> bool` | IceBlock, a basin's frozen crust (`CrustBody`) | the player's floor probe | `player.md` (Slippery floors) |
 | `get_conveyor_speed()` | Conveyor belt | the player's `_conveyor_push_speed()` | `platforms-conveyors.md` |
 | `is_hangable()` | MeltableBlock, RotatingBody | the player's grab, asked at the grab and every frame of the hang | `player.md` (Ledge hang) |
 | `on_laser_hit(point, direction)` | Laser receiver, MeltableBlock, a basin's crust body (`WaterBasin.CrustBody`: a frozen crust heats toward a thaw) | the laser turret's beam | `lasers-arcs-mirrors.md`, `liquid-system.md` (Frozen crust) |

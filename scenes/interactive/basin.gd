@@ -233,10 +233,13 @@ const CRUST_COLOR := Color(0.35, 0.32, 0.3, 1.0)
 	# same as BODY_COLOR_BY_TYPE above.
 
 # --- Frozen crust (the freeze ray, roadmap N3.2) ---------------------------------------------------
-const FROZEN_CRUST_SKIN_PATH := "res://sprites/liquids/spsh_freezing.png"
-	# Cooling art of a FROZEN crust: the same frames as the slag/water crust art in another palette (liquid blue to pale
-	# ice), read through the same LiquidSkin fringe cut. Used for both liquids. A missing file falls back to the liquid's
-	# own crust art, and with none at all to FROZEN_CRUST_COLOR.
+const FROZEN_CRUST_SKIN_PATH_BY_TYPE := {
+	LiquidConstants.LiquidType.WATER: "res://sprites/liquids/spsh_freezing.png",
+	LiquidConstants.LiquidType.SLAG: "res://sprites/liquids/spsh_freezing_steel.png",
+}
+	# Cooling art of a FROZEN crust, per liquid so each can start from its own colour: the same frames as the crust art in
+	# another palette (water: liquid blue to pale ice; slag: molten glow to pale ice), read through the same LiquidSkin
+	# fringe cut. A liquid whose file is missing falls back to its own crust art, and with none at all to FROZEN_CRUST_COLOR.
 const FROZEN_CRUST_COLOR := Color(0.62, 0.82, 0.95, 1.0)
 const FROST_DECAY_PER_SEC := 1.0
 	# Seconds of frost (freeze ray) or heat (laser on a frozen crust) lost per second once the beam has left. Frost builds
@@ -245,7 +248,8 @@ const BEAM_GRACE_FRAMES := 2
 	# A beam hit this many physics frames ago or less still counts as on (the laser receiver's LIT_FRAMES), so the order the
 	# turret and this basin are processed in never matters.
 const THAW_GRACE_FRAMES := 4
-	# A temporary frozen crust (frozen slag, LiquidProfile.frozen_is_temporary) thaws once this many physics frames have
+	# A frozen crust that is still held (frozen slag, LiquidProfile.frozen_is_temporary, or any crust that has not reached its
+	# final cooling frame: see is_temporary_frozen()) starts to thaw once this many physics frames have
 	# passed since a freeze beam last ended on it (or since it formed, while the beam is first finding the new collision):
 	# long enough that the order the turret and this basin run in never matters, short enough to read as "as soon as".
 const FROZEN_STAND_TOLERANCE := 3.0
@@ -613,10 +617,13 @@ var _ripple_strip_wet := PackedByteArray()
 	# the liquid currently covers. Ripples travel only through wet strips, so a dry hump reflects them.
 static var _skins: Dictionary = {}        # LiquidType -> LiquidSkin, only for types whose art file exists
 static var _crust_skins: Dictionary = {}  # LiquidType -> LiquidSkin
-static var _frozen_crust_skin: LiquidSkin = null  # the frozen crust's art, shared by both liquids; null if its file is missing
+static var _frozen_crust_skins: Dictionary = {}  # LiquidType -> LiquidSkin; a liquid whose frozen art file is missing has no entry
 static var _skins_loaded: bool = false
 var _skin_time: float = 0.0       # seconds on the liquid skin's animation clock
 var _skin_frame: int = 0
+var _thaw_by_heat: bool = false  # runtime only: the current thaw was started by a laser (melt_time reached) and lasts only while the laser stays on the crust
+var _beam_exempt: bool = false  # runtime only: this crust's cooling was resumed after the laser left, so it finishes cooling without a freeze beam (cleared by thaw(), convert_to_crust(), load_state())
+var _thawing: bool = false  # runtime only: a temporary frozen crust has lost its beam and is playing its cooling frames backwards (_crust_cool_t falls toward 0); it stays solid until it gets there
 var _crust_cool_t: float = INF    # seconds since this crust formed; INF = fully cooled (also what a restore sets)
 var _ripple_live: bool = false  # true while any ripple exists; _process runs while this or a skin/crust animation needs it
 var _ripple_moving: bool = false
@@ -711,6 +718,9 @@ func load_state(d: Dictionary) -> void:
 	_electrified_left = 0.0
 	_release_embedded()
 	fill_volume = clampf(d.get("fill_volume", 0.0), 0.0, _max_fill_volume())
+	_thawing = false
+	_thaw_by_heat = false
+	_beam_exempt = false
 	_crust_cool_t = INF  # a restored crust is already cold: no cooling replay
 	_surface_vy_frame = -1000  # the surface jumped: restart the surface-speed estimate
 	_rebuild_crust_collision()
@@ -727,6 +737,10 @@ class CrustBody extends StaticBody2D:
 	func on_freeze_hit(_point: Vector2, _direction: Vector2) -> void:
 		if basin != null and is_instance_valid(basin) and basin.has_method(&"on_crust_freeze_hit"):
 			basin.on_crust_freeze_hit()
+	# Floor contract read by player.gd's _floor_is_slippery() (as IceBlock answers it): a FROZEN crust is ice-slick underfoot,
+	# a reaction crust is ordinary ground. Stays true while a temporary crust thaws, since it is solid until the thaw ends.
+	func is_slippery() -> bool:
+		return basin != null and is_instance_valid(basin) and basin.has_method(&"is_frozen_crust") and basin.is_frozen_crust()
 
 func _ensure_crust_body() -> void:
 	# One StaticBody2D + CollisionPolygon2D pair, created once here and reused for this basin's whole
@@ -1158,28 +1172,56 @@ func freeze() -> bool:
 	return true
 
 ## The laser's contact with a frozen crust, forwarded by the crust body (CrustBody.on_laser_hit(), once per physics frame
-## the beam ends on it). Builds heat; at `melt_time` the whole crust thaws. A reaction crust ignores it (and the beam just
-## stops on it, as always).
+## the beam ends on it). Builds heat; at `melt_time` the crust starts to thaw: its cooling frames play backwards and it
+## becomes liquid (non-solid) only when they reach the first frame (_begin_thaw()). The thaw lasts only while the laser stays
+## on the crust: once it has left for BEAM_GRACE_FRAMES the thaw is interrupted and the cooling resumes forward from the same
+## frame (see _physics_process()); a freeze beam arriving on the crust interrupts it too. A reaction crust ignores the laser
+## (and the beam just stops on it, as always).
 func on_crust_laser_hit() -> void:
 	if not is_frozen_crust():
 		return
 	_heat_hit_frame = Engine.get_physics_frames()
-	_heat += get_physics_process_delta_time()
+	_heat = minf(_heat + get_physics_process_delta_time(), melt_time)  # capped: it decays from melt_time once the laser leaves
 	_update_physics_state()
-	if _heat >= melt_time:
-		thaw()
+	if _heat >= melt_time and not _thawing:
+		_begin_thaw(true)
 
-## True while a FROZEN crust that needs the beam to hold it is on this basin: the liquid's profile says its frozen crust is
-## temporary (slag). Frozen water is not: it stays until a laser melts it.
+## True while a FROZEN crust still needs the freeze beam to hold it: its liquid's profile says the freeze is temporary (slag:
+## held for as long as the beam stays), or it has not yet reached its final cooling frame (any liquid: an interrupted freeze
+## reverses). The final frame is reached once the cooling clock has run out AND no player is embedded in the crust (an
+## embedded player holds the animation on the frame before it, see _crust_frame()). A settled frozen water crust is not held:
+## it stays until a laser melts it. A crust whose cooling was resumed after a laser interrupted its thaw is exempt (it was
+## already formed and is not waiting on a beam) unless its liquid's freeze is temporary.
 func is_temporary_frozen() -> bool:
-	return is_frozen_crust() and LiquidConstants.profile(liquid_type).frozen_is_temporary
+	if not is_frozen_crust():
+		return false
+	return LiquidConstants.profile(liquid_type).frozen_is_temporary or (not _beam_exempt and (_embedded or _crust_cool_t < CRUST_COOL_TIME))
 
 ## The freeze ray's contact with a frozen crust, forwarded by the crust body (CrustBody.on_freeze_hit(), once per physics
 ## frame the beam ends on it). A temporary frozen crust is held for as long as this keeps arriving and thaws
-## THAW_GRACE_FRAMES frames after it stops (see _physics_process()); any other crust ignores it.
+## THAW_GRACE_FRAMES frames after it stops (see _physics_process()); a settled crust ignores it, except that it turns a
+## thaw in progress (whatever started it, beam loss or laser) back to cooling.
 func on_crust_freeze_hit() -> void:
-	if is_temporary_frozen():
-		_freeze_hold_frame = Engine.get_physics_frames()
+	if not is_frozen_crust():
+		return
+	_freeze_hold_frame = Engine.get_physics_frames()
+	if _thawing:
+		_thawing = false  # the beam is back: the cooling resumes forward from the frame the thaw had reached
+		_thaw_by_heat = false
+		_heat = 0.0  # a laser melt it was answering starts over
+		_update_physics_state()
+		_update_process_state()
+
+## Starts a frozen crust's thaw (it lost its holding beam, or a laser melted it): the cooling clock runs backwards from
+## wherever it stands (a crust that had gone fully cold starts from the last frame; one still freezing, or held back by an
+## embedded player, from the frame it had reached) and the crust stays solid until it reaches the first frame, when
+## _advance_skin() calls thaw(). A freeze hit in the meantime turns the clock forward again (on_crust_freeze_hit()).
+func _begin_thaw(by_heat: bool = false) -> void:
+	_thawing = true
+	_thaw_by_heat = by_heat
+	_crust_cool_t = minf(_crust_cool_t, CRUST_COOL_TIME)
+	_update_physics_state()
+	_update_process_state()
 
 ## Reverses a frozen crust: the crust and its collision are removed and the band of liquid it held is returned (clamped
 ## to capacity), so the basin is an ordinary crust-free basin again. No steam, no particles. Only a frozen crust thaws;
@@ -1190,6 +1232,9 @@ func thaw() -> bool:
 	var band := crust_volume  # before the faces stop counting
 	has_crust = false
 	crust_frozen = false
+	_thawing = false
+	_thaw_by_heat = false
+	_beam_exempt = false
 	fill_volume = minf(fill_volume + band, _max_fill_volume())
 	_crust_cool_t = INF
 	_frost = 0.0
@@ -1302,7 +1347,7 @@ func _poll_electric_crust() -> void:
 func _needs_physics() -> bool:
 	if Engine.is_editor_hint():
 		return false
-	return _frost > 0.0 or _heat > 0.0 or _embedded or is_temporary_frozen() or (is_frozen_crust() and _electrified_left > 0.0)
+	return _frost > 0.0 or _heat > 0.0 or _embedded or _thawing or is_temporary_frozen() or (is_frozen_crust() and _electrified_left > 0.0)
 
 func _update_physics_state() -> void:
 	set_physics_process(_needs_physics())
@@ -1317,8 +1362,15 @@ func _physics_process(delta: float) -> void:
 		_tick_embedded(delta)
 	if is_frozen_crust() and _electrified_left > 0.0:
 		_poll_electric_crust()
-	if is_temporary_frozen() and frames - _freeze_hold_frame > THAW_GRACE_FRAMES:
-		thaw()  # no freeze beam has ended on the crust for a moment: it lets go (frozen slag is molten slag again)
+	if _thawing and _thaw_by_heat and frames - _heat_hit_frame > BEAM_GRACE_FRAMES:
+		# The laser that was melting the crust has left: the thaw is interrupted and the cooling resumes forward from the
+		# frame it had reached, finishing without a freeze beam. The heat decays from melt_time as usual.
+		_thawing = false
+		_thaw_by_heat = false
+		_beam_exempt = true
+		_update_process_state()
+	if is_temporary_frozen() and not _thawing and frames - _freeze_hold_frame > THAW_GRACE_FRAMES:
+		_begin_thaw()  # no freeze beam has ended on the crust for a moment: it lets go, playing its freeze backwards
 	if not _needs_physics():
 		set_physics_process(false)
 
@@ -1711,6 +1763,9 @@ func convert_to_crust(_amount: float = 0.0) -> float:
 	crust_top_row = top_row
 	crust_bottom_row = get_liquid_surface_row()
 	_crust_cool_t = 0.0  # the new crust plays its cooling frames
+	_thawing = false
+	_thaw_by_heat = false
+	_beam_exempt = false
 	queue_redraw()
 	_rebuild_crust_collision()
 	_lift_blocks_onto_crust()
@@ -2128,8 +2183,9 @@ func _seabed_world_y(local_col: int) -> float:
 
 func _load_skins() -> void:
 	_skins_loaded = true
-	if ResourceLoader.exists(FROZEN_CRUST_SKIN_PATH):
-		_frozen_crust_skin = LiquidSkin.new(load(FROZEN_CRUST_SKIN_PATH) as Texture2D, 0.0, true)  # fringe cut: see LiquidSkin
+	for type in FROZEN_CRUST_SKIN_PATH_BY_TYPE:
+		if ResourceLoader.exists(FROZEN_CRUST_SKIN_PATH_BY_TYPE[type]):
+			_frozen_crust_skins[type] = LiquidSkin.new(load(FROZEN_CRUST_SKIN_PATH_BY_TYPE[type]) as Texture2D, 0.0, true)  # fringe cut: see LiquidSkin
 	for type in SKIN_BY_TYPE:
 		var entry: Dictionary = SKIN_BY_TYPE[type]
 		if ResourceLoader.exists(entry["path"]):
@@ -2153,8 +2209,8 @@ func _crust_skin_art() -> LiquidSkin:
 		return null
 	if not _skins_loaded:
 		_load_skins()
-	if crust_frozen and _frozen_crust_skin != null:
-		return _frozen_crust_skin
+	if crust_frozen and _frozen_crust_skins.has(liquid_type):
+		return _frozen_crust_skins[liquid_type]
 	return _crust_skins.get(liquid_type, _crust_skins.get(LiquidConstants.LiquidType.SLAG))
 
 func _crust_frame(skin: LiquidSkin) -> int:
@@ -2179,7 +2235,7 @@ func _needs_process() -> bool:
 		return false
 	if _ripple_live or _electrified_left > 0.0:
 		return true
-	if has_crust and _crust_cool_t < CRUST_COOL_TIME and _crust_skin_art() != null:
+	if has_crust and (_thawing or (_crust_cool_t < CRUST_COOL_TIME and _crust_skin_art() != null)):
 		return true
 	var skin := _liquid_skin()
 	return skin != null and skin.fps > 0.0 and fill_volume > 0.0 and not _liquid_hidden_by_crust()
@@ -2198,7 +2254,16 @@ func _advance_skin(delta: float) -> bool:
 			_skin_frame = frame
 			changed = true
 	var crust_skin := _crust_skin_art()
-	if has_crust and crust_skin != null and _crust_cool_t < CRUST_COOL_TIME:
+	if has_crust and _thawing:
+		# A thawing crust plays the cooling frames backwards at the same speed and is removed (solid until now) on reaching 0.
+		var before_t := _crust_frame(crust_skin) if crust_skin != null else 0
+		_crust_cool_t = maxf(_crust_cool_t - delta, 0.0)
+		if _crust_cool_t <= 0.0:
+			thaw()  # clears _thawing, redraws and updates the process state
+			return false
+		if crust_skin != null and _crust_frame(crust_skin) != before_t:
+			changed = true
+	elif has_crust and crust_skin != null and _crust_cool_t < CRUST_COOL_TIME:
 		var before := _crust_frame(crust_skin)
 		_crust_cool_t += delta
 		if _crust_frame(crust_skin) != before:
