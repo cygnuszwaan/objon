@@ -17,7 +17,7 @@
 [ext_resource type="PackedScene" path="res://scenes/interactive/button.tscn" id="16_aghq8"]
 [ext_resource type="PackedScene" uid="uid://cc8lsru56yplm" path="res://scenes/traps/laser/laser_turret.tscn" id="17_ujeiy"]
 [ext_resource type="PackedScene" uid="uid://c5wi5y102o0ve" path="res://scenes/interactive/faucet.tscn" id="17_y0ep0"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/carbon_fiber_block.tscn" id="18_ujeiy"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/seesaw.tscn" id="18_ujeiy"]
 
 [sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_8dks1"]
 texture = ExtResource("6_dyh2t")
@@ -179,10 +179,6 @@ latch_mode = 1
 position = Vector2(424, 1248)
 rotation = 1.5707964
 
-[node name="CarbonFiberBlock" parent="." unique_id=633922248 instance=ExtResource("18_ujeiy")]
-position = Vector2(616, 1216)
-size_tiles = Vector2i(2, 1)
-
 [node name="WaterBasin2" parent="." unique_id=1692332547 instance=ExtResource("15_yjlda")]
 z_index = -1
 position = Vector2(560, 1280)
@@ -195,6 +191,16 @@ resolved_width_tiles = 7
 floor_rows = Array[float]([80.125, 83.125, 83.125, 83.125, 83.125, 83.125, 80.125])
 seabed_floor_rows = Array[float]([80.125, 83.125, 83.125, 83.125, 83.125, 83.125, 80.125])
 spill_column = 0
+
+[node name="Seesaw" parent="." unique_id=205998762 instance=ExtResource("18_ujeiy")]
+position = Vector2(672, 1152)
+length_tiles = 10.5
+inertia = 50.0
+damping = 0.2
+friction_torque = 1.0
+restoring_torque = 0.0
+free_rotation = true
+steam_torque_scale = 0.2
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

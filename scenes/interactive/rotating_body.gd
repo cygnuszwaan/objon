@@ -38,7 +38,7 @@ extends AnimatableBody2D
 # in mid-air. Loads stack: whatever rests on a block that rests on this body (a player on a block, a block on a
 # block, up to MAX_STACK_DEPTH levels) is counted too, at its own x (a block or an enemy can carry a stack).
 # Torque = weight x (load x - pivot x), positive = clockwise on screen (the same sign as the angle): standing right of the pivot pushes the right side down.
-# `get_net_torque()` (loads + resting liquid; `get_load_torque()` and `get_liquid_torque()` are its two parts) and
+# `get_net_torque()` (loads + resting liquid + steam push; `get_load_torque()`, `get_liquid_torque()` and `get_steam_torque()` are its parts) and
 # `get_loads()` are what the dynamics read. `debug_draw` (or `debug_toggle_key`
 # at runtime) draws the pivot, every load's lever arm, weight and torque, and the net torque as an arc, in world
 # space; in the editor it draws just the pivot so the Fulcrum can be placed.
@@ -113,6 +113,10 @@ extends AnimatableBody2D
 ## Multiplies every enemy's `get_load_weight()` (a landed enemy standing on the body). 0 = enemies are ignored, so an
 ## existing see-saw is unchanged; 1 = they weigh what they are authored to.
 @export_range(0.0, 10.0, 0.1, "or_greater") var enemy_weight_scale: float = 0.0
+## Scales the upward push of steam dying on the body's underside (WaterManager sums and smooths it; roadmap N3.5). 0 = steam
+## does not tip it, so an existing see-saw is unchanged; 1 = a full boil column under the tip of a 2-tile plank lifts it
+## with a torque of about 45 (more than the player's weight at the tip, less than a metal block's).
+@export_range(0.0, 10.0, 0.1, "or_greater") var steam_torque_scale: float = 0.0
 @export_group("Hang")
 ## Whether the player can ledge-grab this body's ends. Off = never joins "ground", so it is a plain solid.
 @export var hangable: bool = true
@@ -177,6 +181,7 @@ var _pivot_parent: Vector2  # pivot in the parent's space, fixed for the life of
 var _loads: Array[Dictionary] = []  # this frame's loads: {body, id (its instance id, still readable after the body is freed), weight, offset, torque, position}
 var _net_torque: float = 0.0  # sum of the loads' torques about the pivot, positive = clockwise
 var _liquid_torque: float = 0.0  # torque of the liquid resting on the body this frame, from WaterManager (already scaled by `liquid_weight_scale`)
+var _steam_torque: float = 0.0  # torque of the steam pushing the body's underside this frame, from WaterManager (already scaled by `steam_torque_scale`; negative = lifts the right end)
 var _water_manager: Node  # found lazily through the "water_manager" group; null in a level without one
 var _creak  # Audio.LoopPlayer (untyped: this is a @tool script and the Audio autoload isn't), or null with no creak sound
 var _creak_base_db: float = 0.0  # the loop's volume at full level, including Audio's per-id tuning
@@ -267,13 +272,17 @@ func _physics_process(delta: float) -> void:
 		_overlay.queue_redraw()
 
 ## Asks WaterManager for the torque of the liquid resting on this body this frame (it runs earlier in the frame, so
-## this frame's value, not last frame's). No manager in the level, or no liquid on the body, is 0.
+## this frame's value, not last frame's), and, with `steam_torque_scale` above 0, the smoothed push of steam dying on its
+## underside. No manager in the level, or nothing on the body, is 0.
 func _read_liquid_torque() -> void:
 	if _water_manager == null or not is_instance_valid(_water_manager):
 		_water_manager = get_tree().get_first_node_in_group("water_manager")
 	_liquid_torque = 0.0
+	_steam_torque = 0.0
 	if _water_manager != null and _water_manager.has_method("get_resting_torque"):
 		_liquid_torque = float(_water_manager.call("get_resting_torque", self)) * liquid_weight_scale
+	if steam_torque_scale > 0.0 and _water_manager != null and _water_manager.has_method("get_steam_torque"):
+		_steam_torque = float(_water_manager.call("get_steam_torque", self)) * steam_torque_scale
 
 # --- audio (step 3.2) -------------------------------------------------------------------------------------
 
@@ -339,6 +348,7 @@ func load_state(d: Dictionary) -> void:
 	_launched_frame.clear()
 	_net_torque = 0.0
 	_liquid_torque = 0.0
+	_steam_torque = 0.0
 	_apply_angle()
 	_teleport_physics_body()
 	_reset_interpolation_tree(self)
@@ -419,7 +429,7 @@ func is_hangable() -> bool:
 func _integrate_dynamics(delta: float) -> void:
 	_read_liquid_torque()
 	var motor := get_motor_torque()
-	var torque := _net_torque + _liquid_torque + motor + _get_extra_torque()
+	var torque := _net_torque + _liquid_torque + _steam_torque + motor + _get_extra_torque()
 	if not free_rotation and motor == 0.0:
 		torque -= restoring_torque * _angle  # suspended while the motor runs: it would stop the swing short of the stops
 	_drive_torque = torque
@@ -462,9 +472,9 @@ func get_pivot_global() -> Vector2:
 	return parent.to_global(_pivot_parent) if parent != null else _pivot_parent
 
 ## Net torque of everything on the body about the pivot, positive = clockwise on screen: the riders' loads plus the
-## liquid resting on it (the dynamics add the motor and the spring).
+## liquid resting on it and the steam pushing its underside (the dynamics add the motor and the spring).
 func get_net_torque() -> float:
-	return _net_torque + _liquid_torque
+	return _net_torque + _liquid_torque + _steam_torque
 
 ## The riders' (player, blocks) share of get_net_torque().
 func get_load_torque() -> float:
@@ -473,6 +483,11 @@ func get_load_torque() -> float:
 ## The resting liquid's share of get_net_torque().
 func get_liquid_torque() -> float:
 	return _liquid_torque
+
+## The steam's share of get_net_torque(): the smoothed upward push on the underside, already scaled by
+## `steam_torque_scale` (negative lifts the right end, positive the left).
+func get_steam_torque() -> float:
+	return _steam_torque
 
 ## This frame's loads, one Dictionary each: `body` (the player or a MeltableBlock), `weight`, `offset` (its x minus the
 ## pivot's x, px), `torque` (weight x offset) and `position` (its world position). Includes loads stacked on blocks.
@@ -788,6 +803,9 @@ class TorqueOverlay extends Node2D:
 		if absf(liquid) > 0.05:  # the resting liquid's share of the net, on its own line
 			var liquid_color := CLOCKWISE if liquid >= 0.0 else COUNTER
 			draw_string(font, pivot + Vector2(-18.0, radius + 16.0), "liquid T%+.0f  (loads T%+.0f)" % [liquid, body.get_load_torque()], HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, liquid_color)
+		var steam := body.get_steam_torque()
+		if absf(steam) > 0.05:  # the steam's share of the net, on its own line
+			draw_string(font, pivot + Vector2(-18.0, radius + 30.0), "steam T%+.0f" % steam, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, CLOCKWISE if steam >= 0.0 else COUNTER)
 		var motor := body.get_motor_torque()
 		if motor != 0.0:
 			draw_string(font, pivot + Vector2(-18.0, radius + 23.0), "motor T%+.0f" % motor, HORIZONTAL_ALIGNMENT_LEFT, -1, FONT_SIZE, CLOCKWISE if motor >= 0.0 else COUNTER)

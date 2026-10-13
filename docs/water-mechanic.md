@@ -394,7 +394,7 @@ sawwheel.gd/crusher.gd already use, relying on `take_hit()`'s own i-frames rathe
 this end. `STEAM` particles (`is_gas` in their profile) skip collision/absorb/push/hazard entirely
 via a small `_step_gas_particle()` branch early in the main loop — they just drift on their spawn
 velocity (`spawn_steam_puff()` gives each one a random upward-biased direction) until a short
-type-specific lifetime removes them; this is a decorative effect, not a simulated liquid.
+type-specific lifetime removes them; this is a decorative effect, not a simulated liquid. A steam particle's death on a body with a pivot is also its upward push (N3.5): read Steam push in `liquid-system.md` before changing the death path.
 
 **`basin.gd`**: `@export var liquid_type` is only the STARTING type — for a basin authored pre-filled
 (`initial_fill_depth_below_surface` > 0) or meant to stay a fixed type. A basin that's actually empty at

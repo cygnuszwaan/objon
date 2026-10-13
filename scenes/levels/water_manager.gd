@@ -339,6 +339,17 @@ var _resting_torque: Dictionary = {}
 	# screen, the same units and sign as a rider's torque). Rebuilt from scratch every frame like _solid_motion;
 	# read through get_resting_torque(). A body without a pivot (a platform, crusher) is never entered.
 
+var _steam_arrivals: Dictionary = {}
+	# Node2D (a registered solid with get_pivot_global()) -> the summed torque of the steam particles that died on its
+	# underside THIS physics frame (negative = counter-clockwise, an upward push right of the pivot). Cleared at the top
+	# of every frame, folded into _steam_push at the end of the particle loop. Roadmap N3.5.
+var _steam_push: Dictionary = {}
+	# Node2D -> Array[Vector2], one entry per frame that had an arrival: x = age in seconds, y = that frame's summed
+	# torque. A body's steam torque is the sum of y * (1 - x / STEAM_PUSH_DECAY_TIME) over its live entries, so every
+	# arrival is a ramp that starts at full value and falls linearly to nothing, and the ramps ADD (a denser column
+	# pushes harder). Kept apart from _resting_torque so liquid load and steam push do not share a clock. Runtime only,
+	# never saved; forget_motion() drops a body's entries.
+
 var _push_total: Vector2 = Vector2.ZERO
 	# Phase 4.1: this frame's summed push contribution, read by player.gd's _water_push_speed() via
 	# get_player_push() below. Reset to zero at the top of every _physics_process() and rebuilt from
@@ -549,6 +560,8 @@ func _physics_process(delta: float) -> void:
 	_push_total = Vector2.ZERO
 	_push_max_speed = 0.0
 	_resting_torque.clear()
+	_steam_arrivals.clear()
+	_age_steam_push(delta)  # before the early-out below, so a body's old steam fades even in a level with no tilemap
 		# Reset before the early-outs below, not after — either one skips the per-particle loop
 		# entirely for this frame, and a stale nonzero total from some earlier frame must never leak
 		# through to player.gd's next get_player_push() call.
@@ -598,6 +611,7 @@ func _physics_process(delta: float) -> void:
 			_step_particle_physics(i, delta, space_state, half_particle)
 		_accumulate_resting_torque(i)
 		i += 1
+	_fold_steam_arrivals()  # this frame's arrivals enter the history at age 0, so a reader sees them at full value
 	# Two independent ceilings on the final push magnitude, tightest wins: LiquidConstants.PUSH_CAP is
 	# the absolute outer bound regardless of what's contributing (see its own comment);
 	# _push_max_speed keeps the player from ever being pushed faster than the fastest particle
@@ -625,7 +639,12 @@ func _step_gas_particle(i: int, delta: float, space_state: PhysicsDirectSpaceSta
 	if hit.is_empty():
 		return false
 	var collider: Object = hit.collider
-	return collider == _world_tilemap or collider in _registered_solids
+	if collider == _world_tilemap:
+		return true
+	if collider in _registered_solids:
+		_note_steam_arrival(collider, hit.normal, _velocity[i], _position[i].x)  # N3.5: the death is also a push
+		return true
+	return false
 
 func _accumulate_resting_torque(i: int) -> void:
 	# Rotating-bodies roadmap 2.2: a particle resting on a registered body that has a pivot (a RotatingBody, duck-typed
@@ -642,6 +661,63 @@ func _accumulate_resting_torque(i: int) -> void:
 	var pivot: Vector2 = body.call("get_pivot_global")
 	_resting_torque[body] = float(_resting_torque.get(body, 0.0)) + weight * (_position[i].x - pivot.x)
 
+const STEAM_TORQUE_PER_PARTICLE := 1.17
+	# Torque a dying steam particle adds per pixel of its horizontal lever arm from the pivot (so a particle at 16 px
+	# adds about 19, one at 8 px about 9), before the body's steam_torque_scale. Calibrated against the default
+	# boil: a boilable pool at BOIL_STEAM_VOLUME_PER_SEC (1 tile/s, so 16 particles/s) with its whole column
+	# arriving at the tip of a 2-tile plank (16 px) settles at 16 x 16 x 1.17 x (STEAM_PUSH_DECAY_TIME / 2) = about 45,
+	# more than the player's weight at the tip (2 x 16 = 32) and less than a 1x1 metal block's (4 x 16 = 64). One
+	# puff does almost nothing; the number is the arrival rate times the lever arm. Roadmap N3.5; tune by feel.
+const STEAM_PUSH_DECAY_TIME := 0.3
+	# s over which one arrival's push falls linearly from full to nothing (the same time as STEAM_LIFT_DECAY_TIME).
+const STEAM_PUSH_FACE_DOT := -0.5
+	# A steam particle pushes only if the surface it died on faces it: the hit normal's dot with the particle's
+	# direction of travel must be at or below this (-0.5 = within 60 degrees of head-on). The underside of a plank
+	# at its 25 degree stop reads about -0.9; an end face reads about 0, and does not count.
+
+## Roadmap N3.5: called when a steam particle dies on a registered solid. A body with a pivot (a RotatingBody) whose
+## struck face opposes the particle's motion (only the underside of a plank) receives an UPWARD push: STEAM_TORQUE_PER_
+## PARTICLE x the particle's horizontal offset from the pivot, with the sign of an upward push at that lever arm
+## (counter-clockwise right of the pivot, clockwise left of it). Anything else, a platform or the world tilemap, is
+## ignored. A ray that starts inside a body reports a zero normal and is ignored too.
+func _note_steam_arrival(body: Object, normal: Vector2, velocity: Vector2, x: float) -> void:
+	if not body.has_method("get_pivot_global") or velocity.length_squared() < 0.0001:
+		return
+	if normal.dot(velocity.normalized()) > STEAM_PUSH_FACE_DOT:
+		return
+	var pivot: Vector2 = body.call("get_pivot_global")
+	_steam_arrivals[body] = float(_steam_arrivals.get(body, 0.0)) - STEAM_TORQUE_PER_PARTICLE * (x - pivot.x)
+
+func _age_steam_push(delta: float) -> void:
+	for body in _steam_push.keys():
+		if not is_instance_valid(body):
+			_steam_push.erase(body)
+			continue
+		var kept: Array[Vector2] = []
+		for entry: Vector2 in _steam_push[body]:
+			if entry.x + delta < STEAM_PUSH_DECAY_TIME:
+				kept.append(Vector2(entry.x + delta, entry.y))
+		if kept.is_empty():
+			_steam_push.erase(body)
+		else:
+			_steam_push[body] = kept
+
+func _fold_steam_arrivals() -> void:
+	for body in _steam_arrivals:
+		var entries: Array[Vector2] = _steam_push.get(body, [] as Array[Vector2])
+		entries.append(Vector2(0.0, float(_steam_arrivals[body])))
+		_steam_push[body] = entries
+
+## Roadmap N3.5: the torque, about its pivot (positive = clockwise on screen, so an upward push on the right end is
+## negative), of the steam that has died on `body`'s underside within the last STEAM_PUSH_DECAY_TIME: the sum of every
+## arrival's ramp, so it rises at once and a denser column reads higher. 0.0 for a body steam has not touched.
+## RotatingBody scales it by `steam_torque_scale`.
+func get_steam_torque(body: Node2D) -> float:
+	var total := 0.0
+	for entry: Vector2 in _steam_push.get(body, [] as Array[Vector2]):
+		total += entry.y * (1.0 - entry.x / STEAM_PUSH_DECAY_TIME)
+	return total
+
 ## Torque about its pivot (positive = clockwise on screen) of the liquid resting on `body` this physics frame, in the
 ## same units as a rider's torque; 0.0 for a body with nothing on it or no pivot. RotatingBody adds it to its net torque.
 func get_resting_torque(body: Node2D) -> float:
@@ -656,6 +732,7 @@ func forget_motion(body: Node2D) -> void:
 	if index >= 0:
 		_registered_solid_prev_xform[index] = body.global_transform
 	_solid_motion.erase(body)
+	_steam_push.erase(body)  # N3.5: a restored plank comes back level and the column rebuilds
 
 func _update_solid_motions() -> void:
 	# Phase 9.2: rebuilt from scratch every physics frame, before the particle loop reads it. A freed
