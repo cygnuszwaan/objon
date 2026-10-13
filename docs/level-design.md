@@ -2,7 +2,7 @@
 
 A designer's view of the game as it stands: every verb, surface, object and interaction, with the numbers and gotchas that matter when laying out a level. It is a summary: the topic files hold the detail and the reasoning, and where this file and the code disagree, the code wins. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first. The puzzle patterns built from these pieces are in a separate file.
 
-Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms, belts, pads, rails, barriers, powered bridges and ladders; Rotating bodies: see-saw and swing; Blocks: ice and metal; Liquids: water, slag, steam; Beams and projectiles: laser, arc, cannon, mirror; Hazards; Enemies; Power: sources, wiring, devices; Collectibles, checkpoints, finish); Interaction matrix; Gaps, limits and gotchas
+Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms, belts, pads, rails, barriers, powered bridges and ladders; Rotating bodies: see-saw and swing; Blocks: ice, metal and carbon fiber; Liquids: water, slag, steam; Beams and projectiles: laser, arc, cannon, mirror; Hazards; Enemies; Power: sources, wiring, devices; Collectibles, checkpoints, finish); Interaction matrix; Gaps, limits and gotchas
 
 **Units.** 1 tile = 16 px. The camera shows 512×288 px, which is **32×18 tiles**. Speeds are px/s; a walk is 150 px/s (about 9.4 tiles/s). Numbers are the documented defaults and may have been retuned.
 
@@ -10,9 +10,9 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 
 | Verb | How | Notes for design |
 |---|---|---|
-| Walk / jump | left/right, jump | Coyote time and jump buffering. Small step-downs are walked down, not fallen off. |
+| Walk / jump | left/right, jump | Coyote time and jump buffering. Small step-downs are walked down, not fallen off. Walking into a **carbon fiber block** pushes it (see Blocks); every other body in the world stops you. |
 | Crouch / sneak | down; down + left/right | Crouch collider is shorter (fits low gaps). **Sneak** creeps at 50 px/s. Crouching on a button presses/cycles it. |
-| Kick | kick | Hits enemies (`take_damage`), turns mirrors, shoves ice/metal blocks, boots mines. Ground kick roots you; **air kick** doesn't, and cancels upward speed (never slows a fall). No dash, no dodge. |
+| Kick | kick | Hits enemies (`take_damage`), turns mirrors, shoves blocks, boots mines. Ground kick roots you; **air kick** doesn't, and cancels upward speed (never slows a fall). No dash, no dodge. |
 | Ladder | up/down at a ladder tile | Ladders are their own tile layer, sharing a cell with the catwalk they pass through. |
 | Ledge hang + mantle | airborne beside a ledge | Works on ground, glass, catwalk tiles and on bodies in group `ground` (doors, blocks, see-saw ends, moving/drop platforms). **Not** on conveyors, button pedestals, receivers, barriers. |
 | Catwalk underside hang | jump up into a catwalk, or crouch + jump while standing on one | Left/right **brachiates** hand-over-hand. Jump goes up through the catwalk. Blocked by terrain. Hands off onto a ladder with up/down. A **powered catwalk layer** that retracts lets you go. |
@@ -108,31 +108,37 @@ Format: **what it is** → key knobs → reacts to / affects → design notes.
 
 **Swing.** A rigid-rod pendulum, `length_tiles` (default 4), default ±80° limits. `free_rotation` allows full circles. The player pumps with left/right. Catching it transfers your momentum (`ω = r × v / |r|²`). Releasing hands the bar's tangential velocity to the player (jump adds jump speed). The bar is **not solid**. The arc must be clear of solid tiles (hanging bodies aren't physics-resolved). Powered = motor.
 
-### Blocks: ice and metal
+### Blocks: ice, metal and carbon fiber
 
-Both are rigid bodies, sized in tiles, with free rotation by default. They **topple off ledges, can be kicked, and can't be pushed by walking** (the shove guard discards actor pushes). They press buttons and weight plates, ride belts, get launched by pads, and are opaque to lasers.
+All three are rigid bodies, sized in tiles, with free rotation by default. They **topple off ledges, can be kicked, and are opaque to lasers**; they press buttons and weight plates, ride belts and get launched by pads. **A walk moves only carbon fiber**: ice and metal can't be pushed by walking (the shove guard discards actor pushes, and an enemy can't move any block).
 
-| | Ice | Metal |
-|---|---|---|
-| Weight per tile | 1 | 4 |
-| Melts to | water (2 s lit) | slag (3 s lit) |
-| Cools/refreezes | yes (0.5/s) | yes (0.4/s) |
-| In slag | melts fast, bursting water onto the slag (→ **crust**) | floats (60% submerged) but melts in about 8 s |
-| In water | floats (about 80% submerged), small bob | **sinks** to the seabed |
-| Slippery to stand on | **yes** (ice-rink acceleration) | no |
-| Surf friction on top | 0.25× (about 4× the coast) | normal |
-| Kick | shunts at 100 px/s, slides about 4 tiles; can slide off ledges | shunts at 50 px/s, about 1 tile |
-| Crusher | **shatters** (melts to water on the spot) | **jams** the crusher |
-| Surf shove | transfers speed; slides up to 18 tiles on ice | moves less (heavy), but still costs the surfer speed |
+| | Ice | Metal | Carbon fiber |
+|---|---|---|---|
+| Weight per tile | 1 | 4 | 0.5 (a 1×1 is 0.5, a 2×2 is 2) |
+| Melts to | water (2 s lit) | slag (3 s lit) | **never melts**: a beam only stops on it |
+| Cools/refreezes | yes (0.5/s) | yes (0.4/s) | n/a |
+| In slag | melts fast, bursting water onto the slag (→ **crust**) | floats (60% submerged) but melts in about 8 s | **floats (60%) and never melts**: a permanent raft |
+| In water | floats (about 80% submerged), small bob | **sinks** to the seabed | **floats (60%)** |
+| Slippery to stand on | **yes** (ice-rink acceleration) | no | no |
+| Surf friction on top | 0.25× (about 4× the coast) | normal | normal |
+| Kick | shunts at 100 px/s, slides about 4 tiles; can slide off ledges | shunts at 50 px/s, about 1 tile | shunts at 100 px/s, about 4 tiles |
+| Walk | refuses | refuses | **pushed**, at up to 75 px/s (half walk speed) |
+| Cannon bullet | **breaks** (bursts to water) | **absorbs it** (a ping), unharmed | **breaks** (fades, no liquid) |
+| Crusher | **shatters** (melts to water on the spot) | **jams** the crusher | **shatters** (fades, no liquid); never jams |
+| Surf shove | transfers speed; slides up to 18 tiles on ice | moves less (heavy), but still costs the surfer speed | moves furthest and costs the surfer least (light) |
 
 - **Melt progress is reversible**: a block lit then shaded refreezes or cools along its animation.
 - Floating blocks ride a rising/draining surface. A rider can't hold them down; carrying capacity is `rest_fraction`. Level lever: past 1.0 the block can't carry the load and sinks.
-- Swimmers underneath nudge floating blocks sideways slowly.
+- Swimmers underneath nudge floating **ice** blocks sideways slowly; carbon fiber has no underside push.
 - Hanging from a block works while it is flat and still enough (≤10°, ≤90 px/s).
 - A melting block spawns liquid per tile **at the block's position**, which then falls and can land on you, on a see-saw, or into a basin.
+- **Carbon fiber (`carbon_fiber_block.tscn`) is the block that lasts**: no melt means a laser makes it a permanent shield and slag a permanent raft, so a level that wants a disposable shield or a timed raft offers ice or metal and no carbon fiber. It is light: a lone 1×1 (0.5) can't press a weight plate with a threshold of 2 (a rider, a stack or a bigger block still does), a see-saw reads it as a small load, and a jump pad or catapult throws a 1×1 as far as a 1×1 ice block (a bigger one lifts less).
+- **Walk push.** Walking into the side of a carbon fiber block while on the floor pushes it at the lesser of your walk speed and 75 px/s, and you slow to match. **A chain pushes together**: up to 8 carbon fiber blocks in a row, each extra block ×0.75 slower; anything else in the line (a tile, an enemy, an ice or metal block, a wall behind the last) **refuses the whole push** and is a wall as before. **A crouched or sneaking player never pushes.** When the push ends the block **stops dead** on an ordinary floor and **coasts** only on a slippery one (an ice block or a frozen crust), in the air or in liquid. There is no pull: you can only push the way you walk.
+- A carbon fiber block pushed off a ledge falls like any block; onto a platform or belt it follows the ordinary block rules.
+- **Bullets now stop at every block** (a cannon bullet used to fly through them): metal absorbs it unharmed, so a metal block is a permanent bullet shield (the counterpart of a laser shield), while ice and carbon fiber break under it.
 
-**Block dispenser.** A powered device that makes blocks, so ice and metal can be a renewable resource (a shield that replaces itself, a second weight, a stair). A small housing with a **spawn point** (a marker, one tile below it by default) where each block appears, upright and at rest, and then falls under gravity like any block. Its placeholder art is a steel box with a light: green when it is ready, amber while it cools down.
-- **Knobs**: `block_scene` (`ice_block.tscn` by default, or `metal_block.tscn`), `size_tiles` (the size of each block), `max_alive` (1; 0 = unlimited), `cooldown` (0.5 s; 0 = none), `invert`, and `show_spawn_area` (an editor-only outline of the block's footprint at the spawn point). Move the `SpawnPoint` marker to put the block somewhere else, and the `PowerTarget` child to choose where a wire attaches.
+**Block dispenser.** A powered device that makes blocks, so any block can be a renewable resource (a shield that replaces itself, a second weight, a stair). A small housing with a **spawn point** (a marker, one tile below it by default) where each block appears, upright and at rest, and then falls under gravity like any block. Its placeholder art is a steel box with a light: green when it is ready, amber while it cools down.
+- **Knobs**: `block_scene` (`ice_block.tscn` by default, or `metal_block.tscn` or `carbon_fiber_block.tscn`), `size_tiles` (the size of each block), `max_alive` (1; 0 = unlimited), `cooldown` (0.5 s; 0 = none), `invert`, and `show_spawn_area` (an editor-only outline of the block's footprint at the spawn point). Move the `SpawnPoint` marker to put the block somewhere else, and the `PowerTarget` child to choose where a wire attaches.
 - **Reacts to**: a **rising edge** of its power, nothing else: a source that stays on spawns once, a falling edge does nothing, and an inverted dispenser spawns when its source falls. The startup state and a checkpoint restore are never edges, so a level never loads with a block waiting. An unwired dispenser never spawns. An edge during the cooldown is ignored.
 - **Affects**: its own blocks, which are ordinary blocks in every way (kickable, meltable, a plate or see-saw weight, hangable, carried by belts, launched by pads). It keeps at most `max_alive` of them: a new block **dissolves the oldest** (a quiet fade, no liquid), and a block that melted or shattered no longer counts, so its slot is free. It never touches another dispenser's blocks.
 - **Gotchas**: **a spawn into an occupied area is refused**: if the player, an enemy, a block or a tile is inside the block's footprint, the press does nothing but a "blocked" sound (the old block is not dissolved and the cooldown does not start). That includes the block you made last time if it is still sitting under the dispenser, unless it is the one about to be retired. With `max_alive` above 1, the spawn point has to be somewhere blocks leave (a drop, a slope, a belt, a kick) or the second press is refused. **A block a dispenser made is taken back by the next one**: with `max_alive` 1, a block left on a plate or used as a stair vanishes the next time the dispenser fires, whatever the player is doing with it. The dissolved block stops being solid at once, so whatever stood on it falls. A dispenser's blocks are saved with it: a checkpoint keeps the blocks that were alive then, and a restore makes none. Nothing about its state is visible to the player beyond the light, so wire a lamp, a door or a gem to what it is meant to show. No new block can appear without a rising edge, so a block lost to a melt, a pit or slag can only be replaced by the player causing one.
@@ -158,10 +164,10 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 |---|---|---|---|
 | Shape | continuous beam | slow projectile (220 px/s, range 480) | fast projectile |
 | Reflects off mirrors | **yes** | **yes** | no (a bullet *hits* a mirror only if `bullet_rotates`) |
-| Stopped by | solids, doors, blocks, enemies, mirror backs | tiles, doors, blocks, mirror backs | the player and world tiles |
+| Stopped by | solids, doors, blocks, enemies, mirror backs | tiles, doors, blocks, mirror backs | the player, world tiles and blocks (metal absorbs it, ice and carbon fiber break) |
 | Passes through | catwalks, glass | catwalks, glass, **enemies, player layer** | other traps/enemies |
 | Hurts | the player (per frame, polled), enemies (1 per 0.5 s) | the player only | the player |
-| Melts | ice/metal blocks | no | no |
+| Melts | ice/metal blocks (never carbon fiber) | no | no |
 | Lights/triggers | **laser receiver** | **arc receiver**, electrifies water | **bullet target** |
 | Boils water | optional | no | no |
 
@@ -301,29 +307,30 @@ Both are rigid bodies, sized in tiles, with free rotation by default. They **top
 
 Row = thing acting; columns = what it does to each target. Read this to find combos.
 
-| Actor ↓ | Ice block | Metal block | Water pool | Slag pool | Player | Enemies | Mirror | Door/solid |
-|---|---|---|---|---|---|---|---|---|
-| **Laser** | melts → water | melts → slag | optional boil (needs flags); thaws a frozen crust over it | not boiled; thaws a frozen crust over it | damage/frame | 1 dmg/0.5 s | reflects | stopped |
-| **Freeze ray** | stopped, no effect | stopped, no effect | freezes a `freezable` basin after `freeze_time` → frozen crust | freezes it, **held only while the beam stays** | chills (half speed), no damage | chills, no damage | reflects | stopped |
-| **Arc** | – | – | electrifies (also through a frozen crust over it) | – | damage | – (passes) | reflects | stopped |
-| **Bullet** | – | – | – | – | damage | – | turns or flips it (opt-in) | stopped |
-| **Spark** | – | – | electrifies (also through a frozen crust over it) | – | damage | – | – | – |
-| **Kick** | slides it | slides it (short) | – | – | – | damage / flips crawler / arms mine | turns 45° (step) or flips aim (toggle) | – |
-| **Surf** | shoves (long) | shoves (short) | skims if ≥180 | burns/ends surf | – | bowls | – | breaks barrier |
-| **Crusher** | **shatters** | **jams crusher** | – | – | damage | – | – | – |
-| **Slag touch** | melts fast, → crust | floats, slow melt | **crusts** it | rejoins | hurts | – | – | – |
-| **Water touch** | floats | sinks | joins | **crusts** it | – | – | – | – |
-| **Jump pad** | launches (weight-scaled) | launches (less) | – | – | launches | – | – | – |
-| **See-saw stop** (with `launch_gain`) | launches if on the raised end (weight-scaled) | launches (less) | – | – | launches if on the raised end | – (no `launch()`) | – | – |
-| **Block dispenser** (makes) | makes one; past `max_alive` the oldest dissolves | the same | – | – | its spawn area occupied: the press is refused | its spawn area occupied: refused | – | solid in the spawn area: refused |
-| **Mine blast** | – | – | – | – | damage | 2 dmg | – | – |
-| **Retracting catwalk layer** | drops | drops | – (water already falls through a catwalk) | – | drops; a hanger is released | drops | – | – |
-| **Retracting ladder layer** | – | – | – | – | a climber is dropped | – | – | – |
-| **Zone sensor** (reads) | counted if `count_blocks` | counted if `count_blocks` (weight is irrelevant) | – | – | counted if `count_player` (not dead or dancing) | counted if `count_enemies` | – | – |
-| **Weight plate** (reads) | 1 per tile | 4 per tile | – | – | 2 while on the floor | grunt, drillbot, crawler 2; mine, landed Stingbot 1 (× `enemy_weight_scale`); not in the air or dying | – | – |
+| Actor ↓ | Ice block | Metal block | Carbon fiber block | Water pool | Slag pool | Player | Enemies | Mirror | Door/solid |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| **Laser** | melts → water | melts → slag | stopped, **never melts** | optional boil (needs flags); thaws a frozen crust over it | not boiled; thaws a frozen crust over it | damage/frame | 1 dmg/0.5 s | reflects | stopped |
+| **Freeze ray** | stopped, no effect | stopped, no effect | stopped, no effect | freezes a `freezable` basin after `freeze_time` → frozen crust | freezes it, **held only while the beam stays** | chills (half speed), no damage | chills, no damage | reflects | stopped |
+| **Arc** | – | – | – | electrifies (also through a frozen crust over it) | – | damage | – (passes) | reflects | stopped |
+| **Bullet** | **breaks** (bursts to water) | **absorbed** (a ping), unharmed | **breaks** (fades) | – | – | damage | – | turns or flips it (opt-in) | stopped |
+| **Spark** | – | – | – | electrifies (also through a frozen crust over it) | – | damage | – | – | – |
+| **Kick** | slides it | slides it (short) | slides it | – | – | – | damage / flips crawler / arms mine | turns 45° (step) or flips aim (toggle) | – |
+| **Surf** | shoves (long) | shoves (short) | shoves (long, cheap) | skims if ≥180 | burns/ends surf | – | bowls | – | breaks barrier |
+| **Crusher** | **shatters** | **jams crusher** | **shatters** (fades, no liquid) | – | – | damage | – | – | – |
+| **Slag touch** | melts fast, → crust | floats, slow melt | floats, never melts | **crusts** it | rejoins | hurts | – | – | – |
+| **Water touch** | floats | sinks | floats (60%) | joins | **crusts** it | – | – | – | – |
+| **Jump pad** | launches (weight-scaled) | launches (less) | launches (a 1×1 as far as ice) | – | – | launches | – | – | – |
+| **See-saw stop** (with `launch_gain`) | launches if on the raised end (weight-scaled) | launches (less) | launches if on the raised end (weight-scaled) | – | – | launches if on the raised end | – (no `launch()`) | – | – |
+| **Block dispenser** (makes) | makes one; past `max_alive` the oldest dissolves | the same | the same | – | – | its spawn area occupied: the press is refused | its spawn area occupied: refused | – | solid in the spawn area: refused |
+| **Mine blast** | – | – | – | – | – | damage | 2 dmg | – | – |
+| **Retracting catwalk layer** | drops | drops | drops | – (water already falls through a catwalk) | – | drops; a hanger is released | drops | – | – |
+| **Retracting ladder layer** | – | – | – | – | – | a climber is dropped | – | – | – |
+| **Zone sensor** (reads) | counted if `count_blocks` | counted if `count_blocks` (weight is irrelevant) | counted if `count_blocks` (weight is irrelevant) | – | – | counted if `count_player` (not dead or dancing) | counted if `count_enemies` | – | – |
+| **Weight plate** (reads) | 1 per tile | 4 per tile | 0.5 per tile | – | – | 2 while on the floor | grunt, drillbot, crawler 2; mine, landed Stingbot 1 (× `enemy_weight_scale`); not in the air or dying | – | – |
+| **Walking player** | refuses (a wall) | refuses (a wall) | **pushes it** (up to 75 px/s; a chain, never crouched) | – | – | – | – | – | – |
 
 **What presses what**
-- Button: player + blocks. Weight plate: player (standing) + blocks + enemies on the floor (+ stacked riders, through a block or an enemy). See-saw load: player + blocks + liquid (+ enemies when `enemy_weight_scale` is above 0). Speed trap: only a surfer. Zone sensor: any body of an enabled kind inside it (player, enemies, blocks), whatever it weighs.
+- Button: player + blocks (a carbon fiber block too: its weight is 0.5 per tile, which matters only to a plate). Weight plate: player (standing) + blocks + enemies on the floor (+ stacked riders, through a block or an enemy). See-saw load: player + blocks + liquid (+ enemies when `enemy_weight_scale` is above 0). Speed trap: only a surfer. Zone sensor: any body of an enabled kind inside it (player, enemies, blocks), whatever it weighs.
 - Logic nodes and the camera cue's pass-through press nothing: they read other sources' levels and edges, and only a device's `sources` (or another logic node) reads them.
 - Receivers are lit by beam/arc/bullet/freeze ray *specifically*. A laser does nothing to an arc receiver or a freeze receiver, and vice versa.
 
@@ -332,7 +339,7 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 **Things you can't do (yet)**
 - **Spikes switch per layer, not per tile**: a tile can't carry a `PowerTarget`, so independent groups of spikes are separate layers, and a spike with its own timing (a warning, a stroke) must be a node (e.g. a crusher or sawwheel).
 - **Only catwalks, ladders and spikes can be switched as terrain.** Ground and glass can't (the basin scans, the water manager and the laser's world lookup assume one `world_tilemap`), so a wall or floor that appears is a door, a drop platform or a crust (a frozen crust is the one the player can summon with a beam and take away with a laser).
-- **The player can't push anything by walking**; only kick, surf-shove or (in water) underside push move blocks. Design block puzzles around kicks and slopes.
+- **The player can push only carbon fiber by walking**; ice and metal move by kick, surf-shove or (in water, ice only) underside push. There is no pull, no carrying and no lifting.
 - **A mirror has two powered aims at most** (toggle mode); more positions need step mode (one step per rising edge) or several mirrors.
 - **The freeze ray freezes only `freezable` basins and powers only freeze receivers.** It does not freeze blocks, doors or the player; chill is a slowdown, not a stop. Chill is a flat half speed, not a dial.
 - **No lever object**; no keys or carryable items; no pickup that persists to other levels.
@@ -362,7 +369,12 @@ Row = thing acting; columns = what it does to each target. Read this to find com
 - **`breakable_barrier` `break_speed`** below 300 acts as 300 and above 800 is unreachable; above 600 needs wet ground.
 - **Surf and slopes**: a see-saw's raised end is a wall for the surf; basin rims and sloped tiles are ramps; a ladder cell with spikes in it breaks climbing.
 - **Closing doors wait**: they won't crush, so don't use a door as a hazard.
-- **Metal blocks sink in water and float on slag**; ice does the reverse (ice in slag melts almost at once). Pick the liquid to pick the block.
+- **Metal blocks sink in water and float on slag**; ice does the reverse (ice in slag melts almost at once); carbon fiber floats on both and melts in neither. Pick the liquid to pick the block.
+- **Carbon fiber never melts**: a beam or slag will not remove it, so a puzzle that relied on a shield or raft running out needs ice or metal. What does remove it is a bullet, a crusher's spike, a fall into a pit and a dispenser retiring its oldest.
+- **Blocks stop bullets**: a bullet no longer flies through a block, so a block left in a cannon's line shields whatever is behind it (metal for good, ice and carbon fiber for one shot). Check any cannon lane that has a block in it.
+- **A pushed block has no undo**: you can only push the way you walk, so a carbon fiber block pushed against a wall or into a corner stays there unless the player can get round to its other side (a catwalk, a ladder, a hang) or a dispenser makes another.
+- **A light block pays only a light plate**: a lone 1×1 carbon fiber block (0.5) does nothing on a plate at threshold 2, and a zone sensor or button counts it regardless of weight, so two sensors beside each other can disagree about one block.
+- **A pushed block coasts only on a slippery floor**: a frozen crust or an ice block under it turns a precise push into a slide, and the push also needs the player standing, not crouched.
 - **A block dispenser refuses an occupied spawn area and retires its own oldest block**: see the dispenser's gotchas under Blocks. The two to remember are a spawn point where blocks never leave (every press after the first is refused) and a block the player is relying on that the dispenser takes back.
 - **Stingbot has no pathing** and can get stuck behind walls. **Mines have no line of sight** and blast through thin walls.
 - **Hanging**: conveyors, button pedestals, receivers and barriers are deliberately *not* ledge-grabbable; doors, blocks and see-saw ends are.

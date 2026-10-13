@@ -2,7 +2,7 @@
 
 Planned additions that close gaps found while writing the level-design reference: puzzles that the current objects almost support. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
 
-Covers: Phase 3 (Reach of existing systems: Carbon fiber block; Steam lifts blocks; Steam tips the see-saw); Not on the roadmap
+Covers: Phase 3 (Reach of existing systems: Steam lifts blocks; Steam tips the see-saw); Not on the roadmap
 
 **This is the one file that describes planned work, not the project as it stands.** Everything in it is unbuilt or unconfirmed. An item has two lifecycle steps, set out under Finishing a roadmap item in How to maintain this file in `objon.md`: when it is built, the owning topic file describes it (with a `## Status` line) and the entry here gains a line `Built, awaiting in-editor confirmation; see Status in <topic file>.`; when the user has confirmed it in-editor, the entry is deleted here and the design reference and puzzle file are updated. Do not leave a confirmed item here as history.
 
@@ -14,34 +14,9 @@ Covers: Phase 3 (Reach of existing systems: Carbon fiber block; Steam lifts bloc
 
 ## Ordering
 
-Phases run from least to most invasive. Phase 3 extends the block family and steam. Within a phase the order is by value; N3.4 and N3.5 lean on N3.3 for tuning (carbon fiber is the block steam is meant to lift) but need nothing from it in code.
+Phases run from least to most invasive. Phase 3 extends steam to blocks and to the see-saw. Within a phase the order is by value; N3.4 is tuned against the carbon fiber block, which is the block steam is meant to lift.
 
 ## Phase 3: Reach of existing systems
-
-### N3.3 Carbon fiber block (M)
-
-Built, awaiting in-editor confirmation; see Status in `meltable-blocks.md`.
-
-**Gap.** Blocks are two extremes: ice (light, short-lived, melts) and metal (heavy, melts slowly). There is no light block that lasts, no block the player can move without a kick, and the rules that separate blocks (what a bullet or a crusher does to them) are ad hoc. A third `MeltableBlock` subclass, `CarbonFiberBlock`, plus a small set of **material flags** on the base class, makes each block a row in one table.
-
-**The block.** Extends `MeltableBlock`, own scene, placed and sized like the others (layers 1|2, `water_solid`, kickable, hangable, saveable, dispenser-compatible through `block_scene`). **It never melts**: `on_laser_hit()` only stops the beam (no melt progress, no `melt_time`), and slag does not heat it. It is **light**: mass about 0.5 per tile (ice 1, metal 4), so a jump pad or catapult throws it far (`launch_weight_exponent`), a lone 1×1 cannot press a weight plate whose threshold is 2 (stacked blocks or a rider still can), and a see-saw reads it as a small load. A permanent laser shield and a permanent slag raft are intended: a level that wants A3's disposable shield or B4's timed raft simply offers no carbon fiber block.
-
-**Liquids.** Buoyant in water like ice but higher (`float_depth_fraction` about 0.6, tune by feel). On slag it **floats and does not melt** (`float_depth_fraction` as metal's, `_touching_slag()` never starts a melt), so it is a permanent raft. It jams nothing: `jams_crusher()` is false.
-
-**Material flags on `MeltableBlock`** (exports, so a scene sets them and no subclass overrides code for them):
-- `brittle` (ice true, carbon fiber true, metal false): a bullet breaks it and a crusher's spike shatters it. Ice goes through its existing melt path (a water burst); carbon fiber goes through `dissolve()` (fade, no liquid, no steam), so the crusher's `shatter()` hook (`_shatters_when_crushed()`) and the new bullet hook both read the flag instead of an ice-only override.
-- `absorbs_bullets` (metal true): the bullet is consumed on contact with a ping and the block is unharmed, so a metal block is a bullet shield, the counterpart of A3's laser shield. Applies to every metal block, and ice breaks under a bullet too (decided).
-- Both through the existing duck-typed `on_bullet_hit(point, direction) -> bool` that `bullet.gd` already tests for (true = the bullet is consumed): `MeltableBlock` gains it, so `bullet.gd` and the contracts table need no new method. **Today a bullet ignores blocks entirely**, so "metal blocks bullets" is a new rule for existing metal blocks too; check the hit order against `Mirror` (`bullet_rotates`), which implements the same hook.
-- Not in N3.3, left for a later item: a freeze beam on a melting ice block resets its melt progress at once (freeze cools, laser heats); carbon fiber and metal ignore the freeze beam. Needs `on_freeze_hit()` on `MeltableBlock`, which `FreezeTurret` already dispatches on.
-
-**Walking pushes it.** The guard that discards actor pushes is the export `reject_actor_shove` (default true); the plan was for carbon fiber to set it false so the solver's own contact push stands; as built the guard stays on for every block, because the push is the block's own motion and an enemy must still not shove it. Add a duck-typed `walk_shoved(direction: float, walk_speed: float) -> float` on `MeltableBlock` (like `surf_shoved`), called by the player while it is on the floor and moving into a block's side, returning the speed the block took or -1 to refuse (a wall or body on the far side, `shunt_speed` 0). Ice and metal return -1, so **the guard stays for them** and the rule "the player cannot push blocks by walking" stays true except for carbon fiber. The push speed is below walk speed (a cap export on the block, about half) so it reads as effort; the player is slowed to match while pushing and pushing is not a held state, so `_interrupt_current_action()` needs nothing. Decided: a chain of carbon fiber blocks can be pushed together, slower per block, and any other block, tile or body in front refuses; a crouched or sneaking player never pushes; when the push ends the block coasts only on a slippery floor (a frozen crust or an ice block) and stops dead on any other. Still to try: a rider on top, pushing a block off a ledge, and onto a platform or belt (they follow the ordinary block rules).
-
-**Rules to keep.** Authored values are exports; melt-free means no `melt_progress` to save, but `save_state()`/`load_state()` keep position and velocity as the base does. Joins `water_solid` and the other block groups in its own `_ready()`; a subclass calls `super()` in `_ready()` and `_physics_process()`. Sounds (`interactive/carbon_shunt`, `interactive/carbon_break`, `interactive/metal_ping` for an absorbed bullet) in `Audio.PLANNED`. Placeholder art drawn in code (a black woven tile) until sprites exist. Script in `export-audit.md`.
-
-**Open, decide during the build.**
-- Carbon fiber's mass and `float_depth_fraction`, the push cap and the lift numbers of N3.4, by feel.
-
-**Touches.** `meltable-blocks.md` (Meltable block, a new Carbon fiber block bullet, the Block dispenser's `block_scene` note), `hazards-traps.md` (Cannon / Bullet; Sawwheel / Crusher: shatter and jam), `player.md` (Movement: the walk push), `level-design.md` (Blocks table, the Interaction matrix rows for Bullet and Crusher, and the gap line "the player can't push anything by walking"), `puzzles.md` (A3, B4, C-concepts that name block weights), `saving-levels-ui.md` (What each type saves), `objon.md` (contracts: `walk_shoved`, and the layers line if the block's layers differ), `export-audit.md`.
 
 ### N3.4 Steam lifts blocks (S to M)
 
@@ -69,7 +44,7 @@ Built, awaiting in-editor confirmation; see Status in `meltable-blocks.md`.
 
 ## Not on the roadmap
 
-The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single result, so there is no splitter, prism or coloured beam. Two other gaps look intentional and are left alone: the player cannot push blocks by walking (the shove guard in `meltable-blocks.md` is deliberate; a kick, the surf and an underside push move them; carbon fiber, N3.3, is the one planned exception), and doors never crush (`power.md`, Door).
+The beam stays one polyline of one colour: `LaserBeam.trace()` returns a single result, so there is no splitter, prism or coloured beam. Two other gaps look intentional and are left alone: the player cannot push ice or metal blocks by walking (the shove guard in `meltable-blocks.md` is deliberate; a kick, the surf and an underside push move them; carbon fiber is the one block a walk moves), and doors never crush (`power.md`, Door).
 
 Known weak spots in existing behaviour, listed here so nobody mistakes them for planned features: the Stingbot has no obstacle avoidance and can stick on a wall, and the proximity mine's blast has no line-of-sight test (both in `enemies.md`).
 
