@@ -114,6 +114,30 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Scripted button press:** a driver that holds `jump` while moving overshoots a 16 px button. Walk to the button's x, release, then tap jump with a short `move_right`. [verified]
 - 1-7 (*Look Ahead*): TIMED button (9 s) retracts a 10-tile inverted spike field out of sight, with a camera cue on the field; checkpoint; a 20x14 shut-in room whose entry door closes via the zone; ladder to a catwalk deck, TOGGLE button opens the exit door; optional underside route over a floor spike strip for bonus gems and a medkit.
 
+## Flip-flop catwalks, rails and a locked finish (learned building 1-8)
+ 
+- **Flip-flop stones [verified headless]:** two `PoweredCatwalkLayer`s on the same TIMED button(s), one with `invert = true`. When the timer ends, layer A blinks (still solid for `warn_time`) while layer B appears at once, so the player hops A to B inside the blink window. Put a **static** catwalk island between the two pairs of stones with a second TIMED button on it; both buttons go on both layers' `sources` (ORed). A pedestal button must never sit on a powered stone (it would float when the stone retracts).
+- **Jump range is short:** walk 150 px/s, jump 240 px/s up, gravity 900: airtime 0.53 s, **about 80 px (5 tiles) across level ground**, apex 32 px. 2-wide stones were too tight for a scripted player (it overshoots); use 3-wide stones with 2-tile gaps, and make a skip-hop at least 7 tiles so the intended route is forced. Release `move_right` mid-air in a driver to land on a small target.
+- **Rescue ladder at a pit edge:** ladder in the pit's first column plus a static catwalk tile at floor level in the same column (auto-landing snap). [pattern from 1-4; reused]
+- **Tower ladder beside a solid block does not dismount** (the player stays in the CLIMB state at the top, even with `move_right` held, contradicting an older note). Put a one-tile catwalk in the ladder's column flush with the ledge top and run the ladder one row above it. [verified]
+- **Rails [verified headless, not seen]:** `rail.tscn` (plain) with its two markers overridden and a third added as an extra `Marker2D` child; Editable Children needed only for the markers. A hand at 7 px above the player origin catches a rail 20-30 px above the ledge on a jump from the ledge edge. 45-degree slides run at the 220 px/s cap and coast about 40 px onto the flat. Brachiating stops at the rail end and the player stays hanging; **crouch drops**. 
+- **A bot rides its whole rail**, slope included, ping-ponging forever from level load, so its phase when the player arrives is random. Use a **separate short `rail_with_bot.tscn` on the flat stretch** with the bot's `rail_grabbable = false`, and a plain rail for the player. A jump from the rail when the bot is about 18 px ahead cleared it unhurt and re-caught the rail on the way down. [verified]
+- **Locked finish:** `require_all = true` on the Finish plus `sources` on its `PowerTarget` child (`index="1"`, `[editable path="Finish"]`) so gems AND a TOGGLE button are required. Wiring read back at load; the unlock itself was not exercised.
+- 1-8 (*Flip-flop*): TIMED button, 3-wide stones over a 28-wide pit (rescue ladders at both ends, bonus gems + medkit on the pit floor between spike pairs), tower with the TOGGLE finish key, 130 px slide + 224 px flat rail over a floor spike strip with a patrolling bot, locked finish.
+
+## Slopes and the surf (learned building 2-1)
+
+- **Slope tiles are in `riverbank-1.tres`, source 0** [verified: walked and surfed them headless]. Collision lines meet flat ground (top at -6 px) with no seam:
+  - **45° descending right: `(1,7)`.** Tile in row r: surface runs from `r*16+2` (left) to `r*16+18` (right). A staircase of them goes one tile down per column, so a plateau at row R meets `(c,R),(c+1,R+1),...`, and the floor row 80 follows the tile in row 79.
+  - 45° ascending right is `(0,7)`. **2:1 ascending right is a pair, `(2,7)` (low, left) then `(3,7)` (high, right)**: one row of rise per two columns, starting the pair in row r with its left edge at `r*16+18`. 2:1 descending right is `(4,7)` then `(5,7)`.
+  - Filling under a slope: **do not put a plain interior tile `(1,1)` directly under it**. Its flat top pokes about 2 px above the slope line at the seam, the surf's floor normal flickers flat and it loses about half its slope gain (300 vs 362 px/s over a 4-row drop). Put the chamfered tile in the cell right under the slope tile instead, interior below that: **`(1,9)` under `(1,7)`, `(0,9)` under `(0,7)`, `(2,9)` under the low tile `(2,7)`** (nothing special under `(3,7)`: its polygon reaches the cell bottom). `(3,9)` should be the 2:1 descending counterpart (not used yet). [verified for (1,9) and (2,9); the others inferred from the polygons]
+  - Rows 8, 10, 11 of that sheet are ceiling and thin-slab pieces; I did not use them.
+- **Walking up a 2:1 ramp and down a 45° slope works** [verified]. Use 2:1 ramps for the way back up; a staircase isn't needed.
+- **Surf numbers on these slopes [verified headless, with Input actions]:** crouch (hold), then tap `kick` on the floor mounts at 240 px/s; hold `move_right` for nose-down (matched), release for level, hold `move_left` for wrong. A 4-row 45° drop reaches about 360 matched / 320 level; a 10-row drop reaches about 510 matched / 440 level. My rough model (`g*sin*1.25 - 320`) overestimates by about 5% once the chamfers are right; test instead of trusting it.
+- **Mounting before the slope costs the run-up:** from the start speed, 2 tiles of flat before the lip still clears a 450 barrier after a 10-row drop with one flat tile after it; 3 tiles back does not. The coast on the flat is only about 5 tiles.
+- **Breakable barrier:** `size_tiles` 1x3, origin top-left on the grid, so `y = 1280 - 48` on the floor; `break_speed` is an export on the instance. A broken barrier frees itself, so `has_node()` is a cheap headless check.
+- **Headless surf driver** (not committed): teleport the player at frame ~5, hold `crouch` at 40, press `kick` 44-46, then set the tilt each frame and print `get_surf_speed()`. Needs `godot --import` once first (the `.godot` cache is not in the clone); delete the scratch scene afterwards. Don't clean up with `git checkout -- .`: it reverts doc edits too.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
@@ -139,3 +163,4 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Added the ladders/catwalks/hanging section after building 1-3.
 - Added the buttons/doors/powered-layers section and the 1-4 summary after building level 1-4.
 - Added the zone sensor/door/camera cue section and the 1-7 summary after building level 1-7.
+- Added the slopes and surf section after building level 2-1.
