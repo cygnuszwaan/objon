@@ -89,12 +89,28 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Input action names:** `move_left`, `move_right`, `jump`, `crouch`, `climb_up` (down is `crouch`), `kick`. [verified in project.godot]
 - Climb test: put the player on the ladder column, hold `climb_up` for ~240 frames; the player ended above the deck, off the ladder.
 
+## Buttons, doors and powered layers (learned building 1-4)
+
+- **Godot version:** the project is 4.7 (`config/features`). `github.com/godotengine/godot/releases/download/4.7-stable/Godot_v4.7-stable_linux.x86_64.zip` downloads in the sandbox. [verified]
+- **Wiring in a generated `.tscn`:** an `Array[Node]` export is saved as `[NodePath("../../Sources/Btn")]` **and the node's header must carry `node_paths=PackedStringArray("sources")`** (before `instance=`). Without the header attribute Godot errors "Unable to convert array index 0 from NodePath to Object" and `sources` loads empty. [verified: had Godot save a wired scene and copied its output]
+  - Powered layers: `sources`, `invert`, `show_ghost`, `warn_time` go straight on the layer instance (paths relative to the layer, e.g. `../../Sources/Btn`).
+  - Doors: override the child, `[node name="PowerTarget" parent="Dynamic/DoorA" index="2" node_paths=PackedStringArray("sources")]` with `sources = [NodePath("../../../Sources/Btn")]`, plus `[editable path="Dynamic/DoorA"]` at the bottom of the file.
+- **`latch_mode`:** MOMENTARY 0, TOGGLE 1, TIMED 2. Colours: blue 0, red 1, yellow 2, green 3. [verified in `button.gd`]
+- **A button is a 5 px pedestal and `step_height` is 4**, so the player must jump onto it; plan one jump's room either side. A TOGGLE hopped on and off twice flips twice. [verified headless]
+- **The ground's collision top is at y = 1282, not 1280** (2 px below the tile top). A one-way catwalk whose top is 1280 therefore **cannot be walked onto from the floor**: the feet are already below its top, so the player walks through and falls. A bridge that starts at floor level goes one row up (row 79, top y = 1264) and the player jumps onto it; walking off it onto the floor is fine. [verified headless; the first 1-4 bridge at row 80 failed this way]
+- **A powered ladder layer needs `position = Vector2(-16, 0)`** like `Ladders` (the template instance has none), and its cells are painted at col+1. [verified: climbed it]
+- **Ladder beside a solid ledge** (no catwalk through it): the climb ends about 21 px above the ledge surface and the player presses right to land on it. Only a ladder that passes through a catwalk or floor cell gets the automatic landing snap. [verified headless]
+- **Mounting a ladder while still landing from a jump latches `climb_up`** (the mount lifts the feet and the landing branch ends the climb at once; releasing and pressing up again works). A headless driver must let the player settle on the floor (~25 frames) before holding `climb_up`. Release every held action (`jump` especially) when a scripted walk ends. [verified]
+- **Timer sums for a TIMED ladder race** (climb 100 px/s, walk 150 px/s, a ladder retracts `duration + warn_time` after the press): two buttons wired to one layer are ORed, so a second button midway restarts the window. 1-4 uses duration 2 s + 1 s blink on both, so a player who dawdles needs the mid button. Falling is free (no fall damage), so a missed race costs only time. [verified numbers by script; feel not tested]
+- **Headless route test:** a scene that loads the level, drives `Input.action_press`, and prints position/health/gems per stage (hop onto each button, walk, climb) is enough to prove a route is completable; it took four iterations to get the driver right, so keep it. Not committed to the repo.
+- A one-way **catwalk bridge flush with ladders:** a static ladder (the pit rescue ladder in 1-4) shares a cell with the bridge; ladder top = the row above the deck, as in 1-3.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
 - Each level: a regular gem trail teaching the mechanic, one or two checkpoints, a finish near the right, plus an optional **bonus detour** (bonus gems + a medkit, with a small risk).
 - Checkpoint just before a long or risky section, not inside it.
-- 1-1: steps 1/2/3 tiles (the 3rd needs a mantle), a 3-tile wall, a bonus pillar staircase (owner later moved it to a one-way layer). 1-2 (crouch/sneak + spikes, puzzle type E4 in `docs/puzzles.md`): three crouch tunnels, two spike hops, a bonus roof route over the long tunnel. 1-3 (*Up and Under*, ladders/catwalks/underside hang, puzzle types E5 and E1): ladder up to a 36-wide catwalk deck; the deck's right half hangs over a floor spike strip, with the underside route (crouch+jump, brachiate) holding the bonus gems and medkit so the risk is optional; a checkpoint, then a second, taller ladder to a second deck, then a drop to the finish. Check `docs/level-plan.md` for what each level is meant to introduce before designing.
+- 1-1: steps 1/2/3 tiles (the 3rd needs a mantle), a 3-tile wall, a bonus pillar staircase (owner later moved it to a one-way layer). 1-2 (crouch/sneak + spikes, puzzle type E4 in `docs/puzzles.md`): three crouch tunnels, two spike hops, a bonus roof route over the long tunnel. 1-3 (*Up and Under*, ladders/catwalks/underside hang, puzzle types E5 and E1): ladder up to a 36-wide catwalk deck; the deck's right half hangs over a floor spike strip, with the underside route (crouch+jump, brachiate) holding the bonus gems and medkit so the risk is optional; a checkpoint, then a second, taller ladder to a second deck, then a drop to the finish. Check `docs/level-plan.md` for what each level is meant to introduce before designing. 1-4 (*Press and Cross*, buttons/doors/TIMED/powered layers, puzzle types E8 and H6): a TOGGLE button opens a two-tile doorway in a wall; a TIMED button retracts a 12-tile inverted spike field (ghost on); a TIMED button summons a 16-tile bridge over a pit (ghost on, 1 s blink) with a bonus gem/medkit nook and a rescue ladder in the pit; then a two-stage ladder race up two ledges with a second TIMED button midway; checkpoint on the top ledge, then a drop to the finish.
 
 ## Open questions / not yet verified
 
@@ -104,10 +120,12 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Whether bottom-row riverbank tiles `(x,2)` connect visually under a mass.
 - Single-width block tile coordinates.
 - Whether the end of an underside route mantles cleanly onto the deck edge (the 1-3 deck is contiguous, so it may never need to), and how generous the ladder-top step-off is.
-- Buttons, doors, enemies and powered layers are untouched; no level has used them yet.
+- Enemies are untouched. Buttons, doors and powered layers are used in 1-4 (headless-verified, feel and art not seen).
+- 1-4: whether the 2 s ladder window feels like a race or a chore; whether the spike ghost reads clearly; whether jumping up onto the bridge from the lip feels natural.
 - Register new levels in `LevelCatalog` (not done).
 
 ## Changelog
 
 - Initial version: written after levels 1-1 and 1-2.
 - Added the ladders/catwalks/hanging section after building 1-3.
+- Added the buttons/doors/powered-layers section and the 1-4 summary after building level 1-4.
