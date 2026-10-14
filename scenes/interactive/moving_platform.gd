@@ -2,8 +2,8 @@ extends AnimatableBody2D
 
 # Moving platform. Loops forever: wait at the start, travel to the far end, wait there, travel back.
 #
-# HARDCODED ON PURPOSE for now (see objon.md). To open it up later:
-#   - per-instance tuning: change each `const` below to `@export var` (nothing else needs to change)
+# Per-instance tuning is exported (travel_offset, travel_time, dwell_at_start, dwell_at_end).
+# To open it up further:
 #   - multi-stage routes: replace the two explicit legs in _build_sequence() with a loop over a list
 #     of stages (offset / travel time / dwell each) — nothing else in this script cares how many legs
 #     there are
@@ -23,15 +23,15 @@ extends AnimatableBody2D
 # `invert` flips that (read by the PowerTarget child).
 @export var invert: bool = false
 
-const TRAVEL_OFFSET := Vector2(96.0, 0.0)
-	# where the far end is, RELATIVE TO WHERE THE PLATFORM IS PLACED in the editor — direction and
-	# distance in one vector. (96, 0) = 96px (6 tiles) right; (0, -64) = 64px up.
-const TRAVEL_TIME: float = 2.0     # seconds for ONE leg (start -> far end, or back again)
-const DWELL_AT_START: float = 1.0  # seconds paused at the placed position, before each outbound leg
-const DWELL_AT_END: float = 1.0    # seconds paused at the far end, before each return leg
-
-## One full loop of _build_sequence(): dwell, out, dwell, back.
-const PERIOD: float = DWELL_AT_START + TRAVEL_TIME + DWELL_AT_END + TRAVEL_TIME
+## Where the far end is, RELATIVE TO WHERE THE PLATFORM IS PLACED in the editor: direction and
+## distance in one vector. (96, 0) = 96px (6 tiles) right; (0, -64) = 64px up.
+@export var travel_offset: Vector2 = Vector2(96.0, 0.0)
+## Seconds for ONE leg (start -> far end, or back again).
+@export_range(0.1, 20.0, 0.1, "or_greater") var travel_time: float = 2.0
+## Seconds paused at the placed position, before each outbound leg.
+@export_range(0.0, 20.0, 0.1, "or_greater") var dwell_at_start: float = 1.0
+## Seconds paused at the far end, before each return leg.
+@export_range(0.0, 20.0, 0.1, "or_greater") var dwell_at_end: float = 1.0
 
 var _start_position: Vector2
 var _tween: Tween  # kept so set_powered() can pause()/play() it
@@ -48,11 +48,11 @@ func _ready() -> void:
 		_tween.pause()
 
 ## Saveable contract (see game.gd). The platform's whole state is where it is in the loop: `phase` is the
-## tween's elapsed time within one PERIOD.
+## tween's elapsed time within one period.
 func save_state() -> Dictionary:
 	var phase := 0.0
 	if _tween != null and _tween.is_valid():
-		phase = fposmod(_tween.get_total_elapsed_time(), PERIOD)
+		phase = fposmod(_tween.get_total_elapsed_time(), _period())
 	return {"phase": phase, "running": _running}
 
 ## A Tween can't be seeked, so the loop is rebuilt from the start and fast-forwarded to the saved phase in
@@ -82,6 +82,10 @@ func set_powered(on: bool) -> void:
 	else:
 		_tween.pause()
 
+## One full loop of _build_sequence(): dwell, out, dwell, back.
+func _period() -> float:
+	return dwell_at_start + travel_time + dwell_at_end + travel_time
+
 func _build_sequence() -> Tween:
 	var tween := create_tween()
 	tween.set_process_mode(Tween.TWEEN_PROCESS_PHYSICS)  # move in lockstep with the physics step
@@ -89,8 +93,8 @@ func _build_sequence() -> Tween:
 	tween.set_trans(Tween.TRANS_SINE)
 	tween.set_ease(Tween.EASE_IN_OUT)  # eases in/out of each leg so the player isn't jolted at the ends
 
-	tween.tween_interval(DWELL_AT_START)
-	tween.tween_property(self, "position", _start_position + TRAVEL_OFFSET, TRAVEL_TIME)
-	tween.tween_interval(DWELL_AT_END)
-	tween.tween_property(self, "position", _start_position, TRAVEL_TIME)
+	tween.tween_interval(dwell_at_start)
+	tween.tween_property(self, "position", _start_position + travel_offset, travel_time)
+	tween.tween_interval(dwell_at_end)
+	tween.tween_property(self, "position", _start_position, travel_time)
 	return tween

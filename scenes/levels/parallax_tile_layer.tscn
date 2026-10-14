@@ -1,0 +1,24 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://scenes/levels/parallax_tile_layer.gd" id="1_script"]
+[ext_resource type="Shader" path="res://scenes/levels/parallax_tile_layer.gdshader" id="2_shader"]
+[ext_resource type="TileSet" uid="uid://dbsos5viaw3lo" path="res://resources/riverbank-1.tres" id="3_tileset"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_distant"]
+resource_local_to_scene = true
+shader = ExtResource("2_shader")
+shader_parameter/desaturate_red = 0.3
+shader_parameter/desaturate_green = 0.3
+shader_parameter/haze_color = Color(0.55, 0.68, 0.85, 1)
+shader_parameter/haze_amount = 0.15
+shader_parameter/tint = Color(0.9, 0.95, 1, 1)
+
+[node name="ParallaxTileLayer" type="TileMapLayer"]
+z_index = -100
+material = SubResource("ShaderMaterial_distant")
+scale = Vector2(0.5, 0.5)
+tile_set = ExtResource("3_tileset")
+collision_enabled = false
+navigation_enabled = false
+occlusion_enabled = false
+script = ExtResource("1_script")

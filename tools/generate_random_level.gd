@@ -37,31 +37,31 @@ const FALLBACK_TERRAIN := 0
 
 # ---- World -------------------------------------------------------------------
 const SEED := 0                 # 0 = new random world every run
-const ORIGIN := Vector2i(0, 0)  # top-left cell of the world
+const ORIGIN := Vector2i(0, 56)  # top-left cell of the world
 const WIDTH := 200              # tiles
-const HEIGHT := 100             # tiles (the level's kill plane is at row 64)
-const BORDER := 20              # thickness of the wall on the sides and the floor
+const HEIGHT := 40             # tiles (the level's kill plane is at row 64)
+const BORDER := 0              # thickness of the wall on the sides and the floor
 const CLOSED_TOP := false       # also wall off the top edge
 
 # ---- Shape: floating masses --------------------------------------------------
 const SIZE_X := 14.0            # typical horizontal size of a mass (tiles)
 const SIZE_Y := 6.0             # typical vertical size (smaller = flatter islands)
-const THRESHOLD := 0.1          # higher = less solid overall
+const THRESHOLD := 0.001          # higher = less solid overall
 const LAYER_PERIOD := 20.0      # rows between stacked layers of islands
-const LAYER_STRENGTH := 0.2     # 0 = no banding, higher = clearer layers
-const TOP_BIAS := -0.2         # density added at the top (negative = sparse sky)
-const BOTTOM_BIAS := 0.3        # density added at the bottom (positive = solid ground)
+const LAYER_STRENGTH := 0     # 0 = no banding, higher = clearer layers
+const TOP_BIAS := -0.6         # density added at the top (negative = sparse sky)
+const BOTTOM_BIAS := 0.6        # density added at the bottom (positive = solid ground)
 
 # ---- Shape: tunnels and caves ------------------------------------------------
 const TUNNEL_SIZE_X := 22.0
 const TUNNEL_SIZE_Y := 14.0
-const TUNNEL_WIDTH := 0.10      # 0 = no tunnels; larger = wider and more of them
+const TUNNEL_WIDTH := 0      # 0 = no tunnels; larger = wider and more of them
 
 # ---- Cleanup -----------------------------------------------------------------
-const SMOOTH_PASSES := 4        # blob smoothing; 0 keeps the raw noise
+const SMOOTH_PASSES := 8        # blob smoothing; 0 keeps the raw noise
 const MIN_ISLAND := 14          # loose solid pieces smaller than this are removed
 const MIN_POCKET := 8           # sealed-off air pockets smaller than this are filled
-const SLOPE_CHANCE := 0.2       # chance a possible ramp is built (0 = no slopes at all)
+const SLOPE_CHANCE := 0.8       # chance a possible ramp is built (0 = no slopes at all)
 const MAX_RAMP_RISE := 6        # tallest ramp, in tiles of height (a taller wall keeps its top)
 const RAMP_2X1_CHANCE := 0.5    # share of ramps that are gentle 2-wide-per-tile-of-rise slopes
 								# (the rest are 45 degree 1x1 slopes)
@@ -93,7 +93,7 @@ const INTERIOR_NEEDS_CORNERS := false
 
 # ---- Extras ------------------------------------------------------------------
 const CLEAR_EXISTING := true    # wipe the layer first (false = merge into it)
-const MOVE_PLAYER_TO_START := true  # move the scene's "Player" node to a start spot
+const MOVE_PLAYER_TO_START := false  # move the scene's "Player" node to a start spot
 
 
 func _run() -> void:

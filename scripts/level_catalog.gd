@@ -10,8 +10,12 @@ extends RefCounted
 ## An id is permanent once levels are shared: renaming one orphans anything that refers to it.
 
 const LEVELS: Array[Dictionary] = [
-	{"id": &"test_level", "title": "Test level", "path": "res://scenes/levels/test_level.tscn"},
-	{"id": &"test_level_2", "title": "Test level 2", "path": "res://scenes/levels/test_level_2.tscn"},
+	{"id": &"Level 1-1", "title": "Level 1-1", "path": "res://scenes/levels/level_1-1.tscn"},
+	{"id": &"Level 1-2", "title": "Level 1-2", "path": "res://scenes/levels/level_1-2.tscn"},
+	{"id": &"Level 1-3", "title": "Level 1-3", "path": "res://scenes/levels/level_1-3.tscn"},
+	{"id": &"Level 1-4", "title": "Level 1-4", "path": "res://scenes/levels/level_1-4.tscn"},
+	{"id": &"Level 1-5", "title": "Level 1-5", "path": "res://scenes/levels/level_1-5.tscn"},
+	{"id": &"Level 1-6", "title": "Level 1-6", "path": "res://scenes/levels/level_1-6.tscn"},
 ]
 
 ## Prefix of the id made for a level that has no catalog row (a `Finish.next_level` path, or a scene the editor

@@ -105,6 +105,15 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Headless route test:** a scene that loads the level, drives `Input.action_press`, and prints position/health/gems per stage (hop onto each button, walk, climb) is enough to prove a route is completable; it took four iterations to get the driver right, so keep it. Not committed to the repo.
 - A one-way **catwalk bridge flush with ladders:** a static ladder (the pit rescue ladder in 1-4) shares a cell with the bridge; ladder top = the row above the deck, as in 1-3.
 
+## Zone sensors, doors and camera cues (learned building 1-7)
+
+- **Template now includes** `PoweredSpikeLayer`, `PoweredCatwalkLayer`, `PoweredLadderLayer` and `ConductorLayers` as unwired instances, and `catwalks.tres` / `riverbank-1-oneway.tres` are in the repo. Rename-free: wire the template's own `PoweredSpikeLayer` (add `node_paths=PackedStringArray("sources")`, `sources`, `invert`, `show_ghost`) instead of adding a new one; add an extra plain instance for unwired always-out spikes. [verified]
+- **Godot 4.7 headless** loads the repo clone with no stubs needed now; `--import` left no tracked diffs. [verified]
+- **Zone-shut door:** a `ZoneSensor` (instance in `Sources`, `size` set per instance, origin at the zone centre) wired to a door with `invert = true` on the door root gives "closes behind the player, reopens when they leave". Start the zone one tile past the door column so the door never closes on the player. A 2-wide wall with a doorway needs the door in only one of the two columns. [verified headless: closed after the player passed, stayed open until then]
+- **Camera cue:** instance in `Dynamic`, `node_paths=PackedStringArray("sources")` and `sources` go on the cue root (no Editable Children needed). A TIMED button gave `is_cue_playing() == true` the frame after the press. [verified headless; framing/feel not seen]
+- **Scripted button press:** a driver that holds `jump` while moving overshoots a 16 px button. Walk to the button's x, release, then tap jump with a short `move_right`. [verified]
+- 1-7 (*Look Ahead*): TIMED button (9 s) retracts a 10-tile inverted spike field out of sight, with a camera cue on the field; checkpoint; a 20x14 shut-in room whose entry door closes via the zone; ladder to a catwalk deck, TOGGLE button opens the exit door; optional underside route over a floor spike strip for bonus gems and a medkit.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
@@ -129,3 +138,4 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Initial version: written after levels 1-1 and 1-2.
 - Added the ladders/catwalks/hanging section after building 1-3.
 - Added the buttons/doors/powered-layers section and the 1-4 summary after building level 1-4.
+- Added the zone sensor/door/camera cue section and the 1-7 summary after building level 1-7.

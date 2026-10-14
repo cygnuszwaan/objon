@@ -1,0 +1,220 @@
+diff --git a/docs/saving-levels-ui.md b/docs/saving-levels-ui.md
+index 4a86455..72d1b89 100644
+--- a/docs/saving-levels-ui.md
++++ b/docs/saving-levels-ui.md
+@@ -2,13 +2,14 @@
+ 
+ Checkpoint and save/restore (the saveable contract, `Game`, level loading, respawn), the finish, HUD and menus, touch controls, collectibles and points, the parallax backdrop. Read `objon.md` (the core: setup, layers and groups, contracts, invariants, docs index) first.
+ 
+-Covers: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Finish; Health bar; Level-complete overlay; Pause menu; Touch controls; Checkpoint and save/restore (Saveable contract; `Game` API; Level loading; Respawn flow; What each type saves; Not saved; Checkpoint; Live pitfalls)
++Covers: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Parallax tile layer; Finish; Health bar; Level-complete overlay; Pause menu; Touch controls; Checkpoint and save/restore (Saveable contract; `Game` API; Level loading; Respawn flow; What each type saves; Not saved; Checkpoint; Live pitfalls)
+ 
+ - **Gem** (`gem.gd`): `Area2D` in group `"gem"`, calls `collect_gem()` on whatever it overlaps if that body has the method (mirrors the `take_hit` duck-typing convention rather than checking a group name), disables monitoring and frees itself immediately on pickup.
+ - **Points and bonus gem**: `Player.points` is the score; `add_points(amount) -> bool` (duck-typed like `collect_gem()`/`heal()`) is its only writer: it ignores a dead or dancing player and non-positive amounts, emits `points_changed(total, delta)` and spawns the `PointsPopup` feedback. The surf also awards through it (clean landings, bowled enemies, skim distance; see Scoring under Surf). `gem_1.gd` (`points` export, 5) calls `collect_gem()` then `add_points()`; `medkit.gd` (`points` 10) awards through `collect_medkit()` whether or not the heal was needed; `gem_2.gd` + `gem_2.tscn` (`sprites/collectibles/gem2.png`, 16×64 = 4 frames at 10 fps, `points` 50) is the bonus gem: it calls `add_points()` only, is in group `"bonus_gem"` and deliberately **not** `"gem"`, so it never enters `gems_total` or the finish's unlock percentage, and plays `collectibles/collectible` variant 1 (collectible2; the variant index wraps until the file exists). **Power** (roadmap 7.1, gem trails): `gem_2.tscn` carries a `PowerTarget` child and `gem_2.gd` implements `set_powered()` and `set_powered_initial()`, with `invert` exported on its root like the door's: powered = present and collectible, unpowered = hidden with `monitoring` off (switched deferred, since a timed button or speed trap can change state inside a physics callback), so one source can switch a whole trail on and off. An unwired gem is simply present. It keeps no power state: it saves nothing, a collected gem is absent from the snapshot, and an uncollected one re-derives from its restored sources through `set_powered_initial()`. A gem that reappears under the player is collected by polling its overlaps for `RECHECK_FRAMES` (3) physics frames, since a body already inside never enters it again, and `_taken` stops a second overlap in one frame from awarding twice. Wire each gem's `PowerTarget.sources` per instance (Editable Children), or attach a conductor wire by adjacency. `points` is per instance and the default 50 is a bonus-gem value; a trail value needs a `p<N>` popup animation, so use 5 or 10 unless new art exists. `gem_2.gd` is `@tool` only for a configuration warning (`get_points_warnings()`, read from the animations in `points_popup.tscn`) that flags a `points` value with no art; the points are still awarded without it. No new sound: the pickup sound is unchanged. `points` is part of the player's `save_state()`, so score banked before a checkpoint survives a restore (pickups taken before it stay gone) and `restart_level()` resets it. **Popup** (`scenes/effects/points_popup.gd` + `.tscn`, `AnimatedSprite2D`): the player spawns one in its parent at `global_position + points_popup_offset` (default `(0, -20)`, above the head), world space so it stays where it appeared; `points` selects the animation `p<points>` (`sprites/effects/{5,10,20,50}points.png`, 16×160 = 10 frames, 10 fps, each with its own upward drift drawn in), `rise_px` (16) adds a further tween drift over the same duration, and it frees itself on the last frame. A points value with no matching animation warns and shows nothing, so a new reward value needs a new `p<N>` animation. Physics interpolation is off on the popup (it moves in idle time). **Points display** (`scenes/ui/points_display.gd`, `class_name PointsDisplay`): `CanvasLayer` (layer 5) instanced as a child of `player.tscn`, built in code (placeholder default-font `Label` at the top-left, `POINTS  N`, popping on each gain); it syncs from the player deferred at load and follows `points_changed`.
+ - **Gem counter** (`scenes/ui/gem_display.gd`, `class_name GemDisplay`): `CanvasLayer` (layer 5) instanced as a child of `player.tscn` like `PointsDisplay`, built in code: a row under the points counter (`top` 56 px, `margin` 16) of the first frame of `sprites/collectibles/gem1.png` as a `TextureRect` (`icon_size` 32 px, a placeholder until UI art exists) and a default-font `Label`, `collected / total`. It follows `gem_collected` (the row pops) and syncs deferred at load; the level's total is only counted in the player's own deferred `_count_gems()`, which runs after the display's sync, so it also redraws on `gems_counted`. After a checkpoint restore the saved numbers are in place before the sync, so it shows them with no signal. The label turns green once every gem is collected, and a level with no gems (total 0) hides the row. Only the gems in group `"gem"` count, never the bonus gem. Replace the placeholder when there is HUD art.
+ - **Medkit** (`res://scenes/collectibles/medkit.gd` + `medkit.tscn`): `Area2D` with an `AnimatedSprite2D` (`sprites/collectibles/medkit.png`, 16×32 = 2 frames, `idle` at 2 fps) and a 12×12 sensor. Duck-typed like the gem: it calls `collect_medkit(heal_amount, points)` on any overlapping body that has it (the player); `heal_amount` (default 2) and `points` (default 10) are exported. The player heals up to `heal_amount` (clamped to `max_health`, nothing at full health), emits `health_changed`, awards the points and plays `collectibles/medkit`, and the medkit is taken on every touch — **points are awarded even at full health**, so being hurt first is never rewarded. It returns false (medkit left in place) only for a dead or dancing player. The overlap is polled every physics frame rather than using `body_entered`. A collected medkit frees itself; it joins `"saveable"` with empty state, like a gem, so it stays gone after a checkpoint restore. The health bar shows the gain as a reverse of the hurt flash (see Health bar).
+ - **Parallax backdrop** (`scenes/levels/backdrop_layers.tscn` + `backdrop_layer.gd`, `class_name BackdropLayer`; art in `sprites/backgrounds/`): purely visual, no physics. `backdrop_layers.tscn` is a `Node2D` holding a `Sky` (`CanvasLayer` at layer -100 with a full-rect `ColorRect`, the flat colour behind everything, unaffected by the camera) and two layers, `Far` (`z_index` -102, `scroll_scale` (0.15, 0.1)) and `Near` (`z_index` -101, `scroll_scale` (0.4, 0.3)), each a `Node2D` with the script and a centred `Sprite2D` child named `Art` whose texture is one tile (`bg_far.png`, `bg_near.png`: 320×180 placeholders, transparent above the silhouette, seamless sideways). Instance it once per level as the first child of the level root and edit through Editable Children (swap the `Art` textures, colours, scales). `scroll_scale` is per axis and means how fast the art moves on screen relative to a world object: 1 = like the world, 0 = pinned to the screen. A layer's position is the world point the camera must be looking at for its art to sit exactly as drawn in the editor; elsewhere it is displaced by `(camera centre - node position) × (1 - scroll_scale)`, so set the node's y to line the art up with the area being built (x is invisible while `repeat_x` is on). The position is a pure function of the camera — `get_canvas_transform()` read this frame, not a node reference or stored state — so respawn teleports and camera smoothing need no handling; `process_priority` 100 makes it run after the `Camera2D` updates, and `physics_interpolation_mode` is off because the node is moved from `_process()`. With `repeat_x` the script duplicates `Art` as many times as the visible width needs (`ceil(view width / tile width) + 2`) and wraps the row by whole tile widths; the tile must repeat seamlessly and there is no vertical repeat. Keep every layer's `z_index` far below the level's tilemaps (a basin draws at its tilemap's `z_index - 1`).
++- **Parallax tile layer** (`scenes/levels/parallax_tile_layer.tscn` + `.gd` + `.gdshader`, `class_name ParallaxTileLayer`, `@tool`): a `TileMapLayer` for distant painted terrain, purely visual. Instance it in a level and assign the level's ground `TileSet` (the scene defaults to `riverbank-1.tres`); `collision_enabled`, `navigation_enabled` and `occlusion_enabled` are off and it joins **none** of `"ground"`, `"world_tilemap"`, `"catwalk"`, `"ladder_tilemap"`, so the player, water, lasers and basins never see it (`get_layer_warnings()` flags collision on, a scale other than 1, or a group). `z_index` is -100: above the `BackdropLayer`s (-102, -101), far below the level's tilemaps. **Editor**: drawn 1:1 in the Ground layer's coordinates (node scale stays 1), so a cell painted behind a point of the ground is behind that point; the editor never moves it. **Run time**: one export, `runtime_zoom` (default 0.5, 1 = like the ground), is both the layer's drawn size and its scroll speed. `_process()` (priority 100, interpolation off) sets `scale = zoom` and `global_position = origin × zoom + camera centre × (1 - zoom)` from this frame's canvas transform, i.e. the layer is scaled about the middle of the screen, so the cell painted at world position E is drawn at `centre + (E - centre) × zoom`. When the camera is centred on E that is E: terrain painted behind a point lines up whenever the player is there, and elsewhere is pulled toward the screen centre by the zoom. The node's own `position` is the authored grid origin and is not changed in the scene. Respawns and camera smoothing need no handling (pure function of the camera). **Colour filter**: a `ShaderMaterial` (`resource_local_to_scene`, edit it per level in the Inspector) running `parallax_tile_layer.gdshader`: `desaturate_red` and `desaturate_green` (0.3) pull those channels toward the pixel's grey, `haze_color`/`haze_amount` (cool blue, 0.15) mix a haze in, `tint` (0.9, 0.95, 1.0) multiplies; alpha is untouched. `level_1-1.tscn` has one (`DistantGround`, nothing painted yet). No saved state, no sound.
+ - **Finish** (`res://scenes/interactive/finish.gd` + `finish.tscn`, `@tool`): `Area2D` (layer 0, mask 1) with a sensor `CollisionShape2D` and a `PowerTarget` child (at the bottom-left tile; move it to the tile a wire should end at). Art `sprites/interactive/finish_locked.png` / `finish_unlocked.png` (two 32×32 frames, looping, red/green light) and `finish_open.png` (13 frames, plays once and holds); the `AnimatedSprite2D` and its `SpriteFrames` are built in code and never saved into the scene. Node origin is the bottom-centre of the art, on a 16px grid point (sits on the floor tile's top edge). **Unlock rule**: `required_gem_percent` (default 100) of the player's `gems_total` (`ceil(total × percent / 100)`; a level with no gems counts as met), and optionally a button through the `PowerTarget` (`sources`, or a conductor wire attached by adjacency; nothing wired = gems only), combined by `require_all` (true = gems AND button, false = gems OR button). The button is read through `set_powered()`/`set_powered_initial()` (the first call marks the finish as wired; `invert` is exported on the finish). It relocks if the rule stops holding (a released momentary button) until the player enters; the startup state is applied silently. **Entry**: the sensor is polled every physics frame (a player already standing in the doorway when it unlocks still enters); an unlocked finish plays `open`, plays `interactive/finish_open` and calls the player's `dance_through(center_x, slide_time, shrink_time)` (`slide_time` 0.4s, `shrink_time` 1.2s exported on the finish); once `open` has ended and that exit tween has finished it waits `complete_delay` (0.5s), emits `level_completed`, and adds `scenes/ui/level_complete.tscn` to the current scene. The player only shows in front of the open door if the Player node comes after the finish in the tree (or has a higher `z_index`). `interactive/finish_unlock` plays when it becomes unlocked after load. `next_level` (`@export_file`, a path rather than a `PackedScene`) is an optional override of where the overlay's Jump continues; empty = the next row after the current level in `LevelCatalog` (`Game.next_level_id()`), and none after the last (the prompt offers a replay).
+ - **Health bar** (`res://scenes/ui/health_bar.gd` + `.tscn`, `class_name HealthBar`, plus `health_segment_flash.gdshader`): `CanvasLayer` (layer 5) instanced as a child of `player.tscn`, so every level gets it with no level edits; it listens to the player's `health_changed` signal and syncs its starting state deferred (a child's `_ready()` runs before the parent's). Top-right via anchors; `pixel_scale` (default 3 in the script; `player.tscn` sets 2.5 to match the player camera's 2.5 zoom) and `margin` are exports. Art is `sprites/ui/healthbar1_{back,front,outline}.png` (128×16): `Back` has `clip_children = CLIP_AND_DRAW` so it is also the mask for its children (the bar keeps its rounded ends); `healthbar1_front.png` is cut in code into 4 full-bar-size `ImageTexture` `TextureRect` segments under `Back/Segments` (so each sits where it does in the art), cut per row along the art's curved ")" divider lines — `DIVIDER_X` 32/64/96 plus the per-row `DIVIDER_CUT` offsets, each segment keeping the divider line at its right end — not along straight verticals; the four pieces recombine to the original art exactly. Redrawn art with a different divider shape needs `DIVIDER_CUT` updated; `Outline` is on top. Segment i is full while i < health. Losing a hit point flashes that segment (3 blinks of 0.06s on / 0.06s off, `FLASH_STRENGTH` 0.6 toward white) via a per-segment `ShaderMaterial` that only lightens each pixel's colour (so the pixelated divider shading is kept), then hides it so Back's flat divider lines show; gaining health plays the reverse: the segment starts hidden and blinks in (normal, white, three times) before settling shown, with several gained at once filling in left to right `GAIN_STAGGER` (0.2s) apart; the first sync at load snaps without animating. This assumes `max_health` 4. The earlier slide-the-front-layer approach was dropped. The `healthbar1_text.png` ("HEALTH" label) layer is not used yet.
+ - **Level-complete overlay** (`res://scenes/ui/level_complete.gd` + `.tscn`): placeholder `CanvasLayer` (layer 10) built in code — dimmer, title, gem tally, prompt. `show_result(gems, total, next_id)` (a level id, empty = none); ignores input for 0.6s; `jump` calls `Game.load_level(next_id)` when there is one, otherwise the prompt is "Press R to play again" (`R` calls `Game.restart_level()` once the player has won, which discards the checkpoint). Replace the whole scene when real UI exists.
+@@ -24,4 +25,8 @@ Covers: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Finis
+   - **Checkpoint** (`checkpoint.gd`, `Area2D`, layer 0, mask 1): `sprites/interactive/checkpoint.png`, 16×112 = 7 frames on one `Sprite2D` (`vframes` 7), frame 0 inactive, 6 lit, a light climbing the pole between; node origin is the centre of its 16×16 tile. `order` (exported) is assigned automatically when an instance is added to a scene in the editor — the lowest whole number from 1 up that no other checkpoint in the edited scene uses, so sequential adds get 1, 2, 3 and a number freed by deleting a checkpoint is reused by the next one added; it stays hand-editable, instances already saved in a level are never renumbered, and a duplicate or paste is numbered like any new node (the script is `@tool` only for this: in the editor `_ready()` numbers a node whose `owner` is still null, meaning it was just added, and returns before touching the `Game`/`Audio` autoloads, which don't exist there; the root of `checkpoint.tscn` itself is skipped). A touch counts only if it is greater than `Game.checkpoint_index`, so a later checkpoint overrides an earlier one and never the reverse; two checkpoints in one level sharing an `order` get a warning, and would light together (the second can never override the first). The sensor is polled every physics frame, so a player already inside at load still counts; a dead or dancing player never activates one. Activating calls `Game.commit_checkpoint(order, global_position + respawn_offset)` (`respawn_offset` default `(0, -1)`: the player's capsule is 16px tall and centred, so the tile origin puts its feet on the tile's bottom edge) and plays `interactive/checkpoint` (listed in `Audio.PLANNED` until a file exists). A checkpoint is lit while its `order` is at or below `Game.checkpoint_index`: on `checkpoint_committed` every checkpoint in that range animates 0→6 at `anim_fps` (12) if it isn't already lit, so earlier ones stay lit and skipped ones light up with it (only the touched one plays the sound); a level that loads onto a restored snapshot starts with all of them already lit, silently. Place it before the Player in the level tree so the player draws in front.
+   - **Live pitfalls**: a new saveable must join the group in `_ready()` (not deferred) and its `load_state` must be silent and order-independent; anything that recounts or caches level totals at load (like `gems_total`) must survive the restore having already freed collected objects; `load_state` on anything a power source drives must tolerate `set_powered_initial()` running afterwards and winning.
+ 
++## Status
++
++- **Parallax tile layer**: built, not yet confirmed in-editor. To check: paint into `DistantGround` in `level_1-1.tscn` and see that it draws at half size in the editor and at run time, scrolls behind the level, lines up with the level at the anchor, carries the washed-out blue filter, and does not stop the player, water or lasers.
++
+ Reads with: `meltable-blocks.md` (the block dispenser saves and re-creates its spawned blocks), `player.md` (`respawn_at()`, death, gems and win), `power.md` (the finish, restored power state), `enemies.md` (enemy restore rules), `rotating-bodies.md` (restoring a rotating body), `platforms-conveyors.md` (the drop platform is not saved), `liquid-system.md` (a basin comes back settled).
+diff --git a/export-audit.md b/export-audit.md
+index 3b63dc7..0f35b92 100644
+--- a/export-audit.md
++++ b/export-audit.md
+@@ -4,7 +4,7 @@ Tracks which scripts have been checked against the level-editor rule in objon.md
+ 
+ **Method.** `audit_export_writes.py` (next to this file; run from the project root, `--json out.json` for machine output) is a regex scan for assignments and mutating calls on a script's own exports outside the export's setter, plus writes to any exported name through another reference. It covers all scripts. Every hit was then read by hand. **Limits:** it does not see writes through `set()`, exported Resources mutated in place, or an exported array mutated through an alias, and it reports built-in node properties that share a name with an export. A clean scan is not proof.
+ 
+-**Status:** scanned and hand-reviewed 2026-10-07; `laser_turret.gd`, `meltable_block.gd`, `jump_pad.gd`, `crusher.gd`, `ice_block.gd` and `metal_block.gd` re-scanned after roadmap 2.1 to 2.4, and `seesaw.gd`, `rotating_body.gd`, `seesaw_plank_art.gd` and `laser_beam.gd` re-scanned after roadmap 3.1, `mirror.gd` after 3.2 (a comment-only change), and `mirror.gd` again after N1.4, and `water_manager.gd` and `liquid_constants.gd` after 4.1, and `water_manager.gd` again after 4.2, and `player.gd` and `audio.gd` after 4.3, and `surface_types.gd` (new), `player.gd`, `water_manager.gd`, `laser_beam.gd` and `basin.gd` after 5.1, and `surface_types.gd` again after 5.2, and `surface_types.gd` and `laser_beam.gd` after 5.3, and `button.gd` after the crouch-cycle fix, and `finish.gd` and `stingbot.gd` (player-lookup guards), and `basin.gd`, `water_manager.gd`, `laser_turret.gd` and `audio.gd` after 5.4, and `basin.gd` and `player.gd` after 6.1, and `basin.gd` and `player.gd` again after 6.2, and `basin.gd` and `liquid_skin.gd` after the 6.3 crust-underside fix, and `gem_2.gd` after 7.1, and `grunt.gd` and `grunt_art.gd` after 8.1, and `player.gd`, `basin.gd`, `ice_block.gd`, `metal_block.gd` and `meltable_block.gd` after 8.2, and `game.gd`, `audio.gd`, `finish.gd`, `drillbot.gd`, `level_complete.gd`, `pause_menu.gd` (new) and `level_list.gd` (new) after 8.3, and `player.gd`, `audio.gd` and `tile_hazards.gd` (new) after 8.4, and `rotating_body.gd` and `swing.gd` after 8.5, and `gem_display.gd` (new) and `player.gd` after 8.6, and `game.gd`, `finish.gd`, `level_complete.gd`, `pause_menu.gd` and `level_catalog.gd` (new, replaces `level_list.gd`) after the loading entry point, and `touch_controls.gd` (new) and `game.gd` (one `add_child()` line in `_ready()`) after the touch controls and `arc.gd` and `arc_turret.gd` (new) after the arc turret, and `arc.gd` and `arc_receiver.gd` (new) after the arc receiver, and `player.gd`, `audio.gd` (one `PLANNED` id) and `points_popup.tscn` (data only) after the surf scoring and camera lead and `camera_cue.gd` (new), `player.gd` and `audio.gd` (one `PLANNED` id) after N1.1, and `powered_spike_layer.gd` (new), `player.gd` and `audio.gd` (two `PLANNED` ids) after N1.2, and `zone_sensor.gd` (new) and `audio.gd` (two `PLANNED` ids) after N1.3, and `powered_tile_layer.gd` (new, the base the spike layer moved onto), `powered_spike_layer.gd`, `powered_catwalk_layer.gd` (new), `powered_ladder_layer.gd` (new), `player.gd` and `audio.gd` (two `PLANNED` ids) after N1.2b, and `powered_tile_layer.gd` again after the ghost view, and `logic_node.gd`, `logic_delay.gd`, `logic_latch.gd`, `logic_counter.gd` and `logic_pulse.gd` (all new), `camera_cue.gd` and `power_target.gd` after N2.1, and `block_dispenser.gd` (new), `meltable_block.gd` and `audio.gd` (three `PLANNED` ids) after N2.2, and `seesaw.gd`, `rotating_body.gd` and `audio.gd` (one `PLANNED` id) after N2.3 and `carbon_fiber_block.gd` (new), `meltable_block.gd`, `ice_block.gd`, `metal_block.gd`, `player.gd`, `bullet.gd` (comment only) and `audio.gd` (three `PLANNED` ids) after N3.3, and `water_manager.gd` and `rotating_body.gd` after N3.5 (90 scripts, 63 with exports on the latest scan; the earlier count was 86 scripts, 60 with exports, the five new ones included; the count includes `laser_receiver.gd`, `arc_receiver.gd`, `bullet_target.gd`, `weight_plate.gd`, `angle_sensor.gd` and `basin_sensor.gd`, added by roadmap steps; `load_weight` added to the five enemy scripts, `enemy_weight_scale` to `weight_plate.gd` and `rotating_body.gd` after N1.5 (scan hits unchanged); no new real hits since the last scan after 8.2 and 8.3 (the only new scan line is the `dim.color` false positive in `pause_menu.gd`), and no script was added by 3.1). Not yet done for any script: a deep read for the scan's blind spots. Re-run the scan after the roadmap work and review any new hit.
++**Status:** scanned and hand-reviewed 2026-10-07; `laser_turret.gd`, `meltable_block.gd`, `jump_pad.gd`, `crusher.gd`, `ice_block.gd` and `metal_block.gd` re-scanned after roadmap 2.1 to 2.4, and `seesaw.gd`, `rotating_body.gd`, `seesaw_plank_art.gd` and `laser_beam.gd` re-scanned after roadmap 3.1, `mirror.gd` after 3.2 (a comment-only change), and `mirror.gd` again after N1.4, and `water_manager.gd` and `liquid_constants.gd` after 4.1, and `water_manager.gd` again after 4.2, and `player.gd` and `audio.gd` after 4.3, and `surface_types.gd` (new), `player.gd`, `water_manager.gd`, `laser_beam.gd` and `basin.gd` after 5.1, and `surface_types.gd` again after 5.2, and `surface_types.gd` and `laser_beam.gd` after 5.3, and `button.gd` after the crouch-cycle fix, and `finish.gd` and `stingbot.gd` (player-lookup guards), and `basin.gd`, `water_manager.gd`, `laser_turret.gd` and `audio.gd` after 5.4, and `basin.gd` and `player.gd` after 6.1, and `basin.gd` and `player.gd` again after 6.2, and `basin.gd` and `liquid_skin.gd` after the 6.3 crust-underside fix, and `gem_2.gd` after 7.1, and `grunt.gd` and `grunt_art.gd` after 8.1, and `player.gd`, `basin.gd`, `ice_block.gd`, `metal_block.gd` and `meltable_block.gd` after 8.2, and `game.gd`, `audio.gd`, `finish.gd`, `drillbot.gd`, `level_complete.gd`, `pause_menu.gd` (new) and `level_list.gd` (new) after 8.3, and `player.gd`, `audio.gd` and `tile_hazards.gd` (new) after 8.4, and `rotating_body.gd` and `swing.gd` after 8.5, and `gem_display.gd` (new) and `player.gd` after 8.6, and `game.gd`, `finish.gd`, `level_complete.gd`, `pause_menu.gd` and `level_catalog.gd` (new, replaces `level_list.gd`) after the loading entry point, and `touch_controls.gd` (new) and `game.gd` (one `add_child()` line in `_ready()`) after the touch controls and `arc.gd` and `arc_turret.gd` (new) after the arc turret, and `arc.gd` and `arc_receiver.gd` (new) after the arc receiver, and `player.gd`, `audio.gd` (one `PLANNED` id) and `points_popup.tscn` (data only) after the surf scoring and camera lead and `camera_cue.gd` (new), `player.gd` and `audio.gd` (one `PLANNED` id) after N1.1, and `powered_spike_layer.gd` (new), `player.gd` and `audio.gd` (two `PLANNED` ids) after N1.2, and `zone_sensor.gd` (new) and `audio.gd` (two `PLANNED` ids) after N1.3, and `powered_tile_layer.gd` (new, the base the spike layer moved onto), `powered_spike_layer.gd`, `powered_catwalk_layer.gd` (new), `powered_ladder_layer.gd` (new), `player.gd` and `audio.gd` (two `PLANNED` ids) after N1.2b, and `powered_tile_layer.gd` again after the ghost view, and `logic_node.gd`, `logic_delay.gd`, `logic_latch.gd`, `logic_counter.gd` and `logic_pulse.gd` (all new), `camera_cue.gd` and `power_target.gd` after N2.1, and `block_dispenser.gd` (new), `meltable_block.gd` and `audio.gd` (three `PLANNED` ids) after N2.2, and `seesaw.gd`, `rotating_body.gd` and `audio.gd` (one `PLANNED` id) after N2.3 and `carbon_fiber_block.gd` (new), `meltable_block.gd`, `ice_block.gd`, `metal_block.gd`, `player.gd`, `bullet.gd` (comment only) and `audio.gd` (three `PLANNED` ids) after N3.3, and `water_manager.gd` and `rotating_body.gd` after N3.5, and `parallax_tile_layer.gd` (new) after the parallax tile layer (90 scripts, 63 with exports on the latest scan; the earlier count was 86 scripts, 60 with exports, the five new ones included; the count includes `laser_receiver.gd`, `arc_receiver.gd`, `bullet_target.gd`, `weight_plate.gd`, `angle_sensor.gd` and `basin_sensor.gd`, added by roadmap steps; `load_weight` added to the five enemy scripts, `enemy_weight_scale` to `weight_plate.gd` and `rotating_body.gd` after N1.5 (scan hits unchanged); no new real hits since the last scan after 8.2 and 8.3 (the only new scan line is the `dim.color` false positive in `pause_menu.gd`), and no script was added by 3.1). Not yet done for any script: a deep read for the scan's blind spots. Re-run the scan after the roadmap work and review any new hit.
+ 
+ **Severity.** A violation matters only if the editor plays in place. If a play-test always runs a fresh instance of the saved level (as the reload path already does), the rule is a preference and these are low priority. Fix a violation by keeping the export as the authored starting value and adding a separate runtime variable; do it when the object is next touched, not as a sweep. The pattern to copy is `WaterBasin` (`initial_fill_depth_below_surface` authored, `fill_volume` runtime).
+ 
+@@ -94,6 +94,7 @@ Tracks which scripts have been checked against the level-editor rule in objon.md
+ | `scenes/ui/level_complete.gd` | no | 0 | clean | scan hits are built-in node properties that share a name with an export elsewhere (false positives); roadmap 8.3: the accept-delay `create_timer()` passes `process_always = false`; no exports touched. Loading entry point: `show_result()` takes a level id and Jump calls `Game.load_level()`; no exports |
+ | `scenes/ui/pause_menu.gd` | yes | 0 | clean | new (roadmap 8.3: pause menu). No exports; builds its controls in `_ready()` from `LevelList.entries()` and emits `resume_requested` and `level_chosen(path)`. The scan's one hit (`dim.color`) is a built-in node property that shares a name with an export elsewhere (false positive, as in `level_complete.gd`). Loading entry point: lists `LevelCatalog` rows, emits the level id and marks `Game.current_level_id`; no exports |
+ | `scenes/ui/points_display.gd` | no | 3 | clean | no writes found |
++| `scenes/levels/parallax_tile_layer.gd` | no | 1 | clean | new (parallax tile layer). Export `runtime_zoom`, only read in `_apply()`. Runtime writes `scale`, `global_position`, `process_priority`, `physics_interpolation_mode`, `collision_enabled`, `navigation_enabled` and `occlusion_enabled`, all built-in node properties, never an export. Runtime state is `_origin`. `@tool` for the configuration warning only; `_ready()` returns before any runtime setup in the editor |
+ | `scenes/ui/gem_display.gd` | no | 5 | clean | new (roadmap 8.6: gem counter). Authored `margin`, `top`, `font`, `font_size` and `icon_size` are only read; runtime state is `_row`, `_label`, `_tween`. `player.gd` gained the `gems_counted` signal only (no export touched) |
+ | `scenes/enemies/rail_bot.gd` | yes | 3 groups | clean | new (rail bot). Added the `contact_damage` export (read in `_poll_contact()`) and the `Hitbox` child it polls, and the `rail_grabbable` export, read in `_rebuild_rail()` to put the rail in group `grab_rail` (a group join, never an export write). Exports are authored values read in `_ready()` or per frame (`health` is read once into `_health`); the `rail` and `start_fraction` setters only re-place the bot and rebuild the rail line. Runtime state is `_health`, `_powered`, `_offset`, `_dir`, `_pause_left`, `_drip_clock`, `_dead`. It writes the other nodes' state only through the unowned `RailLine` child it creates under the Path2D; sparks get `damage` set by `set()` before they enter the tree |
+ | `scenes/interactive/rail.gd` | no | 5 | clean | new (`Rail`, a `@tool` Path2D built from its Marker2D children). Exports are authored (`smoothing`, `closed`, `grabbable`, `line_color`, `line_width`); runtime state is `_last_points` and `_curve_owned`. It writes the built-in `curve` property (a generated curve, not an export) and only through `_rebuild_curve()` |
+diff --git a/objon.md b/objon.md
+index 27b09df..e7a5b3d 100644
+--- a/objon.md
++++ b/objon.md
+@@ -35,7 +35,7 @@ Read this file in full, then **only the topic files for what you are changing**.
+ - `docs/hazards-traps.md`: Sawwheel, crusher, cannon and bullet, spikes, the powered tile layers (spikes, catwalks, ladders). Names: Sawwheel / Crusher hazards; Cannon / Bullet; Spikes; Powered spike layer; Powered catwalk layer; Powered ladder layer.
+ - `docs/platforms-conveyors.md`: Moving and drop platforms, conveyor belt, jump pad, breakable barrier. Names: Moving platform; Drop platform; Conveyor belt; Jump pad; Breakable barrier; Rail.
+ - `docs/liquid-system.md`: Water, slag and steam: particles, basins, faucets (summary). Names: Liquid system.
+-- `docs/saving-levels-ui.md`: Checkpoints and save/restore, level loading, finish, pause menu, touch controls, HUD, collectibles, backdrop. Names: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Finish; Health bar; Level-complete overlay; Pause menu; Touch controls; Checkpoint and save/restore.
++- `docs/saving-levels-ui.md`: Checkpoints and save/restore, level loading, finish, pause menu, touch controls, HUD, collectibles, backdrop. Names: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Parallax tile layer; Finish; Health bar; Level-complete overlay; Pause menu; Touch controls; Checkpoint and save/restore.
+ - `docs/level-design.md`: The designer's reference: what the game can do now, as a summary with numbers and gotchas (the topic files hold the detail). Names: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms, belts, pads, rails, barriers, powered bridges and ladders; Rotating bodies: see-saw and swing; Blocks: ice and metal; Liquids: water, slag, steam; Beams and projectiles: laser, arc, cannon, mirror; Hazards; Enemies; Power: sources, wiring, devices; Collectibles, checkpoints, finish); Interaction matrix; Gaps, limits and gotchas.
+ - `docs/puzzles.md`: Puzzle primitives and puzzle concepts (design proposals built from the objects in `docs/level-design.md`; not playtested until marked otherwise). Names: Puzzle primitives (Logic; Spatial; Timing; Resource); Puzzle concepts (A. Light, mirrors and receivers; B. Water, slag and steam; C. Weight, balance and swinging; D. Momentum and the surf; E. Traversal and spatial; F. Timing, rhythm and traps; G. Enemies as mechanisms; H. Information, memory, routing and pacing; I. Full-room recipes).
+ - `docs/level-plan.md`: The campaign plan: 11 chapters of levels that introduce objects in order and use the concepts in `docs/puzzles.md` as set pieces, with a difficulty curve and a list of spare puzzles (a plan, not built; read it when making or reordering levels). Names: Principles; Difficulty scale; Chapter overview; Chapters 1 to 11 (1 Footing; 2 Momentum; 3 Light; 4 Weight; 5 Blocks; 6 Rhythm; 7 Enemies; 8 Water; 9 Steam; 10 Memory; 11 Grand works); Spare parts.
+diff --git a/scenes/levels/level_1-1.tscn b/scenes/levels/level_1-1.tscn
+index bcd2290..ee0a0bf 100644
+--- a/scenes/levels/level_1-1.tscn
++++ b/scenes/levels/level_1-1.tscn
+@@ -18,6 +18,7 @@
+ [ext_resource type="PackedScene" path="res://scenes/collectibles/medkit.tscn" id="12_medkit"]
+ [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="13_chk"]
+ [ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="14_fin"]
++[ext_resource type="PackedScene" path="res://scenes/levels/parallax_tile_layer.tscn" id="15_distant"]
+ 
+ [node name="TestLevel" type="Node2D" unique_id=1261410649]
+ script = ExtResource("1_8dks1")
+@@ -46,6 +47,9 @@ metadata/_edit_lock_ = true
+ [node name="Art" parent="Backdrop/Near" index="0"]
+ metadata/_edit_lock_ = true
+ 
++[node name="DistantGround" parent="." instance=ExtResource("15_distant")]
++tile_set = ExtResource("4_dyh2t")
++
+ [node name="Tilemaps" type="Node" parent="." unique_id=1276069544]
+ 
+ [node name="Ground" type="TileMapLayer" parent="Tilemaps" unique_id=918251972 groups=["ground", "world_tilemap"]]
+diff --git a/scenes/levels/parallax_tile_layer.gd b/scenes/levels/parallax_tile_layer.gd
+new file mode 100644
+index 0000000..419f534
+--- /dev/null
++++ b/scenes/levels/parallax_tile_layer.gd
+@@ -0,0 +1,73 @@
++@tool
++class_name ParallaxTileLayer
++extends TileMapLayer
++## A purely visual tile layer that sits behind the level and scrolls in parallax: paint distant terrain with
++## the level's own ground tileset, drawn smaller than the ground and colour-filtered so it reads as far away.
++## No collision, no navigation, no occluders, and it is in none of the tilemap groups ("ground",
++## "world_tilemap", "catwalk", "ladder_tilemap"), so the player, water, lasers and basins never see it.
++##
++## In the editor the layer is drawn 1:1, in the same coordinates as the Ground layer: a cell painted behind a
++## point of the ground is behind that point. At run time the layer is drawn at `runtime_zoom` (0.5 = half
++## size) and its scroll speed is that same number, which is what a plane that far away would do. Zoom and
++## scroll are one setting; there is no separate scroll scale.
++##
++## Alignment: at run time the layer is scaled about the middle of the screen, so the point of the layer
++## that is painted at world position E is drawn at (camera centre + (E - camera centre) x runtime_zoom).
++## When the camera is centred on E that is E itself: terrain painted behind a point of the level appears
++## directly behind it whenever the player is there. Anywhere else it is pulled toward the screen centre by
++## the zoom, which is what makes it look distant. The layer node's own position, scale and rotation are
++## the authored placement; keep the scale at 1 (the zoom is `runtime_zoom`).
++##
++## The transform is a pure function of this frame's camera (canvas transform), with no stored state, so
++## respawn teleports and camera smoothing need no handling. `process_priority` is high so it runs after the
++## Camera2D has updated.
++##
++## The colour filter is the ShaderMaterial in parallax_tile_layer.tscn (parallax_tile_layer.gdshader),
++## local to each instance: tweak it in the Inspector per level. Keep `z_index` below the level's tilemaps
++## and above the BackdropLayers (Far -102, Near -101).
++
++@export_range(0.05, 1.0, 0.01) var runtime_zoom: float = 0.5 ## Size and scroll speed at run time: 1 = like the ground, smaller = further away.
++
++var _origin: Vector2 = Vector2.ZERO
++
++func _ready() -> void:
++	if Engine.is_editor_hint():
++		set_process(false)  # the editor shows the layer 1:1, exactly as authored
++		return
++	# Moved and scaled from _process(); interpolating it between physics ticks would fight that.
++	physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
++	process_priority = 100
++	# Belt and braces: the scene already has these off, and a level could override them.
++	collision_enabled = false
++	navigation_enabled = false
++	occlusion_enabled = false
++	_origin = global_position
++	_apply(Vector2.ZERO)
++
++func _process(_delta: float) -> void:
++	var canvas := get_canvas_transform()
++	_apply(canvas.affine_inverse() * (get_viewport_rect().size * 0.5))  # world point at the middle of the screen
++
++## Scale about the authored origin by the zoom, then slide so the layer is scaled about the camera centre.
++## A cell at local `l` (editor position E = origin + l) lands at centre + (E - centre) x zoom.
++func _apply(centre: Vector2) -> void:
++	var zoom := clampf(runtime_zoom, 0.05, 1.0)
++	scale = Vector2(zoom, zoom)
++	global_position = _origin * zoom + centre * (1.0 - zoom)
++
++## Problems with this layer's setup, as plain strings so a runtime level validator can reuse them.
++func get_layer_warnings() -> PackedStringArray:
++	var warnings := PackedStringArray()
++	if tile_set == null:
++		warnings.append("Assign the level's ground TileSet so the same tiles can be painted.")
++	if collision_enabled:
++		warnings.append("Collision is on: turn off Physics > Collision Enabled, this layer is only a picture.")
++	if not scale.is_equal_approx(Vector2.ONE):
++		warnings.append("Leave Scale at (1, 1): the editor view is 1:1 and the run-time size is Runtime Zoom.")
++	for group in [&"ground", &"world_tilemap", &"catwalk", &"ladder_tilemap"]:
++		if is_in_group(group):
++			warnings.append("Remove this layer from group '%s': the game would treat it as level geometry." % group)
++	return warnings
++
++func _get_configuration_warnings() -> PackedStringArray:
++	return get_layer_warnings()
+diff --git a/scenes/levels/parallax_tile_layer.gdshader b/scenes/levels/parallax_tile_layer.gdshader
+new file mode 100644
+index 0000000..152539d
+--- /dev/null
++++ b/scenes/levels/parallax_tile_layer.gdshader
+@@ -0,0 +1,21 @@
++shader_type canvas_item;
++// Colour filter for a distant tile layer: washes the tiles out and gives them a cool, hazy cast.
++// Reds and greens are pulled toward the pixel's own grey separately (blue is left alone, so what
++// remains leans blue), then a haze colour is mixed in and a multiplicative tint is applied.
++// Alpha is untouched.
++
++uniform float desaturate_red : hint_range(0.0, 1.0) = 0.3;
++uniform float desaturate_green : hint_range(0.0, 1.0) = 0.3;
++uniform vec4 haze_color : source_color = vec4(0.55, 0.68, 0.85, 1.0);
++uniform float haze_amount : hint_range(0.0, 1.0) = 0.15;
++uniform vec4 tint : source_color = vec4(0.9, 0.95, 1.0, 1.0);
++
++void fragment() {
++	vec3 rgb = COLOR.rgb; // tile texture x modulate
++	float grey = dot(rgb, vec3(0.299, 0.587, 0.114));
++	rgb.r = mix(rgb.r, grey, desaturate_red);
++	rgb.g = mix(rgb.g, grey, desaturate_green);
++	rgb = mix(rgb, haze_color.rgb, haze_amount);
++	rgb *= tint.rgb;
++	COLOR = vec4(rgb, COLOR.a);
++}
+diff --git a/scenes/levels/parallax_tile_layer.tscn b/scenes/levels/parallax_tile_layer.tscn
+new file mode 100644
+index 0000000..5fbdd75
+--- /dev/null
++++ b/scenes/levels/parallax_tile_layer.tscn
+@@ -0,0 +1,23 @@
++[gd_scene format=3]
++
++[ext_resource type="Script" path="res://scenes/levels/parallax_tile_layer.gd" id="1_script"]
++[ext_resource type="Shader" path="res://scenes/levels/parallax_tile_layer.gdshader" id="2_shader"]
++[ext_resource type="TileSet" uid="uid://dbsos5viaw3lo" path="res://resources/riverbank-1.tres" id="3_tileset"]
++
++[sub_resource type="ShaderMaterial" id="ShaderMaterial_distant"]
++resource_local_to_scene = true
++shader = ExtResource("2_shader")
++shader_parameter/desaturate_red = 0.3
++shader_parameter/desaturate_green = 0.3
++shader_parameter/haze_color = Color(0.55, 0.68, 0.85, 1)
++shader_parameter/haze_amount = 0.15
++shader_parameter/tint = Color(0.9, 0.95, 1, 1)
++
++[node name="ParallaxTileLayer" type="TileMapLayer"]
++z_index = -100
++material = SubResource("ShaderMaterial_distant")
++tile_set = ExtResource("3_tileset")
++collision_enabled = false
++navigation_enabled = false
++occlusion_enabled = false
++script = ExtResource("1_script")
