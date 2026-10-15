@@ -117,7 +117,8 @@ func _tile_position_index(i: int, count: int, dir: int) -> int:
 
 ## Tears down and reinstances Pieces from left_cap_frames/mid_frames/right_cap_frames per
 ## _segment_layout(), then resizes CollisionShape2D's RectangleShape2D to match (assumes it
-## already holds one — set its shape to a RectangleShape2D once by hand; this only ever touches
+## already holds one — set its shape to a RectangleShape2D once by hand; a shape that is not local to the
+## scene is copied first, so belts never share one; this only ever touches
 ## size/position/disabled on it).
 func _rebuild() -> void:
 	if pieces == null:
@@ -144,6 +145,12 @@ func _rebuild() -> void:
 
 	if count > 0 and collision_shape and collision_shape.shape is RectangleShape2D:
 		var rect := collision_shape.shape as RectangleShape2D
+		if not rect.resource_local_to_scene:
+			# A shape shared between instances (a sub-resource in a scene that is not local-to-scene) would take the
+			# size of whichever belt rebuilt last: give this belt its own copy before resizing.
+			rect = rect.duplicate() as RectangleShape2D
+			rect.resource_local_to_scene = true
+			collision_shape.shape = rect
 		rect.size.x = count * TILE_SIZE
 		collision_shape.position.x = float(dir) * count * TILE_SIZE * 0.5
 

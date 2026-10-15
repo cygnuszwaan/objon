@@ -157,6 +157,17 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Camera cue for an off-screen result (owner's rule):** when a camera cue shows the result of a power change that happens off screen (a door opening far from the trigger), drive the door from the cue's power pass-through, not from the trigger directly. The pass-through holds the rising edge back until the camera is in position (`delay` plus `pan_time` seconds), so the door starts moving only once the player can see it. Wire the door's `PowerTarget` `sources` to the `CameraCue` node, and the cue's own `sources` to the trigger (here the speed trap). Use `frame_player` on the cue so the player stays on screen while it pans. The pass-through delay eats into a timed door: with `hold_time` 5 on the trap, a cue with `pan_time` 0.5 leaves the door about 4.5 s open from the moment it moves, so allow for it in the clock.
 - 2-3 (*Door on the Clock*, the owner has since wired the door through the cue's pass-through): same ramp, plateau and 10-row drop as 2-2, speed trap at col 61, door at col 100, finish at col 114, 16 gems.
 
+## Conveyor belts, a toggle button and a trap that reads the belt (learned building 2-4)
+
+- **Belt shapes were shared (fixed, unconfirmed in-editor):** two belts of different `segments` in one level both took the length of the last one built, because the scene's `RectangleShape2D` was one shared resource. It is now local to the scene and `_rebuild()` copies a shared shape; a level built before the fix may carry belts whose saved shape size is wrong until the scene is reopened.
+- **Belt placement [verified headless]:** `conveyor_belt.tscn` origin is the belt's left edge (positive `segments`) and its collision top; the art's opaque rows are the lower 8 px of the sprite, so the belt's top is the origin y. Set the origin y to the floor's collision top (`row*16 + 2`, so 1282 on the floor) and delete the floor tiles of that row under the belt (two bodies with the same top would fight over which one the player reads). The `PowerTarget` override sits at `index="2"` and the belt needs an `[editable path="Dynamic/<name>"]` line, like a door.
+- **One button, two belts of opposite polarity:** `latch_mode = 1` (TOGGLE) on the button; the against-belt has `invert = true` (running until the button is pressed), the assist belt has `enabled = false` (running only once powered). Powered = running, so `invert` is what makes the first belt stop on a press.
+- **A button is a solid pedestal [verified]:** a walker cannot walk into it, so the player must jump onto it (the test driver stalled against it until it jumped). Put it on a flat where a hop is natural, not in a corridor.
+- **Against-belt (300 px/s, 12 tiles) [verified]:** a surfer at about 390 px/s stalls on it within 2 tiles (ground speed = board speed minus belt); the stall ends the surf and the belt then carries a walker left, so the way back to the ramp is free.
+- **The trap reads surf plus belt [verified]:** an assist belt of 160 px/s right at the foot of the 10-row drop, trap at col 62 with `threshold_speed` 580: a matched run reads about 607 and passes, a level-tilt run reads about 556 and fails, and with the belts unpressed the board is under 480 and the trap never fires. The trap needs the belt: the board alone tops out near 487 at the foot.
+- **Door through the cue pass-through (owner's rule) [verified]:** the doors' `PowerTarget` `sources` is `NodePath("../../DoorCue")` from `Dynamic/DoorA/PowerTarget`, and the cue's own `sources` is the trap. Full run: pass, pan, door opens, finish dances, all 16 gems.
+- 2-4 (*Against the Belt*): same ramp, plateau and drop as 2-2; button on the plateau (col 44), assist belt cols 60-65 with the trap at col 62, against-belt cols 66-77, door wall at col 100, finish col 114, 16 gems.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
@@ -185,3 +196,4 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Added the slopes and surf section after building level 2-1.
 - Added the barrier gauntlet and pad launch section after building level 2-2.
 - Added the speed trap and far door section after building level 2-3.
+- Added the conveyor belt, toggle button and speed-trap-reads-belt section after building level 2-4.
