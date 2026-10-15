@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c6j4mdgvl0q8t" path="res://scenes/interactive/mirror.gd" id="1_mirror"]
 [ext_resource type="Texture2D" uid="uid://b4s55hf48a2jd" path="res://sprites/interactive/mirror2.png" id="2_a0htl"]
+[ext_resource type="Texture2D" uid="uid://ca6xaqayeluwd" path="res://sprites/interactive/mirror-cradle.png" id="3_wrst3"]
 [ext_resource type="Script" uid="uid://debsvssvqq504" path="res://scenes/interactive/power_target.gd" id="9_pwrtgt"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_plate"]
@@ -11,10 +12,15 @@ size = Vector2(14, 3)
 collision_layer = 3
 script = ExtResource("1_mirror")
 texture = ExtResource("2_a0htl")
+cradle_texture = ExtResource("3_wrst3")
+cradle_in_front = true
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1426938853]
 rotation = -0.7853982
 shape = SubResource("RectangleShape2D_plate")
+
+[node name="Plate" type="Node2D" parent="." unique_id=809439880]
+show_behind_parent = true
 
 [node name="PowerTarget" type="Node2D" parent="." unique_id=702962976]
 script = ExtResource("9_pwrtgt")

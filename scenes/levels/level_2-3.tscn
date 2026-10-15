@@ -175,6 +175,7 @@ sources = [NodePath("../../Sources/SpeedTrap")]
 
 [node name="Finish" parent="." unique_id=1584953535 instance=ExtResource("25_fin")]
 position = Vector2(1824, 1280)
+next_level = "uid://brhickkil1lx6"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

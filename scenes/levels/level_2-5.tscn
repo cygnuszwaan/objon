@@ -185,6 +185,7 @@ releases_pass_through = true
 
 [node name="Finish" parent="." unique_id=492129217 instance=ExtResource("25_fin")]
 position = Vector2(1760, 1280)
+next_level = "uid://3t57nu67c6jn"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

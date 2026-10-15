@@ -230,6 +230,7 @@ travel_time = 3.0
 
 [node name="Finish" parent="." unique_id=311306442 instance=ExtResource("25_fin")]
 position = Vector2(1944, 1072)
+next_level = "uid://bm2d2c1hwx4mu"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

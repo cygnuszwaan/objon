@@ -1,4 +1,4 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://forsnbuc62r5"]
 
 [ext_resource type="Script" uid="uid://dm21v52x2lf35" path="res://scenes/levels/test_level.gd" id="1_g1ai2"]
 [ext_resource type="PackedScene" path="res://scenes/levels/backdrop_layers.tscn" id="2_fwulr"]
@@ -13,12 +13,12 @@
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
-[ext_resource type="PackedScene" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
+[ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
 [ext_resource type="PackedScene" path="res://scenes/collectibles/gem_2.tscn" id="22_gem2"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="24_chk"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/finish.tscn" id="25_fin"]
+[ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="25_fin"]
+[ext_resource type="PackedScene" uid="uid://cmwfggn3j6sof" path="res://scenes/interactive/jump_pad.tscn" id="27_pad"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/breakable_barrier.tscn" id="28_bar"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/jump_pad.tscn" id="27_pad"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_g1ai2")
@@ -82,52 +82,52 @@ position = Vector2(328, 1272)
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 
-[node name="Gem1" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem1" parent="Collectibles" unique_id=639856193 instance=ExtResource("21_gem1")]
 position = Vector2(424, 1234)
 
-[node name="Gem2" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem2" parent="Collectibles" unique_id=1691839597 instance=ExtResource("21_gem1")]
 position = Vector2(520, 1186)
 
-[node name="Gem3" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem3" parent="Collectibles" unique_id=1943291036 instance=ExtResource("21_gem1")]
 position = Vector2(616, 1138)
 
-[node name="Gem4" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem4" parent="Collectibles" unique_id=2130450113 instance=ExtResource("21_gem1")]
 position = Vector2(712, 1112)
 
-[node name="Gem5" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem5" parent="Collectibles" unique_id=1115265556 instance=ExtResource("21_gem1")]
 position = Vector2(776, 1112)
 
-[node name="Gem6" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem6" parent="Collectibles" unique_id=491363768 instance=ExtResource("21_gem1")]
 position = Vector2(840, 1150)
 
-[node name="Gem7" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem7" parent="Collectibles" unique_id=256082179 instance=ExtResource("21_gem1")]
 position = Vector2(872, 1182)
 
-[node name="Gem8" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem8" parent="Collectibles" unique_id=1675709933 instance=ExtResource("21_gem1")]
 position = Vector2(904, 1214)
 
-[node name="Gem9" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem9" parent="Collectibles" unique_id=1627449541 instance=ExtResource("21_gem1")]
 position = Vector2(936, 1246)
 
-[node name="Gem10" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem10" parent="Collectibles" unique_id=1418830819 instance=ExtResource("21_gem1")]
 position = Vector2(1048, 1272)
 
-[node name="Gem11" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem11" parent="Collectibles" unique_id=92238539 instance=ExtResource("21_gem1")]
 position = Vector2(1128, 1272)
 
-[node name="Gem12" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem12" parent="Collectibles" unique_id=1187409246 instance=ExtResource("21_gem1")]
 position = Vector2(1192, 1272)
 
-[node name="Gem13" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem13" parent="Collectibles" unique_id=454923036 instance=ExtResource("21_gem1")]
 position = Vector2(1448, 1144)
 
-[node name="Gem14" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem14" parent="Collectibles" unique_id=581650432 instance=ExtResource("21_gem1")]
 position = Vector2(1496, 1144)
 
-[node name="Bonus15" parent="Collectibles" instance=ExtResource("22_gem2")]
+[node name="Bonus15" parent="Collectibles" unique_id=357441400 instance=ExtResource("22_gem2")]
 position = Vector2(1324, 1152)
 
-[node name="Bonus16" parent="Collectibles" instance=ExtResource("22_gem2")]
+[node name="Bonus16" parent="Collectibles" unique_id=161482005 instance=ExtResource("22_gem2")]
 position = Vector2(1352, 1136)
 
 [node name="Enemies" type="Node" parent="." unique_id=1904710388]
@@ -138,7 +138,7 @@ position = Vector2(1352, 1136)
 
 [node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
 
-[node name="Checkpoint1" parent="Checkpoints" instance=ExtResource("24_chk")]
+[node name="Checkpoint1" parent="Checkpoints" unique_id=2017697177 instance=ExtResource("24_chk")]
 position = Vector2(744, 1112)
 order = 1
 
@@ -146,26 +146,26 @@ order = 1
 
 [node name="Dynamic" type="Node" parent="." unique_id=223122078]
 
-[node name="BarrierA" parent="Dynamic" instance=ExtResource("28_bar")]
+[node name="BarrierA" parent="Dynamic" unique_id=1168066206 instance=ExtResource("28_bar")]
 position = Vector2(992, 1232)
-break_speed = 450
 
-[node name="BarrierB" parent="Dynamic" instance=ExtResource("28_bar")]
+[node name="BarrierB" parent="Dynamic" unique_id=2123017725 instance=ExtResource("28_bar")]
 position = Vector2(1088, 1232)
-break_speed = 360
+break_speed = 360.0
 break_from = 1
 
-[node name="BarrierC" parent="Dynamic" instance=ExtResource("28_bar")]
+[node name="BarrierC" parent="Dynamic" unique_id=877283243 instance=ExtResource("28_bar")]
 position = Vector2(1152, 1232)
-break_speed = 300
+break_speed = 300.0
 
-[node name="LaunchPad" parent="Dynamic" instance=ExtResource("27_pad")]
+[node name="LaunchPad" parent="Dynamic" unique_id=1334085078 instance=ExtResource("27_pad")]
 position = Vector2(1224, 1272)
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
-[node name="Finish" parent="." instance=ExtResource("25_fin")]
+[node name="Finish" parent="." unique_id=1768669477 instance=ExtResource("25_fin")]
 position = Vector2(1680, 1152)
+next_level = "uid://bs24vj063tb2p"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

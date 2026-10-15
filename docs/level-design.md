@@ -37,7 +37,7 @@ Covers: Player verbs; Terrain and surfaces; Object catalogue (Movers: platforms,
 | Default breakable-barrier speed | 450 |
 | Default speed-trap threshold | 450 |
 
-- **Tilt** (left/right relative to travel): match the slope (nose down downhill, nose up uphill, level on the flat) for free. Mismatches add drag; nose-up on the flat is a hard brake.
+- **Tilt** (up/down, whichever way you face): up is nose up, down is nose down, neither is level. Match the slope (nose down downhill, nose up uphill, level on the flat) for free. Mismatches add drag; nose-up on the flat is a hard brake. Mounting needs crouch held, so a run starts nose down until down is released: a start on the flat costs speed, so surf routes should start on a downhill.
 - **Launch/landing**: nose-up pops higher and shorter, nose-down flatter. A *clean landing after at least 0.6 s of air* is "earned": speed bonus on slopes, points (5/10/20 by air time), and downhill landings convert fall speed to forward speed.
 - **Speed sources**: downhill slopes, wet floor (higher cap, less friction), a pad launch.
 - **Speed sinks**: uphill (about 1,100 px/s² on a 1:1), friction, tilt mismatch, shoving blocks, landing sloppy.

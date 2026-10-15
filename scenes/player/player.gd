@@ -278,7 +278,7 @@ var hang_swing: Swing  # the swing a SWING hang is attached to; only meaningful 
 	# px/s^2 of air control while carrying momentum (after a swing, or a surf dismount); with no input it is kept untouched
 var _air_carry_active: bool = false  # airborne with carried momentum: horizontal velocity is _air_carry_vx, not input * speed
 var _air_carry_vx: float = 0.0
-var _air_carry_steers: bool = true  # true: left/right steer the carry (swing release, dismount); false: they don't (surfing, where they will tilt the board)
+var _air_carry_steers: bool = true  # true: left/right steer the carry (swing release, dismount); false: they don't (surfing, where they do nothing)
 
 # --- surf (objon.md, Planned: surfboard; stages 1-2 = ground, air, slopes, ramps and the board tilt; no bowling/water yet) ---
 @export var surf_start_speed: float = 240.0  # px/s given on mounting
@@ -347,7 +347,7 @@ const SURF_SHOVE_FOOT_CLEARANCE := 3.0  # px trimmed off the bottom of the shove
 const SURF_SHOVE_GIVE_UP := 0.6  # seconds a shoved body may stay un-overlapped before its exception is dropped anyway (it moved away faster than the board)
 const SURF_SHOVE_CLEAR_MARGIN := 1.0  # px the overlap test is grown by before an exception is dropped, so the body isn't released while still touching
 var _surf_prev_velocity: Vector2 = Vector2.ZERO  # the velocity the surf applied last frame (before move_and_slide() changed it): the launch and landing read it
-var _surf_tilt_sign: int = 0  # the board's target tilt this frame, nose-up positive: +1 up, -1 down, 0 level (from left/right relative to the facing)
+var _surf_tilt_sign: int = 0  # the board's target tilt this frame, nose-up positive: +1 up, -1 down, 0 level (from the up/down keys, independent of facing)
 var _surf_board_angle: float = 0.0  # the drawn board's current tilt in degrees, nose-up positive; eases to the target
 var _surf_air_time: float = 0.0  # s airborne on the current air carry (reset on leaving the ground, read and cleared at touchdown)
 var _surf_bowl_chain: int = 0  # enemies bowled in the current chain (0 = none)
@@ -1112,7 +1112,7 @@ func _physics_process(delta: float) -> void:
 	if is_climbing or is_hanging or is_swimming:
 		pass  # velocity already fully set above; skip normal horizontal movement
 	elif is_surfing:
-		_surf_move(delta, input_dir)
+		_surf_move(delta)
 	elif _air_carry_active:
 		# Carried momentum (swing release, dismount): kept as is until landing. Input steers toward input * speed at
 		# carry_air_accel, except that pushing the way you are already going faster than walk speed never slows you down.
@@ -2779,9 +2779,12 @@ func _stand_up_instantly() -> void:
 
 ## The surf's velocity for this frame (called from the horizontal movement block). On the ground the velocity is the
 ## floor's tangent times `_surf_speed`, so the board follows slopes and a ramp lip launches by itself (an upward tangent
-## suppresses the floor snap). Left/right pick the board's tilt; matching the ground's sign is what keeps the speed.
-func _surf_move(delta: float, input_dir: float) -> void:
-	_surf_tilt_sign = 0 if absf(input_dir) < SURF_TILT_DEADZONE else int(-signf(input_dir) * _surf_facing)
+## suppresses the floor snap). Up/down pick the board's tilt; matching the ground's sign is what keeps the speed.
+func _surf_move(delta: float) -> void:
+	# Up = nose up, down = nose down, regardless of facing (left/right do nothing while surfing). Mounting needs crouch
+	# held, so a mount starts nose down until down is released.
+	var tilt_input := Input.get_action_strength("climb_up") - Input.get_action_strength("crouch")
+	_surf_tilt_sign = 0 if absf(tilt_input) < SURF_TILT_DEADZONE else int(signf(tilt_input))
 	_update_surf_wetness(delta)
 	_update_surf_steam_lift(delta)
 	_surf_bowl_chain_timer = maxf(_surf_bowl_chain_timer - delta, 0.0)

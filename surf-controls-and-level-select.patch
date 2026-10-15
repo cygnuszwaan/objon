@@ -1,0 +1,319 @@
+diff --git a/docs/player-surf.md b/docs/player-surf.md
+index 193e7dd..1c551df 100644
+--- a/docs/player-surf.md
++++ b/docs/player-surf.md
+@@ -4,9 +4,9 @@ The surf state (`State.SURF`): ground speed, tilt, launch and landing, bowling a
+ 
+ Covers: Surf (Ground speed; Tilt; Leaving the ground; Landing; Scoring; Bowling; Shoving blocks; Surface friction; Water; Conveyors, jump pads and the swing; Drop platforms and the see-saw; Ends without keeping momentum; Shared air carry; Board and audio)
+ 
+-- **Surf** (`is_surfing`, `State.SURF`): a held state that owns the crouch collider (`wants_crouch` includes `is_surfing`, so it is kept in the air too; up/down are zeroed so ladders and the ladder mount are suppressed). **Mount**: kick while crouching on the floor (`_start_surf()`, before the ordinary kick block); **dismount**: kick again (`_end_surf(true)`: on the ground the player stops and the crouch logic stands up; in the air the speed goes to a steering air carry and the player stands at once via `_stand_up_instantly()`, because the UNCROUCHING one-shot would cancel the carry). Facing is locked at mounting.
++- **Surf** (`is_surfing`, `State.SURF`): a held state that owns the crouch collider (`wants_crouch` includes `is_surfing`, so it is kept in the air too; up/down are not read as ladder or crouch input, so ladders and the ladder mount are suppressed; they tilt the board instead, see Tilt). **Mount**: kick while crouching on the floor (`_start_surf()`, before the ordinary kick block); **dismount**: kick again (`_end_surf(true)`: on the ground the player stops and the crouch logic stands up; in the air the speed goes to a steering air carry and the player stands at once via `_stand_up_instantly()`, because the UNCROUCHING one-shot would cancel the carry). Facing is locked at mounting.
+   - **Ground speed**: its own `_surf_speed` along the travel direction (not `_slide_vx`), starting at `surf_start_speed` (240), changing each step by `gravity * t.y * surf_slope_gain` (1.25; t is the floor tangent in the travel direction, `t.y` < 0 uphill, so downhill gains and uphill loses fast) minus the friction (`surf_friction` 320 dry, about 5 tiles of coasting on the flat from the start speed, eased toward `surf_friction_wet` 80 by the wetness, see Water, then multiplied by the floor's friction scale, see Surface friction) minus the tilt-mismatch drag (and `surf_skim_drag` while skimming), clamped to 0..the top speed (`surf_top_speed` 600 dry, eased toward `surf_top_speed_wet` 800 by the wetness). It ends below `surf_min_speed` (40); a wall zeroes it, so a wall ends the surf the same way. The velocity is `t * _surf_speed` minus `SURF_FLOOR_PRESS` (60 px/s) along the floor normal: a velocity exactly along an uphill slope never touches it, so `is_on_floor()` flickered false (and the floor snap is off while moving up) without the press. Floor normals within `SURF_FLAT_NORMAL_X` (about 3°) of up are treated as exactly flat (contact normals are noisy, and a tiny upward tangent also cancelled the snap). The press is not part of `_surf_prev_velocity`, which stores the pure tangent velocity a launch or landing should read. Because `_surf_speed` is kept across floor changes, joints between slopes and flat lose no speed; only air landings cost (below). The conveyor and water pushes still add on top of `velocity.x` and don't change `_surf_speed` (the water push is multiplied by `surf_water_push_scale` while surfing; for the belt, see Conveyors, jump pads and the swing below).
+-  - **Tilt** (left/right, relative to the facing; up/down unused): input toward the travel direction is nose down, against it is nose up, none is level (`_surf_tilt_sign`: +1 up, -1 down, 0 level; deadzone 0.3). Match is by sign: ground sign is +1 uphill, -1 downhill, 0 flat (floor angle under `surf_flat_threshold_degrees`, 8°). A matching tilt costs nothing; a level board on a slope adds `surf_drag_level` (150); any other mismatch adds `surf_drag_wrong` (400), including nose up/down on the flat, so pulling the nose up on the flat is a hard brake (about 35px of coasting against about 82). The drawn board eases (`surf_tilt_ease_degrees_per_second`, 720) to `surf_tilt_down_degrees` (26.57, 2:1) or `surf_tilt_up_degrees` (45, 1:1) by rotating the `SurfBoard` node (`rotation = -angle * facing`); that is looks only, the match uses the target at once.
++  - **Tilt** (up/down, independent of the facing; left/right unused): up (`climb_up`) is nose up, down (`crouch`) is nose down, neither or both is level (`_surf_tilt_sign`: +1 up, -1 down, 0 level; deadzone 0.3). Mounting needs crouch held, so a mount starts nose down until down is released (intended: a run isn't meant to start on the flat). Match is by sign: ground sign is +1 uphill, -1 downhill, 0 flat (floor angle under `surf_flat_threshold_degrees`, 8°). A matching tilt costs nothing; a level board on a slope adds `surf_drag_level` (150); any other mismatch adds `surf_drag_wrong` (400), including nose up/down on the flat, so pulling the nose up on the flat is a hard brake (about 35px of coasting against about 82). The drawn board eases (`surf_tilt_ease_degrees_per_second`, 720) to `surf_tilt_down_degrees` (26.57, 2:1) or `surf_tilt_up_degrees` (45, 1:1) by rotating the `SurfBoard` node (`rotation = -angle * facing`); that is looks only, the match uses the target at once.
+   - **Leaving the ground** (a ledge, a ramp lip or a jump): `_surf_move()` detects it on the first airborne frame (or the jump consumed by `_surf_jump_pending`), takes `_surf_prev_velocity`, rotates it by the tilt (`_surf_launch_bias()`: nose up `surf_launch_pop_degrees` 12° upward, nose down `surf_launch_dive_degrees` 10° downward, magnitude kept; skipped for a coyote jump already in the air), adds `jump_velocity * surf_jump_boost` to the vertical part on a jump (so a slope's vertical tangent is kept), and hands it to the shared air carry with steering off. A ramp lip needs no code: the upward tangent suppresses the floor snap, so the board simply leaves. Checked: a 1:1 ramp launches along 45°, nose up launches higher and shorter, nose down flatter. A 1:1 slope costs about 1,100 px/s² of speed uphill, so a ramp 2.5 tiles high needs roughly 500 px/s to launch, a 1-tile ramp about 320; downhill 1:1 matched reaches the 600 cap quickly.
+   - **Landing** (carry active and the floor reached): `_surf_touchdown()` takes the arrival velocity (`_surf_prev_velocity`) along the new floor's tangent (what is into the floor is lost), multiplied by `surf_landing_level` (0.85) for a level board on a slope or `surf_landing_wrong` (0.5) for any other tilt/ground sign mismatch, and caps the result at the current top speed (the wet one when the floor reached is wet). A landing is **clean** when the tilt's sign matches the ground's (level on the flat, nose down on a downhill, nose up on an uphill), and a clean landing that follows at least `surf_landing_min_air_time` (0.6 s) in the air is **earned**. An earned landing on a slope multiplies the speed by `surf_landing_clean_bonus` (1.1), and on a downhill it also adds `surf_landing_downhill_convert` (0.5) of the speed that was going into the floor to the forward speed, so fall speed becomes forward speed and dips and half-pipes can be chained; the top-speed cap bounds all of it. The flat gets no speed bonus (a level board is the default there, so it would be free). A clean landing short of the minimum, or on a matching slope without it, keeps what it arrives with and nothing more. The minimum sits just above a plain surf hop (about 0.53 s on the flat, about 0.38 s down a 30° slope, since the jump adds to the slope's downward velocity), so only a ramp, a ledge, a pad or steam earns, and hopping pumps neither speed nor points. The air time is `_surf_air_time`, counted while the carry is active and restarted when the board leaves the floor (a jump, a lip, steam, or a pad launched from the floor; a coyote jump or a pad in the air keeps counting). Checked: the same ramp jump landing on the flat keeps about twice the speed level as with the nose still up.
+   - **Scoring** (all through `add_points()`, so each award plays the popup like a gem's; the surf's own state, `_reset_surf_scoring()`, is cleared on mounting and on every end of the surf): *Clean landing*: an earned landing (see Landing) pays by its air time, the highest tier reached of `surf_landing_points_air_times` (0.6, 1.0, 1.5 s) against `surf_landing_points` (5, 10, 20), and plays `player/surf_land_clean`; a sloppy landing forfeits it. *Bowl chain*: each enemy the sweep bowls (an `"enemy"`-group body only; a breakable barrier is a route obstacle and pays nothing) continues the chain if the last was within `surf_bowl_chain_window` (2 s, counted down in `_surf_move()`), else starts one, and pays `surf_bowl_points` (5, 10, 20) by its place in the chain, the last entry repeating. *Skim distance*: while on a basin's skim floor each `surf_skim_points_distance` (128 px) travelled pays `surf_skim_points` (5), the remainder carrying over for the whole run and not cleared by leaving the surface; a distance of 0 turns it off. Every value awarded needs a `p<N>` popup animation (5, 10, 20 and 50 exist, see Points and bonus gem). Gems placed along a launch arc double as guides to the line; they are level design, not code.
+diff --git a/docs/saving-levels-ui.md b/docs/saving-levels-ui.md
+index 2968d04..c2d9716 100644
+--- a/docs/saving-levels-ui.md
++++ b/docs/saving-levels-ui.md
+@@ -13,7 +13,7 @@ Covers: Gem; Points and bonus gem; Gem counter; Medkit; Parallax backdrop; Paral
+ - **Finish** (`res://scenes/interactive/finish.gd` + `finish.tscn`, `@tool`): `Area2D` (layer 0, mask 1) with a sensor `CollisionShape2D` and a `PowerTarget` child (at the bottom-left tile; move it to the tile a wire should end at). Art `sprites/interactive/finish_locked.png` / `finish_unlocked.png` (two 32×32 frames, looping, red/green light) and `finish_open.png` (13 frames, plays once and holds); the `AnimatedSprite2D` and its `SpriteFrames` are built in code and never saved into the scene. Node origin is the bottom-centre of the art, on a 16px grid point (sits on the floor tile's top edge). **Unlock rule**: `required_gem_percent` (default 100) of the player's `gems_total` (`ceil(total × percent / 100)`; a level with no gems counts as met), and optionally a button through the `PowerTarget` (`sources`, or a conductor wire attached by adjacency; nothing wired = gems only), combined by `require_all` (true = gems AND button, false = gems OR button). The button is read through `set_powered()`/`set_powered_initial()` (the first call marks the finish as wired; `invert` is exported on the finish). It relocks if the rule stops holding (a released momentary button) until the player enters; the startup state is applied silently. **Entry**: the sensor is polled every physics frame (a player already standing in the doorway when it unlocks still enters); an unlocked finish plays `open`, plays `interactive/finish_open` and calls the player's `dance_through(center_x, slide_time, shrink_time)` (`slide_time` 0.4s, `shrink_time` 1.2s exported on the finish); once `open` has ended and that exit tween has finished it waits `complete_delay` (0.5s), emits `level_completed`, and adds `scenes/ui/level_complete.tscn` to the current scene. The player only shows in front of the open door if the Player node comes after the finish in the tree (or has a higher `z_index`). `interactive/finish_unlock` plays when it becomes unlocked after load. `next_level` (`@export_file`, a path rather than a `PackedScene`) is an optional override of where the overlay's Jump continues; empty = the next row after the current level in `LevelCatalog` (`Game.next_level_id()`), and none after the last (the prompt offers a replay).
+ - **Health bar** (`res://scenes/ui/health_bar.gd` + `.tscn`, `class_name HealthBar`, plus `health_segment_flash.gdshader`): `CanvasLayer` (layer 5) instanced as a child of `player.tscn`, so every level gets it with no level edits; it listens to the player's `health_changed` signal and syncs its starting state deferred (a child's `_ready()` runs before the parent's). Top-right via anchors; `pixel_scale` (default 3 in the script; `player.tscn` sets 2.5 to match the player camera's 2.5 zoom) and `margin` are exports. Art is `sprites/ui/healthbar1_{back,front,outline}.png` (128×16): `Back` has `clip_children = CLIP_AND_DRAW` so it is also the mask for its children (the bar keeps its rounded ends); `healthbar1_front.png` is cut in code into 4 full-bar-size `ImageTexture` `TextureRect` segments under `Back/Segments` (so each sits where it does in the art), cut per row along the art's curved ")" divider lines — `DIVIDER_X` 32/64/96 plus the per-row `DIVIDER_CUT` offsets, each segment keeping the divider line at its right end — not along straight verticals; the four pieces recombine to the original art exactly. Redrawn art with a different divider shape needs `DIVIDER_CUT` updated; `Outline` is on top. Segment i is full while i < health. Losing a hit point flashes that segment (3 blinks of 0.06s on / 0.06s off, `FLASH_STRENGTH` 0.6 toward white) via a per-segment `ShaderMaterial` that only lightens each pixel's colour (so the pixelated divider shading is kept), then hides it so Back's flat divider lines show; gaining health plays the reverse: the segment starts hidden and blinks in (normal, white, three times) before settling shown, with several gained at once filling in left to right `GAIN_STAGGER` (0.2s) apart; the first sync at load snaps without animating. This assumes `max_health` 4. The earlier slide-the-front-layer approach was dropped. The `healthbar1_text.png` ("HEALTH" label) layer is not used yet.
+ - **Level-complete overlay** (`res://scenes/ui/level_complete.gd` + `.tscn`): placeholder `CanvasLayer` (layer 10) built in code — dimmer, title, gem tally, prompt. `show_result(gems, total, next_id)` (a level id, empty = none); ignores input for 0.6s; `jump` calls `Game.load_level(next_id)` when there is one, otherwise the prompt is "Press R to play again" (`R` calls `Game.restart_level()` once the player has won, which discards the checkpoint). Replace the whole scene when real UI exists.
+-- **Pause menu** (`res://scenes/ui/pause_menu.gd` + `.tscn`, `class_name PauseMenu`, plus `res://scripts/level_catalog.gd`, `class_name LevelCatalog`): `Escape` (the `menu` input action) toggles a modal placeholder menu: a placeholder `CanvasLayer` (layer 20, above the level-complete overlay at 10) built in code — dimmer, title, a Resume button and one button per level, the current level's marked "(restart)". `Game` owns it (`open_menu()`, `close_menu()`, `toggle_menu()`, `is_menu_open()`): the menu scene instances under the viewport root, `Game` sets `get_tree().paused`, and both run in `PROCESS_MODE_ALWAYS`; the menu reads no Escape itself, `Game` handles it in both directions (so one press can't be handled twice) and `R` does nothing while it is open. Opening is ignored while a load is under way or with no level; it opens over the level-complete overlay too. **Pause freezes** physics, `_process`, tweens and every `Timer` (including the water manager and the player's death/respawn tween); the three `create_timer()` calls in game code (`Finish` completion delay, the overlay's accept delay, Drillbot's dwell) pass `process_always = false` so they stop as well, and **a new `create_timer()` must do the same**. **Audio while paused**: the `Audio` autoload is `PROCESS_MODE_ALWAYS`, so music keeps playing and one-shots already in flight finish; loops (`Audio.make_loop()`) are children of the nodes that own them and pause with them. Sounds `ui/menu_open`, `ui/menu_close` and `ui/menu_select` are in `Audio.PLANNED`. **Levels** are rows in `LevelCatalog.LEVELS` (`id`, `title`, `path`; list order is play order); `LevelCatalog.entries()` skips a row whose scene file doesn't exist, with a warning. The menu emits the row's id and `Game.load_level(id)` closes the menu (unpausing), discards the checkpoint (`restart_level()` semantics) and loads it, or restarts when the pick is the current level (marked by `Game.current_level_id`). Replace the whole scene when real UI exists.
++- **Pause menu** (`res://scenes/ui/pause_menu.gd` + `.tscn`, `class_name PauseMenu`, plus `res://scripts/level_catalog.gd`, `class_name LevelCatalog`): `Escape` (the `menu` input action) toggles a modal placeholder menu: a placeholder `CanvasLayer` (layer 20, above the level-complete overlay at 10) built in code with three pages in one column: **Main** (Resume, Restart level, Select level), **Chapters** (one button per `LevelCatalog.chapters()` entry, the current one marked, and Back) and **Levels** (the chosen chapter's levels in a fixed-height scroll list, the current one marked, and Back to Chapters). Restart level emits `level_chosen` with the current id. `Game` owns it (`open_menu()`, `close_menu()`, `toggle_menu()`, `is_menu_open()`): the menu scene instances under the viewport root, `Game` sets `get_tree().paused`, and both run in `PROCESS_MODE_ALWAYS`; the menu reads no Escape itself, `Game` handles it in both directions from any page (so one press can't be handled twice) and `R` does nothing while it is open. Opening is ignored while a load is under way or with no level; it opens over the level-complete overlay too. **Pause freezes** physics, `_process`, tweens and every `Timer` (including the water manager and the player's death/respawn tween); the three `create_timer()` calls in game code (`Finish` completion delay, the overlay's accept delay, Drillbot's dwell) pass `process_always = false` so they stop as well, and **a new `create_timer()` must do the same**. **Audio while paused**: the `Audio` autoload is `PROCESS_MODE_ALWAYS`, so music keeps playing and one-shots already in flight finish; loops (`Audio.make_loop()`) are children of the nodes that own them and pause with them. Sounds `ui/menu_open`, `ui/menu_close` and `ui/menu_select` are in `Audio.PLANNED`. **Levels** are rows in `LevelCatalog.LEVELS` (`id`, `title`, `chapter`, `path`; list order is play order) and chapters are rows in `LevelCatalog.CHAPTERS` (`number`, `title`; `chapters()` lists those with an existing level, `entries_in_chapter()` a chapter's levels): a new chapter needs a `CHAPTERS` row. `LevelCatalog.entries()` skips a row whose scene file doesn't exist, with a warning. The menu emits the id and `Game.load_level(id)` closes the menu (unpausing), discards the checkpoint (`restart_level()` semantics) and loads it, or restarts when the pick is the current level (marked by `Game.current_level_id`). Replace the whole scene when real UI exists.
+ - **Touch controls** (`res://scripts/touch_controls.gd`, `class_name TouchControls`, a `CanvasLayer` at layer 8: above the HUD (5), below the level-complete overlay (10) and the pause menu (20)): `Game` adds one as a child in `_ready()`, so every level has it with no level edits. It drives the existing input actions through `Input.parse_input_event(InputEventAction)` (so `Input.is_action_pressed()` polling and `_unhandled_input()` handlers both see it) and nothing else reads touch. Every touch is tracked by finger index, and after each event the held set of actions is recomputed from all fingers and only the differences are sent, so crouch + jump and crouch + kick (surf mount) work with two fingers, and a finger can slide from one button to another. Layout is placeholder art drawn in code, laid out against the visible rect and redone on `size_changed` (it grows past 1280×720 on wide screens): bottom left an 8-way D-pad (a touch within 1.5 radii grabs it and keeps it until release; left/right `move_left`/`move_right`, up `climb_up`, down `crouch`, diagonals press both axes for swimming; the vertical deadzone is larger than the horizontal so a drifting thumb can't crouch while running); bottom right JUMP and KICK; top centre pause (`menu`) and restart (`restart`, which fires only after `RESTART_HOLD` 0.6 s of holding, with a progress ring, because a respawn is costly). While `get_tree().paused` (the pause menu) it ignores new touches and releases everything; the menu's own buttons work through the engine's touch-to-mouse emulation. Visible when `DisplayServer.is_touchscreen_available()`, or from the first touch event if the platform doesn't report one; **F8 toggles it in a debug build and then the real mouse acts as one finger**, for checking the layout on a desktop (mouse events the engine emulates from touches are skipped, so a touch is never counted twice). Tuning is constants at the top of the script, not exports. The level-complete prompt says "Press R": on touch, hold the restart button (jump continues to the next level as before).
+ - **Checkpoint and save/restore** (`res://scripts/game.gd` autoload `Game`; `res://scenes/interactive/checkpoint.gd` + `checkpoint.tscn`): a checkpoint stores an in-memory snapshot of every saveable node; dying or pressing `R` reloads the level and re-applies it.
+   - **Saveable contract**: a node joins group `"saveable"` in its own `_ready()` (never deferred — the restore runs before deferred work) and implements `save_state() -> Dictionary` (plain data only: bool/int/float/String/Vector2/Array/Dictionary, nothing referencing nodes or resources) and `load_state(d)`. `load_state` runs on the freshly loaded node after its `_ready()`, so it must snap (no animation, sound or edge event) and must not depend on any other saveable having been restored first. Snapshot keys are node paths relative to the scene root, so renaming or moving a saveable in a level just starts it fresh. A node that frees itself (gem, melted block, dead enemy) is absent from the snapshot, and `Game.apply()` frees the fresh copy of any saveable with no entry — such nodes only describe their alive state and need no "was I freed" flag. The snapshot belongs to the level id it was taken in and is discarded when another id is loaded (`has_checkpoint()` is false elsewhere, and `Game` ignores a moment with no level); nothing is written to disk.
+diff --git a/scenes/player/player.gd b/scenes/player/player.gd
+index 5b152d0..28c7b73 100644
+--- a/scenes/player/player.gd
++++ b/scenes/player/player.gd
+@@ -278,7 +278,7 @@ var hang_swing: Swing  # the swing a SWING hang is attached to; only meaningful
+ 	# px/s^2 of air control while carrying momentum (after a swing, or a surf dismount); with no input it is kept untouched
+ var _air_carry_active: bool = false  # airborne with carried momentum: horizontal velocity is _air_carry_vx, not input * speed
+ var _air_carry_vx: float = 0.0
+-var _air_carry_steers: bool = true  # true: left/right steer the carry (swing release, dismount); false: they don't (surfing, where they will tilt the board)
++var _air_carry_steers: bool = true  # true: left/right steer the carry (swing release, dismount); false: they don't (surfing, where they do nothing)
+ 
+ # --- surf (objon.md, Planned: surfboard; stages 1-2 = ground, air, slopes, ramps and the board tilt; no bowling/water yet) ---
+ @export var surf_start_speed: float = 240.0  # px/s given on mounting
+@@ -347,7 +347,7 @@ const SURF_SHOVE_FOOT_CLEARANCE := 3.0  # px trimmed off the bottom of the shove
+ const SURF_SHOVE_GIVE_UP := 0.6  # seconds a shoved body may stay un-overlapped before its exception is dropped anyway (it moved away faster than the board)
+ const SURF_SHOVE_CLEAR_MARGIN := 1.0  # px the overlap test is grown by before an exception is dropped, so the body isn't released while still touching
+ var _surf_prev_velocity: Vector2 = Vector2.ZERO  # the velocity the surf applied last frame (before move_and_slide() changed it): the launch and landing read it
+-var _surf_tilt_sign: int = 0  # the board's target tilt this frame, nose-up positive: +1 up, -1 down, 0 level (from left/right relative to the facing)
++var _surf_tilt_sign: int = 0  # the board's target tilt this frame, nose-up positive: +1 up, -1 down, 0 level (from the up/down keys, independent of facing)
+ var _surf_board_angle: float = 0.0  # the drawn board's current tilt in degrees, nose-up positive; eases to the target
+ var _surf_air_time: float = 0.0  # s airborne on the current air carry (reset on leaving the ground, read and cleared at touchdown)
+ var _surf_bowl_chain: int = 0  # enemies bowled in the current chain (0 = none)
+@@ -1112,7 +1112,7 @@ func _physics_process(delta: float) -> void:
+ 	if is_climbing or is_hanging or is_swimming:
+ 		pass  # velocity already fully set above; skip normal horizontal movement
+ 	elif is_surfing:
+-		_surf_move(delta, input_dir)
++		_surf_move(delta)
+ 	elif _air_carry_active:
+ 		# Carried momentum (swing release, dismount): kept as is until landing. Input steers toward input * speed at
+ 		# carry_air_accel, except that pushing the way you are already going faster than walk speed never slows you down.
+@@ -2779,9 +2779,12 @@ func _stand_up_instantly() -> void:
+ 
+ ## The surf's velocity for this frame (called from the horizontal movement block). On the ground the velocity is the
+ ## floor's tangent times `_surf_speed`, so the board follows slopes and a ramp lip launches by itself (an upward tangent
+-## suppresses the floor snap). Left/right pick the board's tilt; matching the ground's sign is what keeps the speed.
+-func _surf_move(delta: float, input_dir: float) -> void:
+-	_surf_tilt_sign = 0 if absf(input_dir) < SURF_TILT_DEADZONE else int(-signf(input_dir) * _surf_facing)
++## suppresses the floor snap). Up/down pick the board's tilt; matching the ground's sign is what keeps the speed.
++func _surf_move(delta: float) -> void:
++	# Up = nose up, down = nose down, regardless of facing (left/right do nothing while surfing). Mounting needs crouch
++	# held, so a mount starts nose down until down is released.
++	var tilt_input := Input.get_action_strength("climb_up") - Input.get_action_strength("crouch")
++	_surf_tilt_sign = 0 if absf(tilt_input) < SURF_TILT_DEADZONE else int(signf(tilt_input))
+ 	_update_surf_wetness(delta)
+ 	_update_surf_steam_lift(delta)
+ 	_surf_bowl_chain_timer = maxf(_surf_bowl_chain_timer - delta, 0.0)
+diff --git a/scenes/ui/pause_menu.gd b/scenes/ui/pause_menu.gd
+index 406ec1b..21fdb47 100644
+--- a/scenes/ui/pause_menu.gd
++++ b/scenes/ui/pause_menu.gd
+@@ -1,17 +1,27 @@
+ class_name PauseMenu
+ extends CanvasLayer
+-## Placeholder pause menu: a dimmer, a title, one button per level in `LevelCatalog` and a Resume button. Built in
+-## code like the level-complete overlay, until real UI art exists; replace the whole scene then.
++## Placeholder pause menu, built in code like the level-complete overlay, until real UI art exists; replace the whole
++## scene then. Three pages share one centred column:
++##   Main      Resume, Restart level, Select level
++##   Chapters  one button per chapter in `LevelCatalog.chapters()`, and Back
++##   Levels    one button per level of the chosen chapter, and Back (to Chapters)
++## The level list scrolls if a chapter outgrows the screen.
+ ##
+ ## `Game` owns it: it instances this on the `menu` action (Escape), pauses the tree, and frees it on resume or on
+ ## a level pick. The scene's process mode is ALWAYS so its buttons work while the tree is paused. It does not read
+-## Escape itself (Game does, in both directions), so one press can't be handled twice.
++## Escape itself (Game does, in both directions, and Escape always resumes from any page), so one press can't be
++## handled twice.
+ ##   `resume_requested`   the Resume button; Game closes the menu.
+-##   `level_chosen(id)`   a level button; Game clears the checkpoint and loads it (`Game.load_level()`).
++##   `level_chosen(id)`   Restart level (the current id) or a level button; Game clears the checkpoint and loads it
++##                        (`Game.load_level()`, which restarts when the id is the current level).
+ 
+ signal resume_requested
+ signal level_chosen(id: StringName)
+ 
++const LIST_HEIGHT := 380.0  # height of the scrolling chapter and level lists, px
++
++var _box: VBoxContainer
++
+ func _init() -> void:
+ 	layer = 20
+ 	process_mode = Node.PROCESS_MODE_ALWAYS
+@@ -27,30 +37,106 @@ func _ready() -> void:
+ 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
+ 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+ 	add_child(center)
+-	var box := VBoxContainer.new()
+-	box.add_theme_constant_override("separation", 12)
+-	center.add_child(box)
++	_box = VBoxContainer.new()
++	_box.add_theme_constant_override("separation", 12)
++	center.add_child(_box)
++
++	_show_main()
+ 
+-	box.add_child(_label("PAUSED", 48))
++## Empties the column for the next page.
++func _clear_page() -> void:
++	for child in _box.get_children():
++		_box.remove_child(child)
++		child.queue_free()
++
++func _show_main() -> void:
++	_clear_page()
++	_box.add_child(_label("PAUSED", 48))
+ 	var resume := _button("Resume")
+ 	resume.pressed.connect(func() -> void:
+ 		Audio.play(&"ui/menu_select")
+ 		resume_requested.emit())
+-	box.add_child(resume)
++	_box.add_child(resume)
++
++	var restart := _button("Restart level")
++	restart.pressed.connect(func() -> void:
++		Audio.play(&"ui/menu_select")
++		level_chosen.emit(Game.current_level_id))
++	_box.add_child(restart)
++
++	var select := _button("Select level")
++	select.pressed.connect(func() -> void:
++		Audio.play(&"ui/menu_select")
++		_show_chapters())
++	_box.add_child(select)
++
++	_box.add_child(_label("Esc to resume", 18))
++	resume.grab_focus.call_deferred()  # keyboard and gamepad navigation start on Resume
++
++func _show_chapters() -> void:
++	_clear_page()
++	_box.add_child(_label("Select chapter", 36))
++	var current_chapter := LevelCatalog.chapter_of(Game.current_level_id)
++	var list := _scrolling_list()
++	var focus: Button = null
++	for chapter in LevelCatalog.chapters():
++		var number: int = chapter["number"]
++		var text := "Chapter %d: %s" % [number, chapter["title"]]
++		if number == current_chapter:
++			text += "  (current)"
++		var button := _button(text)
++		button.pressed.connect(func() -> void:
++			Audio.play(&"ui/menu_select")
++			_show_levels(number))
++		list.add_child(button)
++		if focus == null or number == current_chapter:
++			focus = button
++	_add_back_button(_show_main)
++	if focus != null:
++		focus.grab_focus.call_deferred()
+ 
+-	box.add_child(_label("Levels", 22))
++func _show_levels(chapter_number: int) -> void:
++	_clear_page()
++	var title := "Chapter %d" % chapter_number
++	for chapter in LevelCatalog.chapters():
++		if chapter["number"] == chapter_number:
++			title = "Chapter %d: %s" % [chapter_number, chapter["title"]]
++	_box.add_child(_label(title, 36))
+ 	var current: StringName = Game.current_level_id
+-	for row in LevelCatalog.entries():
++	var list := _scrolling_list()
++	var focus: Button = null
++	for row in LevelCatalog.entries_in_chapter(chapter_number):
+ 		var id: StringName = row["id"]
+-		var text: String = row["title"] + ("  (restart)" if id == current else "")
+-		var button := _button(text)
++		var button := _button(row["title"] + ("  (current)" if id == current else ""))
+ 		button.pressed.connect(func() -> void:
+ 			Audio.play(&"ui/menu_select")
+ 			level_chosen.emit(id))
+-		box.add_child(button)
++		list.add_child(button)
++		if focus == null or id == current:
++			focus = button
++	_add_back_button(_show_chapters)
++	if focus != null:
++		focus.grab_focus.call_deferred()
+ 
+-	box.add_child(_label("Esc to resume", 18))
+-	resume.grab_focus.call_deferred()  # keyboard and gamepad navigation start on Resume
++## A scroll area (fixed height, so the page doesn't jump between short and long lists) with a column inside; returns
++## the column to add buttons to.
++func _scrolling_list() -> VBoxContainer:
++	var scroll := ScrollContainer.new()
++	scroll.custom_minimum_size = Vector2(320.0, LIST_HEIGHT)
++	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
++	_box.add_child(scroll)
++	var list := VBoxContainer.new()
++	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
++	list.add_theme_constant_override("separation", 12)
++	scroll.add_child(list)
++	return list
++
++func _add_back_button(target: Callable) -> void:
++	var back := _button("Back")
++	back.pressed.connect(func() -> void:
++		Audio.play(&"ui/menu_select")
++		target.call())
++	_box.add_child(back)
+ 
+ func _label(text: String, font_size: int) -> Label:
+ 	var label := Label.new()
+@@ -62,6 +148,6 @@ func _label(text: String, font_size: int) -> Label:
+ func _button(text: String) -> Button:
+ 	var button := Button.new()
+ 	button.text = text
+-	button.custom_minimum_size = Vector2(280.0, 44.0)
++	button.custom_minimum_size = Vector2(320.0, 44.0)
+ 	button.add_theme_font_size_override("font_size", 24)
+ 	return button
+diff --git a/scripts/level_catalog.gd b/scripts/level_catalog.gd
+index 12c6b99..9c7bd32 100644
+--- a/scripts/level_catalog.gd
++++ b/scripts/level_catalog.gd
+@@ -1,7 +1,7 @@
+ class_name LevelCatalog
+ extends RefCounted
+ ## The playable levels as data, in play order: `id` (stable identity, what `Game` scopes checkpoints to), `title`
+-## (what a menu shows) and `path` (the scene file). The pause menu lists these, `Game.load_level(id)` loads one, and
++## (what a menu shows), `chapter` (the menu's grouping) and `path` (the scene file). The pause menu lists them by chapter, `Game.load_level(id)` loads one, and
+ ## `next_after()` is what \"continue\" follows, so the order of a set of levels belongs here, not to each level. Add a
+ ## level by adding a row; nothing else needs to know about it.
+ ##
+@@ -9,13 +9,30 @@ extends RefCounted
+ ## rows (with a source other than a res:// path); `Game.load_level()` already takes a path or a PackedScene.
+ ## An id is permanent once levels are shared: renaming one orphans anything that refers to it.
+ 
++## Chapters, in play order: `number` (a level row's `chapter`) and `title`. `chapters()` lists only chapters that
++## have at least one existing level.
++const CHAPTERS: Array[Dictionary] = [
++	{"number": 1, "title": "Footing"},
++	{"number": 2, "title": "Momentum"},
++	{"number": 3, "title": "Light"},
++]
++
+ const LEVELS: Array[Dictionary] = [
+-	{"id": &"Level 1-1", "title": "Level 1-1", "path": "res://scenes/levels/level_1-1.tscn"},
+-	{"id": &"Level 1-2", "title": "Level 1-2", "path": "res://scenes/levels/level_1-2.tscn"},
+-	{"id": &"Level 1-3", "title": "Level 1-3", "path": "res://scenes/levels/level_1-3.tscn"},
+-	{"id": &"Level 1-4", "title": "Level 1-4", "path": "res://scenes/levels/level_1-4.tscn"},
+-	{"id": &"Level 1-5", "title": "Level 1-5", "path": "res://scenes/levels/level_1-5.tscn"},
+-	{"id": &"Level 1-6", "title": "Level 1-6", "path": "res://scenes/levels/level_1-6.tscn"},
++	{"id": &"Level 1-1", "title": "Level 1-1", "chapter": 1, "path": "res://scenes/levels/level_1-1.tscn"},
++	{"id": &"Level 1-2", "title": "Level 1-2", "chapter": 1, "path": "res://scenes/levels/level_1-2.tscn"},
++	{"id": &"Level 1-3", "title": "Level 1-3", "chapter": 1, "path": "res://scenes/levels/level_1-3.tscn"},
++	{"id": &"Level 1-4", "title": "Level 1-4", "chapter": 1, "path": "res://scenes/levels/level_1-4.tscn"},
++	{"id": &"Level 1-5", "title": "Level 1-5", "chapter": 1, "path": "res://scenes/levels/level_1-5.tscn"},
++	{"id": &"Level 1-6", "title": "Level 1-6", "chapter": 1, "path": "res://scenes/levels/level_1-6.tscn"},
++	{"id": &"Level 1-7", "title": "Level 1-7", "chapter": 1, "path": "res://scenes/levels/level_1-7.tscn"},
++	{"id": &"Level 1-8", "title": "Level 1-8", "chapter": 1, "path": "res://scenes/levels/level_1-8.tscn"},
++	{"id": &"Level 2-1", "title": "Level 2-1", "chapter": 2, "path": "res://scenes/levels/level_2-1.tscn"},
++	{"id": &"Level 2-2", "title": "Level 2-2", "chapter": 2, "path": "res://scenes/levels/level_2-2.tscn"},
++	{"id": &"Level 2-3", "title": "Level 2-3", "chapter": 2, "path": "res://scenes/levels/level_2-3.tscn"},
++	{"id": &"Level 2-4", "title": "Level 2-4", "chapter": 2, "path": "res://scenes/levels/level_2-4.tscn"},
++	{"id": &"Level 2-5", "title": "Level 2-5", "chapter": 2, "path": "res://scenes/levels/level_2-5.tscn"},
++	{"id": &"Level 2-6", "title": "Level 2-6", "chapter": 2, "path": "res://scenes/levels/level_2-6.tscn"},
++	{"id": &"Level 3-1", "title": "Level 3-1", "chapter": 3, "path": "res://scenes/levels/level_3-1.tscn"},
+ ]
+ 
+ ## Prefix of the id made for a level that has no catalog row (a `Finish.next_level` path, or a scene the editor
+@@ -32,6 +49,29 @@ static func entries(warn: bool = true) -> Array[Dictionary]:
+ 			push_warning("LevelCatalog: no scene at '%s' (level '%s')." % [row["path"], row["id"]])
+ 	return found
+ 
++## The chapters that have at least one existing level, in order.
++static func chapters() -> Array[Dictionary]:
++	var present := {}
++	for row in entries(false):
++		present[row.get("chapter", 0)] = true
++	var found: Array[Dictionary] = []
++	for chapter in CHAPTERS:
++		if present.has(chapter["number"]):
++			found.append(chapter)
++	return found
++
++## The existing level rows of chapter `number`, in play order.
++static func entries_in_chapter(number: int) -> Array[Dictionary]:
++	var found: Array[Dictionary] = []
++	for row in entries(false):
++		if row.get("chapter", 0) == number:
++			found.append(row)
++	return found
++
++## The chapter number of level `id` (0 if it has no catalog row or no chapter).
++static func chapter_of(id: StringName) -> int:
++	return entry(id).get("chapter", 0)
++
+ ## The row for `id`, or an empty Dictionary.
+ static func entry(id: StringName) -> Dictionary:
+ 	for row in LEVELS:

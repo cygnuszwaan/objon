@@ -192,6 +192,7 @@ position = Vector2(1528, 1272)
 
 [node name="Finish" parent="." unique_id=1799146556 instance=ExtResource("25_fin")]
 position = Vector2(1872, 1152)
+next_level = "uid://3i8yom8hxc7s"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

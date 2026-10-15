@@ -238,12 +238,17 @@ sources = [NodePath("../../../Sources/ButtonExit")]
 [node name="CueSpikes" parent="Dynamic" unique_id=1418581550 node_paths=PackedStringArray("sources") instance=ExtResource("30_cue")]
 position = Vector2(1008, 1264)
 hold_time = 1.8
+zoom = null
+frame_player = null
+frame_padding = null
+min_zoom = null
 sources = [NodePath("../../Sources/ButtonCue")]
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
 [node name="Finish" parent="." unique_id=1851923238 instance=ExtResource("25_fin")]
 position = Vector2(2080, 1280)
+next_level = "res://scenes/levels/level_1-8.tscn"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

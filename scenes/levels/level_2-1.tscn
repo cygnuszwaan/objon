@@ -1,4 +1,4 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://886bth1wisdo"]
 
 [ext_resource type="Script" uid="uid://dm21v52x2lf35" path="res://scenes/levels/test_level.gd" id="1_g1ai2"]
 [ext_resource type="PackedScene" path="res://scenes/levels/backdrop_layers.tscn" id="2_fwulr"]
@@ -13,11 +13,10 @@
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
-
-[ext_resource type="PackedScene" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
+[ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
 [ext_resource type="PackedScene" path="res://scenes/collectibles/gem_2.tscn" id="22_gem2"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="24_chk"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/finish.tscn" id="25_fin"]
+[ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="25_fin"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/breakable_barrier.tscn" id="28_bar"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
@@ -82,82 +81,82 @@ position = Vector2(360, 1208)
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 
-[node name="Gem1" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem1" parent="Collectibles" unique_id=276364625 instance=ExtResource("21_gem1")]
 position = Vector2(360, 1208)
 
-[node name="Gem2" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem2" parent="Collectibles" unique_id=1457774773 instance=ExtResource("21_gem1")]
 position = Vector2(392, 1208)
 
-[node name="Gem3" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem3" parent="Collectibles" unique_id=696201174 instance=ExtResource("21_gem1")]
 position = Vector2(440, 1214)
 
-[node name="Gem4" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem4" parent="Collectibles" unique_id=285789891 instance=ExtResource("21_gem1")]
 position = Vector2(456, 1230)
 
-[node name="Gem5" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem5" parent="Collectibles" unique_id=289036552 instance=ExtResource("21_gem1")]
 position = Vector2(472, 1246)
 
-[node name="Gem6" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem6" parent="Collectibles" unique_id=2010624338 instance=ExtResource("21_gem1")]
 position = Vector2(488, 1262)
 
-[node name="Gem7" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem7" parent="Collectibles" unique_id=631315655 instance=ExtResource("21_gem1")]
 position = Vector2(504, 1272)
 
-[node name="Gem8" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem8" parent="Collectibles" unique_id=1232611883 instance=ExtResource("21_gem1")]
 position = Vector2(520, 1272)
 
-[node name="Gem9" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem9" parent="Collectibles" unique_id=365648304 instance=ExtResource("21_gem1")]
 position = Vector2(648, 1272)
 
-[node name="Gem10" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem10" parent="Collectibles" unique_id=459455431 instance=ExtResource("21_gem1")]
 position = Vector2(696, 1272)
 
-[node name="Gem11" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem11" parent="Collectibles" unique_id=1329564796 instance=ExtResource("21_gem1")]
 position = Vector2(744, 1272)
 
-[node name="Gem12" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem12" parent="Collectibles" unique_id=1146280395 instance=ExtResource("21_gem1")]
 position = Vector2(856, 1224)
 
-[node name="Gem13" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem13" parent="Collectibles" unique_id=1407691537 instance=ExtResource("21_gem1")]
 position = Vector2(952, 1176)
 
-[node name="Gem14" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem14" parent="Collectibles" unique_id=1276066781 instance=ExtResource("21_gem1")]
 position = Vector2(1048, 1128)
 
-[node name="Gem15" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem15" parent="Collectibles" unique_id=1778792327 instance=ExtResource("21_gem1")]
 position = Vector2(1128, 1112)
 
-[node name="Gem16" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem16" parent="Collectibles" unique_id=1841136374 instance=ExtResource("21_gem1")]
 position = Vector2(1176, 1112)
 
-[node name="Gem17" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem17" parent="Collectibles" unique_id=36644613 instance=ExtResource("21_gem1")]
 position = Vector2(1272, 1134)
 
-[node name="Gem18" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem18" parent="Collectibles" unique_id=676336641 instance=ExtResource("21_gem1")]
 position = Vector2(1304, 1166)
 
-[node name="Gem19" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem19" parent="Collectibles" unique_id=789050813 instance=ExtResource("21_gem1")]
 position = Vector2(1336, 1198)
 
-[node name="Gem20" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem20" parent="Collectibles" unique_id=1247987469 instance=ExtResource("21_gem1")]
 position = Vector2(1368, 1230)
 
-[node name="Gem21" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem21" parent="Collectibles" unique_id=154523042 instance=ExtResource("21_gem1")]
 position = Vector2(1400, 1262)
 
-[node name="Gem22" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem22" parent="Collectibles" unique_id=521204584 instance=ExtResource("21_gem1")]
 position = Vector2(1416, 1272)
 
-[node name="Gem23" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem23" parent="Collectibles" unique_id=1422676923 instance=ExtResource("21_gem1")]
 position = Vector2(1496, 1272)
 
-[node name="Gem24" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem24" parent="Collectibles" unique_id=1514283035 instance=ExtResource("21_gem1")]
 position = Vector2(1560, 1272)
 
-[node name="Bonus25" parent="Collectibles" instance=ExtResource("22_gem2")]
+[node name="Bonus25" parent="Collectibles" unique_id=201559390 instance=ExtResource("22_gem2")]
 position = Vector2(1224, 1072)
 
-[node name="Bonus26" parent="Collectibles" instance=ExtResource("22_gem2")]
+[node name="Bonus26" parent="Collectibles" unique_id=207688076 instance=ExtResource("22_gem2")]
 position = Vector2(1272, 1072)
 
 [node name="Enemies" type="Node" parent="." unique_id=1904710388]
@@ -168,11 +167,11 @@ position = Vector2(1272, 1072)
 
 [node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
 
-[node name="Checkpoint1" parent="Checkpoints" instance=ExtResource("24_chk")]
+[node name="Checkpoint1" parent="Checkpoints" unique_id=275890061 instance=ExtResource("24_chk")]
 position = Vector2(1112, 1112)
 order = 1
 
-[node name="Checkpoint2" parent="Checkpoints" instance=ExtResource("24_chk")]
+[node name="Checkpoint2" parent="Checkpoints" unique_id=1231788481 instance=ExtResource("24_chk")]
 position = Vector2(1480, 1272)
 order = 2
 
@@ -180,18 +179,18 @@ order = 2
 
 [node name="Dynamic" type="Node" parent="." unique_id=223122078]
 
-[node name="BarrierA" parent="Dynamic" instance=ExtResource("28_bar")]
+[node name="BarrierA" parent="Dynamic" unique_id=116690058 instance=ExtResource("28_bar")]
 position = Vector2(528, 1232)
 break_speed = 300.0
 
-[node name="BarrierB" parent="Dynamic" instance=ExtResource("28_bar")]
+[node name="BarrierB" parent="Dynamic" unique_id=1155185106 instance=ExtResource("28_bar")]
 position = Vector2(1424, 1232)
-break_speed = 450.0
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
-[node name="Finish" parent="." instance=ExtResource("25_fin")]
+[node name="Finish" parent="." unique_id=1368217500 instance=ExtResource("25_fin")]
 position = Vector2(1776, 1280)
+next_level = "res://scenes/levels/level_2-2.tscn"
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]
