@@ -168,6 +168,14 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Door through the cue pass-through (owner's rule) [verified]:** the doors' `PowerTarget` `sources` is `NodePath("../../DoorCue")` from `Dynamic/DoorA/PowerTarget`, and the cue's own `sources` is the trap. Full run: pass, pan, door opens, finish dances, all 16 gems.
 - 2-4 (*Against the Belt*): same ramp, plateau and drop as 2-2; button on the plateau (col 44), assist belt cols 60-65 with the trap at col 62, against-belt cols 66-77, door wall at col 100, finish col 114, 16 gems.
 
+## Speed gate: an inverted spike layer opened by a trap, and a tax belt (learned building 2-5)
+
+- **Wiring the template's spike layer [verified headless]:** replace its node line with `node_paths=PackedStringArray("sources")`, then `tile_map_data = PackedByteArray(...)` (spike tiles are source 3, atlas `(0,0)` points up, so each tile is `(3,0,0,0)`), `sources = [NodePath("../../Sources/SpeedTrap")]`, `invert = true`, `show_ghost = true`. Inverted means the trap's pass retracts the spikes for `hold_time`; below the threshold they stay out.
+- **Taller drop for a taxed run:** a 14-row 45° drop reaches about 558 px/s at the foot (10 rows gave 487), so the plateau is row 66, the 2:1 ramp is 28 columns (22 to 49), the plateau 8 wide and the foot at col 72. [verified]
+- **A belt only taxes the trap's reading [verified]:** crossing an against-belt barely changes the board's own speed (the extra friction time is tiny), it lowers the ground speed the trap reads while the trap sits on or just past the belt's start. A 70 px/s against-belt at cols 72-79 with the trap at col 73 and `threshold_speed` 450: matched run reads about 480 (passes at 470, fails at 490, so about 30 px/s of margin), level-tilt run about 440 and fails. A trap further along the belt reads lower (a belt of 100 with the trap at col 76 read about 410 and failed the matched run).
+- **Failing the gate [verified]:** the surfer reaches the extended spikes, loses 1 health and is knocked off the board; the belt (running left) and the floor take a walker back towards the ramp. Walking on into the field costs a hit each time the i-frames end.
+- 2-5 (*Speed Gate*): 14-row drop, tax belt cols 72-79, trap col 73, 10 floor spikes at cols 84-93, finish col 110, 16 gems. The belt as an assist is untried.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
@@ -197,3 +205,4 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Added the barrier gauntlet and pad launch section after building level 2-2.
 - Added the speed trap and far door section after building level 2-3.
 - Added the conveyor belt, toggle button and speed-trap-reads-belt section after building level 2-4.
+- Added the speed gate and tax belt section after building level 2-5.
