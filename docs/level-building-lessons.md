@@ -174,7 +174,17 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Taller drop for a taxed run:** a 14-row 45° drop reaches about 558 px/s at the foot (10 rows gave 487), so the plateau is row 66, the 2:1 ramp is 28 columns (22 to 49), the plateau 8 wide and the foot at col 72. [verified]
 - **A belt only taxes the trap's reading [verified]:** crossing an against-belt barely changes the board's own speed (the extra friction time is tiny), it lowers the ground speed the trap reads while the trap sits on or just past the belt's start. A 70 px/s against-belt at cols 72-79 with the trap at col 73 and `threshold_speed` 450: matched run reads about 480 (passes at 470, fails at 490, so about 30 px/s of margin), level-tilt run about 440 and fails. A trap further along the belt reads lower (a belt of 100 with the trap at col 76 read about 410 and failed the matched run).
 - **Failing the gate [verified]:** the surfer reaches the extended spikes, loses 1 health and is knocked off the board; the belt (running left) and the floor take a walker back towards the ramp. Walking on into the field costs a hit each time the i-frames end.
-- 2-5 (*Speed Gate*): 14-row drop, tax belt cols 72-79, trap col 73, 10 floor spikes at cols 84-93, finish col 110, 16 gems. The belt as an assist is untried.
+- 2-5 (*Speed Gate*): 14-row drop, tax belt cols 72-79, trap col 73, 10 floor spikes at cols 84-93, finish col 110, 16 gems. The belt as an assist is untried. A multi-stop cue (`Dynamic/SpeedCue`: number stop, then spike stop that releases the pass-through at 0.08 time) shows cause then effect; the spike layer is wired to the cue, not to the trap.
+
+## Slow-motion camera cue stops (learned adding them to 2-5)
+
+- **Cue stops [verified headless, not seen]:** a `CameraCue` with `CameraCueStop` children (plain `type="Node2D"` nodes with `scenes/interactive/camera_cue_stop.gd`, no scene needed) plays them in order. Put `releases_pass_through = true` on the stop where the effect should happen and wire the device (here the spike layer) to the **cue**, with the cue's own `sources` on the trigger, exactly like the 2-3 door. The cue's own origin and `pan_time`/`hold_time`/`zoom` are unused once it has stops.
+- **Time scale is a stop property** (`time_scale`, 0.05 to 1): the world runs at it from the start of that stop's pan, and eases back to 1 over the cue's `return_time`. Cue timers are real time, but every game clock slows, so **budget the effect in game time**: real seconds of cue before the release x scale = game seconds the player keeps moving.
+- **2-5 numbers [verified headless]:** trap at x=1176, spikes from x=1344 (168 px). A passing surf run reads at about 466 px/s. Stops: number (pan 0.35, hold 1.0, zoom 3.5) then spikes (pan 0.6, hold 0.9, zoom 1), both at 0.08, `return_time` 0.7. The release lands 1.95 s real after the read, 117 physics frames (0.156 s game time), with the player at x=1248, 96 px short of the field; time is back to 1 at 3.57 s. 0.15 would have put the player about 60 px *into* the field at the release (the cue is about 0.3 game s before the surfer arrives), so keep the scale at or below about 0.1 or move the spikes out.
+- **Zoom for a code-drawn trap number:** the speed trap's screen is 15x11 px at about (+11.5, -19.5) from its origin, so legible digits need `zoom` around 3.5 (camera 8.75, a 146x82 px view). The stop's `zoom` goes to 4; the cue's own export stops at 2.
+- **A trap's `hold_time` is game time**, so under slow motion it is effectively longer in real time (about 2.7 s here); in game time it is unchanged.
+- **Failing a gate shows no cue [verified]:** only a rising edge of the trap's power cues, so a failed read gives no slow motion (the red number and the spikes are the only feedback). A cue on a failed read is not built.
+- **Headless driver notes:** hold nose-down only on the slope (x from the lip, y above the flat), never on the plateau flat (400 px/s^2 mismatch drag). A scratch driver must live under `/root`, not under the main scene: `Game.load_level()` adopts the main scene as the level and frees it on the swap. Mount at about x=880 for 2-5's plateau (lip at x=928).
 
 ## Level design conventions used so far
 
@@ -206,3 +216,4 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Added the speed trap and far door section after building level 2-3.
 - Added the conveyor belt, toggle button and speed-trap-reads-belt section after building level 2-4.
 - Added the speed gate and tax belt section after building level 2-5.
+- Added the slow-motion camera cue stops section after adding them to level 2-5 (headless-verified; feel, rendering and audio unchecked).

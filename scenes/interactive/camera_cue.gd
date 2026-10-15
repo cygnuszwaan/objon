@@ -29,6 +29,21 @@ extends Node2D
 ## left of it. The wait is a plain countdown, unaffected by a hit or the cue ending early. The startup state passes
 ## at once and a restore re-derives it, so neither waits.
 ##
+## STOPS: a cue with `CameraCueStop` children plays them in tree order instead of looking at its own origin: the camera
+## pans to each in turn (each with its own `pan_time`, `hold_time`, `zoom` and `time_scale`), then returns to the
+## player. A cue without stops is the single stop it always was. The cue's own `pan_time`, `hold_time`, `zoom` and
+## `frame_player` are unused once it has stops. The pass-through of a cue with stops is released by the camera
+## arriving at a stop (the first stop with `releases_pass_through`, else the first stop) instead of by a countdown,
+## and also when the cue ends for any other reason (a hit, a respawn, the dance, a replacement), so it never waits
+## forever. `delay` still comes first.
+##
+## TIME: a stop's `time_scale` below 1 slows the whole game (`Engine.time_scale`) while the cue plays. The cue's own
+## clocks (pan, hold, return) run in real time, so a 3 s sequence is 3 s on the wall at any scale; the game clocks
+## (the pass-through's `delay`, `cooldown`, the speed trap's `hold_time`, every timer) run in game time and so slow.
+## That is why a pass-through is released by a stop and not by seconds. The player applies and restores the scale (see
+## Camera under Player); this node only passes the numbers. A hit, the dance, a respawn and a level swap all restore
+## normal time at once. Audio is not slowed.
+##
 ## The camera work is the player's (`show_cue()`, see Camera under Player); this node only decides when. It reads
 ## `global_position` every frame, so a cue parented to a moving platform tracks it. The cue never locks input.
 ##
@@ -63,7 +78,7 @@ enum CueEase { LINEAR, SINE, CUBIC }
 		queue_redraw()
 ## Centre the view between this node and the player and zoom out just far enough to hold both, every frame, so the
 ## player stays on screen while the cue shows something far away. The zoom follows the distance, between
-## `min_zoom` and `zoom`.
+## `min_zoom` and `zoom`. Not used by a cue with stops.
 @export var frame_player: bool = false
 ## Frame mode: world pixels kept clear around the node and the player.
 @export_range(0.0, 200.0, 4.0, "or_greater") var frame_padding: float = 48.0
@@ -91,6 +106,7 @@ signal powered_changed(on: bool) ## The pass-through output changed (see PASS-TH
 
 const VIEW_SIZE := Vector2(512.0, 288.0) ## What the camera sees: the 1280x720 viewport at zoom 2.5.
 const SOUND_PAN := &"interactive/camera_cue_pan"
+const SOUND_SLOW := &"interactive/camera_cue_slow"
 const OVERLAY_COLOR := Color(1.0, 0.85, 0.3, 0.8)
 
 var powered: bool = false ## The last final (post-invert) state the device was given.
@@ -100,6 +116,7 @@ var _delay_left: float = -1.0 ## Seconds until the pan starts; negative = no cue
 var _out: bool = false ## The pass-through output.
 var _applied: bool = false ## The PowerTarget has applied a state to this device (set_powered or set_powered_initial).
 var _pass_left: float = -1.0 ## Seconds until a rising edge passes; negative = none is waiting.
+var _pass_stop_wait: bool = false ## A rising edge is waiting for the camera to arrive at the release stop (a cue with stops).
 var _cooldown_left: float = 0.0
 var _player: Node
 
@@ -121,6 +138,7 @@ func set_powered_initial(on: bool) -> void:
 	_applied = true
 	powered = on
 	_pass_left = -1.0
+	_pass_stop_wait = false
 	_set_out(on)
 
 func set_powered(on: bool) -> void:
@@ -129,16 +147,20 @@ func set_powered(on: bool) -> void:
 	powered = on
 	if not on:
 		_pass_left = -1.0
+		_pass_stop_wait = false
 		_set_out(false)
 		return
 	if not rising:
 		return
 	var wait := _play()
-	if wait > 0.0:
-		_pass_left = wait
+	if wait <= 0.0:
+		_set_out(true)
+	elif not _get_stops().is_empty():
+		_pass_stop_wait = true  # released by the camera arriving at a stop, not by a countdown
 		set_physics_process(true)
 	else:
-		_set_out(true)
+		_pass_left = wait
+		set_physics_process(true)
 
 ## The pass-through output. Before the PowerTarget has applied a first state it answers what that first apply will
 ## record, so a device whose own startup apply runs earlier reads the right level.
@@ -175,15 +197,19 @@ func _play() -> float:
 		_delay_left = delay
 		set_physics_process(true)
 		return delay + pan_time
-	return pan_time if _start_cue() else 0.0
+	if not _start_cue():
+		return 0.0
+	return pan_time if _get_stops().is_empty() else maxf(pan_time, 0.001)  # with stops only "above 0" matters
 
 func _physics_process(delta: float) -> void:
 	if _delay_left >= 0.0:
 		_delay_left -= delta
 		if _delay_left <= 0.0:
 			_delay_left = -1.0
-			if not _start_cue() and _pass_left >= 0.0:
-				_pass_left = 0.0  # nobody to show it to: nothing to wait for
+			if not _start_cue():
+				if _pass_left >= 0.0:
+					_pass_left = 0.0  # nobody to show it to: nothing to wait for
+				_release_pass_wait()
 	if _pass_left >= 0.0:
 		_pass_left -= delta
 		if _pass_left <= 0.0:
@@ -201,7 +227,9 @@ func _start_cue() -> bool:
 		return false
 	if not player.is_connected(&"cue_ended", _on_cue_ended):
 		player.connect(&"cue_ended", _on_cue_ended)
-	player.show_cue(self, {
+	if not player.is_connected(&"cue_stop_reached", _on_cue_stop_reached):
+		player.connect(&"cue_stop_reached", _on_cue_stop_reached)
+	var params := {
 		"pan_time": pan_time,
 		"hold_time": hold_time,
 		"return_time": return_time,
@@ -211,17 +239,62 @@ func _start_cue() -> bool:
 		"frame_padding": frame_padding,
 		"min_zoom": min_zoom,
 		"source": self,
-	})
+	}
+	var stops := _get_stops()
+	if not stops.is_empty():
+		params["frame_player"] = false  # a stop is a place to look at, never a frame around the player
+		params["stops"] = stops.map(func(stop: CameraCueStop) -> Dictionary: return {
+			"target": stop,
+			"pan_time": stop.pan_time,
+			"hold_time": stop.hold_time,
+			"zoom": stop.zoom,
+			"time_scale": stop.time_scale,
+		})
+	player.show_cue(self, params)
 	if player.is_cue_playing():  # a dead or dancing player ignores the cue: no sound then
 		Audio.play(SOUND_PAN)
+		if stops.any(func(stop: CameraCueStop) -> bool: return stop.time_scale < 1.0):
+			Audio.play(SOUND_SLOW)
 		return true
 	return false
 
+## The camera has arrived at a stop of this cue: the release stop lets the pass-through rise.
+func _on_cue_stop_reached(source: Object, index: int) -> void:
+	if source == self and _pass_stop_wait and index == _release_index():
+		_release_pass_wait()
+
+## This cue is over, however it ended: a pass-through still waiting for a stop passes now, and the cooldown starts.
 func _on_cue_ended(source: Object) -> void:
-	if source != self or cooldown <= 0.0:
+	if source != self:
+		return
+	_release_pass_wait()
+	if cooldown <= 0.0:
 		return
 	_cooldown_left = cooldown
 	set_physics_process(true)
+
+## Lets a rising edge that is waiting for a stop through. A no-op when none is waiting or the power has fallen since.
+func _release_pass_wait() -> void:
+	if not _pass_stop_wait:
+		return
+	_pass_stop_wait = false
+	_set_out(powered)
+
+## The index of the stop whose arrival releases the pass-through: the first one marked, else the first stop.
+func _release_index() -> int:
+	var stops := _get_stops()
+	for i in stops.size():
+		if stops[i].releases_pass_through:
+			return i
+	return 0
+
+## The `CameraCueStop` children, in tree order.
+func _get_stops() -> Array[CameraCueStop]:
+	var out: Array[CameraCueStop] = []
+	for child in get_children():
+		if child is CameraCueStop:
+			out.append(child)
+	return out
 
 ## The player, looked up lazily because it joins group "player" in its own `_ready()`, which can run after ours.
 func _find_player() -> Node:
@@ -247,6 +320,7 @@ func load_state(d: Dictionary) -> void:
 	_delay_left = -1.0  # a restore never plays a cue
 	_cooldown_left = 0.0
 	_pass_left = -1.0  # nor holds an edge back: the pass-through is re-derived by the first apply
+	_pass_stop_wait = false
 
 ## Copies `sources` onto the `PowerTarget` child (a copy, so a conductor's `add_source()` never writes this export).
 ## `replace` also forwards an empty list, so clearing `sources` in the Inspector clears the child; at load an empty
@@ -272,6 +346,15 @@ func get_warnings() -> PackedStringArray:
 		warnings.append("Add a PowerTarget child: without one nothing can drive this cue.")
 	elif sources.is_empty() and target.sources.is_empty():
 		warnings.append("No sources: pick the power source(s) in `sources`. (Fine only if a conductor wire ends at the PowerTarget.)")
+	var stops := _get_stops()
+	if not stops.is_empty() and frame_player:
+		warnings.append("`frame_player` is ignored: this cue has stops, which look at their own points.")
+	var marked := 0
+	for stop in stops:
+		if stop.releases_pass_through:
+			marked += 1
+	if marked > 1:
+		warnings.append("More than one stop has `releases_pass_through`: only the first of them releases it.")
 	return warnings
 
 func _get_configuration_warnings() -> PackedStringArray:
@@ -279,6 +362,16 @@ func _get_configuration_warnings() -> PackedStringArray:
 
 func _draw() -> void:
 	if not authoring_overlay or not show_view_rect:
+		return
+	var stops := _get_stops()
+	if not stops.is_empty():
+		var previous := Vector2.ZERO  # the path from this origin through the stops (each stop draws its own view)
+		for i in stops.size():
+			var at: Vector2 = stops[i].position
+			if at != previous:
+				draw_dashed_line(previous, at, OVERLAY_COLOR, 1.0, 3.0)
+			previous = at
+		draw_circle(Vector2.ZERO, 2.0, OVERLAY_COLOR)
 		return
 	var view := VIEW_SIZE / maxf(zoom, 0.05)  # the view at the holding zoom (in frame mode, the most zoomed-in it gets)
 	draw_rect(Rect2(-view * 0.5, view), OVERLAY_COLOR, false, 1.0)

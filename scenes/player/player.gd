@@ -9,6 +9,7 @@ signal gem_collected(count: int, total: int)  # total = gems in the level at loa
 signal gems_counted(total: int)  # the level's gem total was just counted at load (not emitted when a restore supplied it); the GemDisplay redraws on it
 signal points_changed(total: int, delta: int)  # the PointsDisplay (a child of this scene) listens
 signal won  # emitted by start_dance()
+signal cue_stop_reached(source: Object, index: int)  # the camera has finished panning onto stop `index` of a cue (a cue without stops has the one stop, 0); a CameraCue releases its pass-through on it
 signal cue_ended(source: Object)  # a camera cue finished, was replaced by another, or was cut short; `source` is the `source` the cue was shown with (null if none): a CameraCue starts its cooldown on it
 
 var state: State = State.IDLE
@@ -466,6 +467,7 @@ const KICK_DAMAGE: int = 1  # dealt to anything with take_damage(amount) -> int 
 var _base_kick_hitbox_x: float
 @onready var camera: Camera2D = $Camera2D
 enum CuePhase { NONE, PAN, HOLD, RETURN }
+const CUE_MIN_TIME_SCALE := 0.05  # a camera cue never slows the game below this
 var _lead_offset: Vector2 = Vector2.ZERO  # the eased camera lead and look-down; camera.offset follows it unless a cue plays
 var _cue_phase: CuePhase = CuePhase.NONE
 var _cue_time: float = 0.0  # seconds into the current phase
@@ -484,6 +486,11 @@ var _cue_hold_time: float = 1.5
 var _cue_return_time: float = 0.6
 var _cue_ease: StringName = &"sine"
 var _cue_from: Vector2 = Vector2.ZERO  # the offset the current phase eases from
+var _cue_stops: Array = []  # the cue's stops, each {target, pan_time, hold_time, zoom, time_scale}; a cue shown without stops has one
+var _cue_index: int = 0  # the stop being panned to or held
+var _cue_scale_wanted: float = 1.0  # the engine time scale the cue wants; written at the end of `_process()` (see `_flush_time_scale()`)
+var _cue_scale_from: float = 1.0  # the time scale at the start of the return, which eases it back to 1
+var _scale_applied: float = 1.0  # the `Engine.time_scale` this script has written; 1.0 = it owes nothing
 
 func _update_kick_hitbox_facing() -> void:
 	kick_hitbox_shape.position.x = -_base_kick_hitbox_x if sprite.flip_h else _base_kick_hitbox_x
@@ -519,8 +526,11 @@ func _update_camera_lead(delta: float) -> void:
 		target.y = clampf((velocity.y - camera_fall_start_speed) * camera_fall_gain, 0.0, camera_fall_max)
 	_lead_offset.x = lerpf(_lead_offset.x, target.x, 1.0 - exp(-camera_lead_smoothing * delta))
 	_lead_offset.y = lerpf(_lead_offset.y, target.y, 1.0 - exp(-camera_fall_smoothing * delta))
-	camera.offset = _cue_offset(delta) if _cue_phase != CuePhase.NONE else _lead_offset
+	# The cue runs on real time: `delta` is scaled by `Engine.time_scale`, and `_scale_applied` is what it was scaled
+	# by (it is only written at the end of this function, after `delta` was computed, or restored at once).
+	camera.offset = _cue_offset(delta / _scale_applied) if _cue_phase != CuePhase.NONE else _lead_offset
 	camera.zoom = _base_zoom * _zoom_mult
+	_flush_time_scale()
 
 # --- camera cue ----------------------------------------------------------------------------
 # A cue pans the camera to a world point, holds, and returns (see Camera cue under Power). Public entry:
@@ -541,21 +551,56 @@ func show_cue(target: Variant, params: Dictionary = {}) -> void:
 	var is_point := typeof(target) == TYPE_VECTOR2
 	if not is_point and not (is_instance_valid(target) and target is Node2D):
 		return
+	var stops := _cue_stops_from(target, params)
+	if stops.is_empty():
+		return
 	if _cue_phase != CuePhase.NONE:
 		_finish_cue()  # replaced: the old source's cue has ended
-	_cue_target = target
+	_cue_stops = stops
 	_cue_source = params.get("source", null)
-	_cue_pan_time = maxf(float(params.get("pan_time", 0.6)), 0.0)
-	_cue_hold_time = maxf(float(params.get("hold_time", 1.5)), 0.0)
 	_cue_return_time = maxf(float(params.get("return_time", 0.6)), 0.0)
 	_cue_ease = StringName(params.get("ease", &"sine"))
-	_cue_point_last = target if is_point else (target as Node2D).global_position
-	_cue_from = camera.offset  # from wherever the camera is now, lead and look-down included
-	_cue_zoom_from = _zoom_mult  # and from wherever the zoom is now, so a replaced cue does not pop
-	_cue_zoom = clampf(float(params.get("zoom", 1.0)), 0.05, 4.0)
 	_cue_frame = bool(params.get("frame_player", false))
 	_cue_frame_padding = maxf(float(params.get("frame_padding", 48.0)), 0.0)
 	_cue_min_zoom = clampf(float(params.get("min_zoom", 0.35)), 0.05, 1.0)
+	# From wherever the camera and the zoom are now (lead and look-down included), so a replaced cue does not pop.
+	_begin_cue_stop(0, camera.offset, _zoom_mult)
+
+## The stops a `show_cue()` call plays. `params["stops"]` (an Array of Dictionaries, each with a `target` (a Vector2
+## or a Node2D) and optional `pan_time`, `hold_time`, `zoom`, `time_scale`) gives several; without it the call's own
+## `target`, `pan_time`, `hold_time`, `zoom` and `time_scale` make one. A stop with a bad target is dropped.
+func _cue_stops_from(target: Variant, params: Dictionary) -> Array:
+	var raw: Array = params.get("stops", [])
+	if raw.is_empty():
+		raw = [{"target": target}]
+	var out: Array = []
+	for entry in raw:
+		var stop_target: Variant = entry.get("target", null)
+		var is_point := typeof(stop_target) == TYPE_VECTOR2
+		if not is_point and not (is_instance_valid(stop_target) and stop_target is Node2D):
+			continue
+		out.append({
+			"target": stop_target,
+			"pan_time": maxf(float(entry.get("pan_time", params.get("pan_time", 0.6))), 0.0),
+			"hold_time": maxf(float(entry.get("hold_time", params.get("hold_time", 1.5))), 0.0),
+			"zoom": clampf(float(entry.get("zoom", params.get("zoom", 1.0))), 0.05, 4.0),
+			"time_scale": clampf(float(entry.get("time_scale", params.get("time_scale", 1.0))), CUE_MIN_TIME_SCALE, 1.0),
+		})
+	return out
+
+## Starts panning onto stop `index` from the given camera offset and zoom multiplier, and asks for its time scale
+## (applied at the end of this frame's `_process()`).
+func _begin_cue_stop(index: int, from_offset: Vector2, from_zoom: float) -> void:
+	var stop: Dictionary = _cue_stops[index]
+	_cue_index = index
+	_cue_target = stop["target"]
+	_cue_pan_time = stop["pan_time"]
+	_cue_hold_time = stop["hold_time"]
+	_cue_zoom = stop["zoom"]
+	_cue_scale_wanted = stop["time_scale"]
+	_cue_point_last = _cue_target if typeof(_cue_target) == TYPE_VECTOR2 else (_cue_target as Node2D).global_position
+	_cue_from = from_offset
+	_cue_zoom_from = from_zoom
 	_cue_time = 0.0
 	_cue_phase = CuePhase.PAN
 
@@ -569,12 +614,15 @@ func _end_cue() -> void:
 		return
 	_cue_from = camera.offset
 	_cue_zoom_from = _zoom_mult
+	_restore_time_scale()  # a hit or the win dance ends slow motion at once; only the camera eases back
+	_cue_scale_from = 1.0
 	_cue_time = 0.0
 	_cue_phase = CuePhase.RETURN
 
 ## Drops the cue at once (a hard teleport), telling its source.
 func _cancel_cue() -> void:
 	_zoom_mult = 1.0  # a hard teleport must not leave the view zoomed out
+	_restore_time_scale()
 	if _cue_phase != CuePhase.NONE:
 		_finish_cue()
 
@@ -583,7 +631,34 @@ func _finish_cue() -> void:
 	_cue_phase = CuePhase.NONE
 	_cue_target = null
 	_cue_source = null
+	_cue_stops = []
+	_restore_time_scale()
 	cue_ended.emit(source)
+
+## Writes the cue's wanted time scale to the engine. Called at the end of `_process()`, never from a physics
+## callback: the frame's `delta` was already scaled by the old value, and `_cue_offset()` divides it back by
+## `_scale_applied`, so the two must change together between frames. Only a playing cue slows time.
+func _flush_time_scale() -> void:
+	if _cue_phase == CuePhase.NONE:
+		return
+	var wanted := clampf(_cue_scale_wanted, CUE_MIN_TIME_SCALE, 1.0)
+	if is_equal_approx(wanted, _scale_applied):
+		return
+	Engine.time_scale = wanted
+	_scale_applied = wanted
+
+## Gives time back at once. Every way a cue can stop reaches it (the return finishing, `_finish_cue()` for a replaced
+## or cancelled cue, `_end_cue()` for a hit or the dance) and so does leaving the tree (a respawn or a level
+## swap), so no exit leaves the game slow. A no-op unless this script slowed it.
+func _restore_time_scale() -> void:
+	_cue_scale_wanted = 1.0
+	if is_equal_approx(_scale_applied, 1.0):
+		return
+	Engine.time_scale = 1.0
+	_scale_applied = 1.0
+
+func _exit_tree() -> void:
+	_restore_time_scale()
 
 ## The cue point in world space; a freed node leaves the last known point.
 func _cue_point() -> Vector2:
@@ -606,16 +681,21 @@ func _cue_offset(delta: float) -> Vector2:
 				_cue_time = 0.0
 				_cue_phase = CuePhase.HOLD
 				_zoom_mult = zoom_goal
+				cue_stop_reached.emit(_cue_source, _cue_index)
 				return aim
 			var k := _cue_curve(_cue_time / _cue_pan_time)
 			_zoom_mult = lerpf(_cue_zoom_from, zoom_goal, k)
 			return _cue_from.lerp(aim, k)
 		CuePhase.HOLD:
 			if _cue_time >= _cue_hold_time:
-				_cue_from = aim
-				_cue_zoom_from = zoom_goal
-				_cue_time = 0.0
-				_cue_phase = CuePhase.RETURN
+				if _cue_index + 1 < _cue_stops.size():
+					_begin_cue_stop(_cue_index + 1, aim, zoom_goal)  # on to the next stop, from this one
+				else:
+					_cue_from = aim
+					_cue_zoom_from = zoom_goal
+					_cue_scale_from = _scale_applied
+					_cue_time = 0.0
+					_cue_phase = CuePhase.RETURN
 			_zoom_mult = zoom_goal
 			return aim
 		CuePhase.RETURN:
@@ -625,6 +705,7 @@ func _cue_offset(delta: float) -> Vector2:
 				return _lead_offset
 			var k := _cue_curve(_cue_time / _cue_return_time)
 			_zoom_mult = lerpf(_cue_zoom_from, 1.0, k)
+			_cue_scale_wanted = lerpf(_cue_scale_from, 1.0, k)  # time speeds back up with the camera
 			return _cue_from.lerp(_lead_offset, k)
 	return _lead_offset
 

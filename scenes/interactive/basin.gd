@@ -1091,7 +1091,7 @@ func get_liquid_surface_velocity_y() -> float:
 	if frames > SURFACE_VELOCITY_GAP_FRAMES:
 		_surface_vy = 0.0
 	else:
-		var step := frames / float(Engine.physics_ticks_per_second)
+		var step := frames * get_physics_process_delta_time()  # game time, not wall time: the surface moves with the scaled delta (a camera cue can slow the game)
 		var raw := clampf((y - _surface_prev_y) / step, -SURFACE_VELOCITY_MAX, SURFACE_VELOCITY_MAX)
 		_surface_vy += (raw - _surface_vy) * minf(1.0, step / SURFACE_VELOCITY_SMOOTH_TIME)
 	_surface_prev_y = y

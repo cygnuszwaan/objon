@@ -236,6 +236,7 @@ func _swap_level(id: StringName, source: Variant, packed: PackedScene) -> void:
 		_restore_pending = false
 		return
 	var root := get_tree().root
+	Engine.time_scale = 1.0  # a camera cue's slow motion never carries into the next level (the player restores it on leaving the tree too)
 	if _level != null and is_instance_valid(_level):
 		if _level.get_parent() != null:
 			_level.get_parent().remove_child(_level)

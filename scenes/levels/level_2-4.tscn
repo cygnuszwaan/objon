@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
+[ext_resource type="Script" uid="uid://l3k7sgpaxtyr" path="res://scenes/interactive/camera_cue_stop.gd" id="21_2ccrc"]
 [ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="24_chk"]
 [ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="25_fin"]
@@ -21,6 +22,14 @@
 [ext_resource type="PackedScene" path="res://scenes/interactive/speed_trap.tscn" id="29_trap"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/camera_cue.tscn" id="30_cue"]
 [ext_resource type="PackedScene" uid="uid://clpqocev1ktyi" path="res://scenes/interactive/conveyor_belt.tscn" id="31_belt"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_drtlr"]
+resource_local_to_scene = true
+size = Vector2(96, 8)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_iutqy"]
+resource_local_to_scene = true
+size = Vector2(192, 8)
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_g1ai2")
@@ -165,6 +174,7 @@ enabled = false
 
 [node name="CollisionShape2D" parent="Dynamic/BeltAssist" index="0" unique_id=1129086100]
 position = Vector2(48, 4)
+shape = SubResource("RectangleShape2D_drtlr")
 
 [node name="PowerTarget" parent="Dynamic/BeltAssist" index="2" node_paths=PackedStringArray("sources")]
 sources = [NodePath("../../../Sources/ButtonBelts")]
@@ -178,6 +188,7 @@ invert = true
 
 [node name="CollisionShape2D" parent="Dynamic/BeltAgainst" index="0" unique_id=1129086100]
 position = Vector2(96, 4)
+shape = SubResource("RectangleShape2D_iutqy")
 
 [node name="PowerTarget" parent="Dynamic/BeltAgainst" index="2" node_paths=PackedStringArray("sources")]
 sources = [NodePath("../../../Sources/ButtonBelts")]
@@ -199,10 +210,24 @@ sources = [NodePath("../../DoorCue")]
 position = Vector2(1608, 1264)
 pan_time = 0.5
 hold_time = 2.5
-return_time = 0.8
-frame_player = true
+return_time = 2.0
 min_zoom = 0.5
 sources = [NodePath("../../Sources/SpeedTrap")]
+
+[node name="NumberStop" type="Node2D" parent="Dynamic/DoorCue" unique_id=1637118721]
+position = Vector2(-596, -12)
+script = ExtResource("21_2ccrc")
+pan_time = 0.35
+zoom = 3.5
+time_scale = 0.08
+
+[node name="DoorStop" type="Node2D" parent="Dynamic/DoorCue" unique_id=1853934803]
+script = ExtResource("21_2ccrc")
+pan_time = 0.4
+hold_time = 0.2
+zoom = 2.25
+time_scale = 0.1
+releases_pass_through = true
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 

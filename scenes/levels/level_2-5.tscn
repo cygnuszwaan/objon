@@ -1,4 +1,4 @@
-[gd_scene format=4]
+[gd_scene format=4 uid="uid://bgmbsgu0olvf2"]
 
 [ext_resource type="Script" uid="uid://dm21v52x2lf35" path="res://scenes/levels/test_level.gd" id="1_g1ai2"]
 [ext_resource type="PackedScene" path="res://scenes/levels/backdrop_layers.tscn" id="2_fwulr"]
@@ -13,11 +13,13 @@
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
-[ext_resource type="PackedScene" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
+[ext_resource type="PackedScene" uid="uid://ddse8vbhq13v4" path="res://scenes/collectibles/gem_1.tscn" id="21_gem1"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/checkpoint.tscn" id="24_chk"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/finish.tscn" id="25_fin"]
+[ext_resource type="PackedScene" uid="uid://cbnfs6a3gb0mj" path="res://scenes/interactive/finish.tscn" id="25_fin"]
 [ext_resource type="PackedScene" path="res://scenes/interactive/speed_trap.tscn" id="29_trap"]
-[ext_resource type="PackedScene" path="res://scenes/interactive/conveyor_belt.tscn" id="31_belt"]
+[ext_resource type="PackedScene" uid="uid://clpqocev1ktyi" path="res://scenes/interactive/conveyor_belt.tscn" id="31_belt"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/camera_cue.tscn" id="32_cue"]
+[ext_resource type="Script" uid="uid://l3k7sgpaxtyr" path="res://scenes/interactive/camera_cue_stop.gd" id="33_stop"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_g1ai2")
@@ -69,7 +71,7 @@ tile_set = ExtResource("7_j5y0x")
 
 [node name="PoweredSpikeLayer" parent="Tilemaps" unique_id=1205680104 node_paths=PackedStringArray("sources") instance=ExtResource("10_yw11j")]
 tile_map_data = PackedByteArray("AABUAE8AAwAAAAAAAABVAE8AAwAAAAAAAABWAE8AAwAAAAAAAABXAE8AAwAAAAAAAABYAE8AAwAAAAAAAABZAE8AAwAAAAAAAABaAE8AAwAAAAAAAABbAE8AAwAAAAAAAABcAE8AAwAAAAAAAABdAE8AAwAAAAAAAAA=")
-sources = [NodePath("../../Sources/SpeedTrap")]
+sources = [NodePath("../../Dynamic/SpeedCue")]
 invert = true
 show_ghost = true
 
@@ -85,68 +87,67 @@ position = Vector2(328, 1272)
 
 [node name="Collectibles" type="Node" parent="." unique_id=872633615]
 
-[node name="Gem1" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem1" parent="Collectibles" unique_id=970016665 instance=ExtResource("21_gem1")]
 position = Vector2(456, 1218)
 
-[node name="Gem2" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem2" parent="Collectibles" unique_id=745713496 instance=ExtResource("21_gem1")]
 position = Vector2(584, 1154)
 
-[node name="Gem3" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem3" parent="Collectibles" unique_id=2133599231 instance=ExtResource("21_gem1")]
 position = Vector2(712, 1090)
 
-[node name="Gem4" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem4" parent="Collectibles" unique_id=1316398434 instance=ExtResource("21_gem1")]
 position = Vector2(840, 1048)
 
-[node name="Gem5" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem5" parent="Collectibles" unique_id=411350210 instance=ExtResource("21_gem1")]
 position = Vector2(904, 1048)
 
-[node name="Gem6" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem6" parent="Collectibles" unique_id=43877483 instance=ExtResource("21_gem1")]
 position = Vector2(968, 1086)
 
-[node name="Gem7" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem7" parent="Collectibles" unique_id=26551164 instance=ExtResource("21_gem1")]
 position = Vector2(1016, 1134)
 
-[node name="Gem8" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem8" parent="Collectibles" unique_id=228243366 instance=ExtResource("21_gem1")]
 position = Vector2(1064, 1182)
 
-[node name="Gem9" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem9" parent="Collectibles" unique_id=1874981718 instance=ExtResource("21_gem1")]
 position = Vector2(1112, 1230)
 
-[node name="Gem10" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem10" parent="Collectibles" unique_id=1215442291 instance=ExtResource("21_gem1")]
 position = Vector2(1192, 1272)
 
-[node name="Gem11" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem11" parent="Collectibles" unique_id=1248089924 instance=ExtResource("21_gem1")]
 position = Vector2(1288, 1272)
 
-[node name="Gem12" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem12" parent="Collectibles" unique_id=1025828976 instance=ExtResource("21_gem1")]
 position = Vector2(1416, 1272)
 
-[node name="Gem13" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem13" parent="Collectibles" unique_id=1982727264 instance=ExtResource("21_gem1")]
 position = Vector2(1480, 1272)
 
-[node name="Gem14" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem14" parent="Collectibles" unique_id=45483206 instance=ExtResource("21_gem1")]
 position = Vector2(1560, 1272)
 
-[node name="Gem15" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem15" parent="Collectibles" unique_id=1444471141 instance=ExtResource("21_gem1")]
 position = Vector2(1656, 1272)
 
-[node name="Gem16" parent="Collectibles" instance=ExtResource("21_gem1")]
+[node name="Gem16" parent="Collectibles" unique_id=1455067276 instance=ExtResource("21_gem1")]
 position = Vector2(1704, 1272)
 
 [node name="Enemies" type="Node" parent="." unique_id=1904710388]
 
 [node name="Sources" type="Node" parent="." unique_id=486040387]
 
-[node name="SpeedTrap" parent="Sources" instance=ExtResource("29_trap")]
+[node name="SpeedTrap" parent="Sources" unique_id=1647867277 instance=ExtResource("29_trap")]
 position = Vector2(1176, 1272)
-threshold_speed = 450
-hold_time = 4
+hold_time = 4.0
 
 [node name="Traps" type="Node" parent="." unique_id=673943172]
 
 [node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
 
-[node name="Checkpoint1" parent="Checkpoints" instance=ExtResource("24_chk")]
+[node name="Checkpoint1" parent="Checkpoints" unique_id=585090517 instance=ExtResource("24_chk")]
 position = Vector2(856, 1048)
 order = 1
 
@@ -154,15 +155,35 @@ order = 1
 
 [node name="Dynamic" type="Node" parent="." unique_id=223122078]
 
-[node name="BeltTax" parent="Dynamic" instance=ExtResource("31_belt")]
+[node name="BeltTax" parent="Dynamic" unique_id=163493888 instance=ExtResource("31_belt")]
 position = Vector2(1152, 1282)
 segments = 8
 direction = 0
-belt_speed = 70
+belt_speed = 70.0
+
+[node name="SpeedCue" parent="Dynamic" unique_id=817462337 node_paths=PackedStringArray("sources") instance=ExtResource("32_cue")]
+position = Vector2(1176, 1272)
+return_time = 0.7
+sources = [NodePath("../../Sources/SpeedTrap")]
+
+[node name="NumberStop" type="Node2D" parent="Dynamic/SpeedCue" unique_id=865351650]
+position = Vector2(11.5, -19.5)
+script = ExtResource("33_stop")
+pan_time = 0.35
+zoom = 3.5
+time_scale = 0.08
+
+[node name="SpikeStop" type="Node2D" parent="Dynamic/SpeedCue" unique_id=1793768545]
+position = Vector2(248, -36)
+script = ExtResource("33_stop")
+hold_time = 0.9
+zoom = 2.25
+time_scale = 0.08
+releases_pass_through = true
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
-[node name="Finish" parent="." instance=ExtResource("25_fin")]
+[node name="Finish" parent="." unique_id=492129217 instance=ExtResource("25_fin")]
 position = Vector2(1760, 1280)
 
 [editable path="Backdrop"]

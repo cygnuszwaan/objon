@@ -127,6 +127,7 @@ const PLANNED: Array[StringName] = [
 	&"interactive/door_open",          # door starting to open (not played while a blocked close waits)
 	&"interactive/door_close",         # door starting to close
 	&"interactive/camera_cue_pan",     # a camera cue starting its pan (not played if the player is dead or dancing)
+	&"interactive/camera_cue_slow",    # a camera cue with a stop below normal time starting (time winding down; not played if the player is dead or dancing)
 	&"interactive/finish_unlock",     # finish turning from locked to unlocked (not at load)
 	&"interactive/finish_open",       # player entering the unlocked finish
 	&"interactive/checkpoint",        # a checkpoint being activated (start of its light-up animation)
