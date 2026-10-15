@@ -186,6 +186,15 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Failing a gate shows no cue [verified]:** only a rising edge of the trap's power cues, so a failed read gives no slow motion (the red number and the spikes are the only feedback). A cue on a failed read is not built.
 - **Headless driver notes:** hold nose-down only on the slope (x from the lip, y above the flat), never on the plateau flat (400 px/s^2 mismatch drag). A scratch driver must live under `/root`, not under the main scene: `Game.load_level()` adopts the main scene as the level and frees it on the swap. Mount at about x=880 for 2-5's plateau (lip at x=928).
 
+## Lasers, glass and receivers (learned building 3-1)
+
+- **Template now has a `Glass` layer** (`glass.tres`, groups `ground` + `world_tilemap`): a glass cell is **source 1, atlas (0,0)**. It only lets light through because `LaserBeam` now asks the layer it hit instead of the first `world_tilemap` node. Remove the template's stray test tile at (23, 79) and its sample `LaserTurret` when starting a level. [verified headless: beam through a 2x3 glass window reached a receiver]
+- **Turret and receiver coordinates [verified]:** both use the **tile centre** `(col*16+8, row*16+8)`; the beam leaves the turret to the right at rotation 0, so one row index (here 71, y 1144) puts turret, window and receiver on one line. A turret's `PowerTarget` is child index 3 (`[node name="PowerTarget" parent="Traps/<n>" index="3" node_paths=...]` plus `[editable path="Traps/<n>"]`). Powered = firing; wired to a TOGGLE button it stays on after one press, an unwired turret fires from load.
+- **Keep the beam out of reach:** a beam at the floor row would hurt a walker every frame. Put turret and receiver on **one-row shelves cantilevered from the wall** (ground tiles at row beam+1, `(1,0)`), 8 tiles above the floor, so nothing blocks the floor route and the beam is above the jump apex. [verified: hp stayed 4 over the walk]
+- **Shutter door in a window [verified]:** a `Door` (rotation 0, bottom-anchored) at the beam row inside a wall's window blocks the beam while shut (doors are `ground`, not `catwalk`) and clears it once open; the window cells around it are glass, the shutter cell is left empty. Wired to a button it makes "open a line of fire".
+- **Chain wiring:** doors' `PowerTarget` takes the **receiver** as source (`NodePath("../../../Sources/ReceiverA")`); receiver `hold_time` default 0.3 s is fine for a fixed beam. Both receivers read false until their button is pressed. [verified]
+- 3-1 (*First Light*): button A turns on turret A, beam through a glass window lights receiver A, which opens door A in a 2-wide wall; checkpoint; turret B is always on but a shutter in wall B blocks it, button B opens the shutter, receiver B opens door B; finish; 20 gems. Not tested: the button hops (driver teleported onto the buttons), art of the shelves and window joins, finish, feel. No bonus route yet.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
@@ -217,3 +226,4 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Added the conveyor belt, toggle button and speed-trap-reads-belt section after building level 2-4.
 - Added the speed gate and tax belt section after building level 2-5.
 - Added the slow-motion camera cue stops section after adding them to level 2-5 (headless-verified; feel, rendering and audio unchecked).
+- Added the lasers, glass and receivers section after building level 3-1 (headless-verified chain; art and feel unchecked).
