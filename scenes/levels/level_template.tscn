@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://b8yefrcdq7oyg" path="res://sprites/backgrounds/volcano2.png" id="3_i403b"]
 [ext_resource type="TileSet" uid="uid://dbsos5viaw3lo" path="res://resources/riverbank-1.tres" id="4_2l0hg"]
 [ext_resource type="TileSet" uid="uid://b3flb1a0piwg7" path="res://resources/riverbank-1-oneway.tres" id="5_7gsxw"]
+[ext_resource type="TileSet" uid="uid://bi5vjp50wqvdn" path="res://resources/glass.tres" id="6_fwulr"]
 [ext_resource type="TileSet" uid="uid://b7dc00shyfc3u" path="res://resources/ladder_tileset.tres" id="6_quo62"]
 [ext_resource type="TileSet" uid="uid://dw2p0okska038" path="res://resources/catwalks.tres" id="7_j5y0x"]
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_ladder_layer.tscn" id="8_mvorh"]
@@ -12,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_spike_layer.tscn" id="10_yw11j"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
+[ext_resource type="PackedScene" uid="uid://cc8lsru56yplm" path="res://scenes/traps/laser/laser_turret.tscn" id="13_i403b"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
@@ -50,6 +52,10 @@ tile_set = ExtResource("4_2l0hg")
 [node name="One-Way Ground" type="TileMapLayer" parent="Tilemaps" unique_id=1703254172 groups=["ground", "world_tilemap"]]
 tile_set = ExtResource("5_7gsxw")
 
+[node name="Glass" type="TileMapLayer" parent="Tilemaps" unique_id=1349664587 groups=["ground", "world_tilemap"]]
+tile_map_data = PackedByteArray("AAAXAE8AAQAAAAAAAAA=")
+tile_set = ExtResource("6_fwulr")
+
 [node name="Ladders" type="TileMapLayer" parent="Tilemaps" unique_id=2114889966 groups=["ladder_tilemap"]]
 position = Vector2(-16, 0)
 tile_set = ExtResource("6_quo62")
@@ -81,6 +87,9 @@ position = Vector2(328, 1272)
 [node name="Sources" type="Node" parent="." unique_id=486040387]
 
 [node name="Traps" type="Node" parent="." unique_id=673943172]
+
+[node name="LaserTurret" parent="Traps" unique_id=81752479 instance=ExtResource("13_i403b")]
+position = Vector2(352, 1272)
 
 [node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
 

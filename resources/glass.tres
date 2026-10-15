@@ -1,0 +1,20 @@
+[gd_resource type="TileSet" format=3 uid="uid://bi5vjp50wqvdn"]
+
+[ext_resource type="Texture2D" uid="uid://mpw2ayt1knno" path="res://sprites/tiles/glass.png" id="2_0ww4i"]
+
+[sub_resource type="TileSetAtlasSource" id="TileSetAtlasSource_sfq5d"]
+texture = ExtResource("2_0ww4i")
+0:0/0 = 0
+0:0/0/physics_layer_0/polygon_0/points = PackedVector2Array(-8, -8, 8, -8, 8, 8, -8, 8)
+0:0/0/custom_data_0 = "glass"
+
+[resource]
+physics_layer_0/collision_layer = 2
+terrain_set_0/mode = 0
+terrain_set_0/terrain_0/name = "Grass"
+terrain_set_0/terrain_0/color = Color(0, 0.49665564, 0.7605489, 1)
+terrain_set_0/terrain_1/name = "Rock 1"
+terrain_set_0/terrain_1/color = Color(0.4494766, 0.3758046, 0.8515866, 1)
+custom_data_layer_0/name = "surface_type"
+custom_data_layer_0/type = 4
+sources/1 = SubResource("TileSetAtlasSource_sfq5d")

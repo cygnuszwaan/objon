@@ -54,7 +54,6 @@ static func trace(
 	result.end_point = pos
 	result.end_direction = dir
 
-	var world_tilemap := tree.get_first_node_in_group(&"world_tilemap") as TileMapLayer
 	var mirrors: Array[Node] = tree.get_nodes_in_group(&"laser_mirror")
 	var excluded: Array[RID] = exclude.duplicate()
 	for mirror in mirrors:
@@ -100,12 +99,12 @@ static func trace(
 			return result
 
 		if not hit.is_empty():
-			if _is_passthrough(hit, world_tilemap):
+			if _is_passthrough(hit):
 				pos = hit.position + dir * PASS_NUDGE
 				# The nudge can land inside a solid (a beam clipping a catwalk's corner right under a block).
 				# A ray that starts inside a shape ignores it, so the beam would travel straight through:
 				# test the new start point and end the beam on whatever already contains it.
-				var inside := _solid_at(space, pos, mask, excluded, world_tilemap)
+				var inside := _solid_at(space, pos, mask, excluded)
 				if inside != null:
 					result.points.append(pos)
 					result.end_collider = inside
@@ -135,27 +134,32 @@ static func trace(
 static func _keeps_physical_body(mirror: Node) -> bool:
 	return mirror.has_method(&"laser_body_is_physical") and bool(mirror.call(&"laser_body_is_physical"))
 
-## Whether the beam steps past this hit: for the world tilemap, the tile's surface_type (SurfaceTypes.laser_passes():
+## Whether a physics collider is a world tilemap layer (group "world_tilemap"). A level may have several (ground, one-way
+## ground, glass...), each with its own tileset, so the beam asks the layer it actually hit, never "the first one".
+static func _is_world_tilemap(collider) -> bool:
+	return collider is TileMapLayer and (collider as TileMapLayer).is_in_group(&"world_tilemap")
+
+## Whether the beam steps past this hit: for a world tilemap layer, the tile's surface_type (SurfaceTypes.laser_passes():
 ## catwalk or glass), for any other body membership of group "catwalk".
-static func _is_passthrough(hit: Dictionary, world_tilemap: TileMapLayer) -> bool:
+static func _is_passthrough(hit: Dictionary) -> bool:
 	var collider = hit.collider
-	if world_tilemap != null and collider == world_tilemap:
-		return SurfaceTypes.laser_passes(SurfaceTypes.surface_at_hit(world_tilemap, hit.position, hit.normal))
+	if _is_world_tilemap(collider):
+		return SurfaceTypes.laser_passes(SurfaceTypes.surface_at_hit(collider, hit.position, hit.normal))
 	if collider is Node:
 		return (collider as Node).is_in_group(&"catwalk")
 	return false
 
 ## The first opaque (non-catwalk) body whose shape contains `point`, or null. Needed because a physics ray that
 ## starts inside a shape does not hit it (see the pass-through step in trace()).
-static func _solid_at(space: PhysicsDirectSpaceState2D, point: Vector2, mask: int, excluded: Array[RID], world_tilemap: TileMapLayer) -> Object:
+static func _solid_at(space: PhysicsDirectSpaceState2D, point: Vector2, mask: int, excluded: Array[RID]) -> Object:
 	var query := PhysicsPointQueryParameters2D.new()
 	query.position = point
 	query.collision_mask = mask
 	query.exclude = excluded
 	for hit in space.intersect_point(query, 8):
 		var collider = hit.collider
-		if world_tilemap != null and collider == world_tilemap:
-			if SurfaceTypes.laser_passes(SurfaceTypes.surface_at_point(world_tilemap, point)):
+		if _is_world_tilemap(collider):
+			if SurfaceTypes.laser_passes(SurfaceTypes.surface_at_point(collider, point)):
 				continue
 			return collider
 		if collider is Node and (collider as Node).is_in_group(&"catwalk"):
