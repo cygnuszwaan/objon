@@ -55,6 +55,21 @@ enum CueEase { LINEAR, SINE, CUBIC }
 @export_range(0.0, 30.0, 0.1, "or_greater") var cooldown: float = 0.0
 ## The curve of the pan and of the return.
 @export var ease_curve: CueEase = CueEase.SINE
+## Camera zoom while the cue holds, as a multiplier of the normal zoom: 1 leaves it alone, 0.5 shows twice as much
+## of the level. With `frame_player` on it is the most zoomed-in the view may be.
+@export_range(0.1, 2.0, 0.05) var zoom: float = 1.0:
+	set(value):
+		zoom = value
+		queue_redraw()
+## Centre the view between this node and the player and zoom out just far enough to hold both, every frame, so the
+## player stays on screen while the cue shows something far away. The zoom follows the distance, between
+## `min_zoom` and `zoom`.
+@export var frame_player: bool = false
+## Frame mode: world pixels kept clear around the node and the player.
+@export_range(0.0, 200.0, 4.0, "or_greater") var frame_padding: float = 48.0
+## Frame mode: the smallest zoom multiplier it may reach. A cue farther away than this view holds loses the player
+## off the edge instead of shrinking the view further.
+@export_range(0.1, 1.0, 0.05) var min_zoom: float = 0.35
 ## The power sources that drive the cue (any one of them powers it). Forwarded to the `PowerTarget` child when the
 ## node enters the tree and whenever this list is edited, so the child needs no Editable Children. Left empty, the
 ## child's own `sources` (and any conductor wire) are used as before.
@@ -191,6 +206,10 @@ func _start_cue() -> bool:
 		"hold_time": hold_time,
 		"return_time": return_time,
 		"ease": _ease_name(),
+		"zoom": zoom,
+		"frame_player": frame_player,
+		"frame_padding": frame_padding,
+		"min_zoom": min_zoom,
 		"source": self,
 	})
 	if player.is_cue_playing():  # a dead or dancing player ignores the cue: no sound then
@@ -261,7 +280,11 @@ func _get_configuration_warnings() -> PackedStringArray:
 func _draw() -> void:
 	if not authoring_overlay or not show_view_rect:
 		return
-	draw_rect(Rect2(-VIEW_SIZE * 0.5, VIEW_SIZE), OVERLAY_COLOR, false, 1.0)
+	var view := VIEW_SIZE / maxf(zoom, 0.05)  # the view at the holding zoom (in frame mode, the most zoomed-in it gets)
+	draw_rect(Rect2(-view * 0.5, view), OVERLAY_COLOR, false, 1.0)
+	if frame_player:
+		var wide := VIEW_SIZE / min_zoom  # ...and the widest view frame mode will ever show
+		draw_rect(Rect2(-wide * 0.5, wide), OVERLAY_COLOR * Color(1, 1, 1, 0.4), false, 1.0)
 	draw_line(Vector2(-6, 0), Vector2(6, 0), OVERLAY_COLOR, 1.0)
 	draw_line(Vector2(0, -6), Vector2(0, 6), OVERLAY_COLOR, 1.0)
 	draw_arc(Vector2.ZERO, 4.0, 0.0, TAU, 16, OVERLAY_COLOR, 1.0)

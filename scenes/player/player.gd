@@ -472,6 +472,13 @@ var _cue_time: float = 0.0  # seconds into the current phase
 var _cue_target: Variant = null  # Vector2 or Node2D
 var _cue_point_last: Vector2 = Vector2.ZERO
 var _cue_source: Object = null
+var _base_zoom: Vector2 = Vector2.ONE  # the camera's authored zoom, captured in _ready(); the cue scales it by `_zoom_mult`
+var _zoom_mult: float = 1.0  # 1 = the authored zoom; below 1 shows more of the level. Only a cue moves it.
+var _cue_zoom_from: float = 1.0  # `_zoom_mult` at the start of the current phase
+var _cue_zoom: float = 1.0  # the cue's zoom multiplier; with `_cue_frame` the most zoomed-in the fit may be
+var _cue_frame: bool = false  # frame the cue point and the player together
+var _cue_frame_padding: float = 48.0  # world px kept clear around both in frame mode
+var _cue_min_zoom: float = 0.35  # frame mode never zooms out past this multiplier
 var _cue_pan_time: float = 0.6
 var _cue_hold_time: float = 1.5
 var _cue_return_time: float = 0.6
@@ -513,6 +520,7 @@ func _update_camera_lead(delta: float) -> void:
 	_lead_offset.x = lerpf(_lead_offset.x, target.x, 1.0 - exp(-camera_lead_smoothing * delta))
 	_lead_offset.y = lerpf(_lead_offset.y, target.y, 1.0 - exp(-camera_fall_smoothing * delta))
 	camera.offset = _cue_offset(delta) if _cue_phase != CuePhase.NONE else _lead_offset
+	camera.zoom = _base_zoom * _zoom_mult
 
 # --- camera cue ----------------------------------------------------------------------------
 # A cue pans the camera to a world point, holds, and returns (see Camera cue under Power). Public entry:
@@ -524,7 +532,7 @@ func _update_camera_lead(delta: float) -> void:
 ## Pans the camera onto `target` (a Vector2 world point, or a Node2D whose `global_position` is read every frame,
 ## so a cue parented to a moving platform tracks it), holds, and eases back to the player. `params` keys, all
 ## optional: `pan_time` (0.6 s), `hold_time` (1.5), `return_time` (0.6), `ease` (`&"linear"`, `&"sine"` (default) or
-## `&"cubic"`), `source` (an Object handed back through `cue_ended`). A cue shown while another plays replaces it:
+## `&"cubic"`), `zoom` (camera zoom multiplier, 1.0 = unchanged, 0.5 = twice the view; default 1.0), `frame_player` (bool: centre between the cue point and the player and zoom out just far enough to fit both, with `zoom` as the most zoomed-in it may be; default false), `frame_padding` (world px, 48), `min_zoom` (frame mode's floor for the multiplier, 0.35), `source` (an Object handed back through `cue_ended`). A cue shown while another plays replaces it:
 ## the pan starts from the camera's current offset and the hold restarts; cues are never queued. Ignored while dead
 ## or dancing. No input is locked: the player can move, and be hit, while the camera is elsewhere.
 func show_cue(target: Variant, params: Dictionary = {}) -> void:
@@ -543,6 +551,11 @@ func show_cue(target: Variant, params: Dictionary = {}) -> void:
 	_cue_ease = StringName(params.get("ease", &"sine"))
 	_cue_point_last = target if is_point else (target as Node2D).global_position
 	_cue_from = camera.offset  # from wherever the camera is now, lead and look-down included
+	_cue_zoom_from = _zoom_mult  # and from wherever the zoom is now, so a replaced cue does not pop
+	_cue_zoom = clampf(float(params.get("zoom", 1.0)), 0.05, 4.0)
+	_cue_frame = bool(params.get("frame_player", false))
+	_cue_frame_padding = maxf(float(params.get("frame_padding", 48.0)), 0.0)
+	_cue_min_zoom = clampf(float(params.get("min_zoom", 0.35)), 0.05, 1.0)
 	_cue_time = 0.0
 	_cue_phase = CuePhase.PAN
 
@@ -555,11 +568,13 @@ func _end_cue() -> void:
 	if _cue_phase == CuePhase.NONE or _cue_phase == CuePhase.RETURN:
 		return
 	_cue_from = camera.offset
+	_cue_zoom_from = _zoom_mult
 	_cue_time = 0.0
 	_cue_phase = CuePhase.RETURN
 
 ## Drops the cue at once (a hard teleport), telling its source.
 func _cancel_cue() -> void:
+	_zoom_mult = 1.0  # a hard teleport must not leave the view zoomed out
 	if _cue_phase != CuePhase.NONE:
 		_finish_cue()
 
@@ -582,27 +597,55 @@ func _cue_point() -> Vector2:
 ## node, so its view centre is its own position plus `offset`: the offset that centres the cue point is the point
 ## relative to the camera.
 func _cue_offset(delta: float) -> Vector2:
-	var aim := _cue_point() - camera.global_position
+	var aim := _cue_aim()
+	var zoom_goal := _cue_zoom_goal()
 	_cue_time += delta
 	match _cue_phase:
 		CuePhase.PAN:
 			if _cue_time >= _cue_pan_time:
 				_cue_time = 0.0
 				_cue_phase = CuePhase.HOLD
+				_zoom_mult = zoom_goal
 				return aim
-			return _cue_from.lerp(aim, _cue_curve(_cue_time / _cue_pan_time))
+			var k := _cue_curve(_cue_time / _cue_pan_time)
+			_zoom_mult = lerpf(_cue_zoom_from, zoom_goal, k)
+			return _cue_from.lerp(aim, k)
 		CuePhase.HOLD:
 			if _cue_time >= _cue_hold_time:
 				_cue_from = aim
+				_cue_zoom_from = zoom_goal
 				_cue_time = 0.0
 				_cue_phase = CuePhase.RETURN
+			_zoom_mult = zoom_goal
 			return aim
 		CuePhase.RETURN:
 			if _cue_time >= _cue_return_time:
+				_zoom_mult = 1.0
 				_finish_cue()
 				return _lead_offset
-			return _cue_from.lerp(_lead_offset, _cue_curve(_cue_time / _cue_return_time))
+			var k := _cue_curve(_cue_time / _cue_return_time)
+			_zoom_mult = lerpf(_cue_zoom_from, 1.0, k)
+			return _cue_from.lerp(_lead_offset, k)
 	return _lead_offset
+
+## Where the camera centre should be, relative to the camera: the cue point, or in frame mode the midpoint
+## between the cue point and the player.
+func _cue_aim() -> Vector2:
+	var point := _cue_point()
+	if _cue_frame:
+		point = (point + global_position) * 0.5
+	return point - camera.global_position
+
+## The zoom multiplier the cue wants this frame. Plain: the cue's `zoom`. Frame mode: the largest multiplier at or
+## below `zoom` whose view still holds both the cue point and the player with `_cue_frame_padding` to spare, never
+## below `_cue_min_zoom` (a very distant cue then loses the player rather than shrinking the view to nothing).
+func _cue_zoom_goal() -> float:
+	if not _cue_frame:
+		return _cue_zoom
+	var apart := (_cue_point() - global_position).abs() * 0.5 + Vector2.ONE * _cue_frame_padding
+	var view := get_viewport_rect().size  # px on screen; the world view is this divided by the camera zoom
+	var fit := minf(view.x / (2.0 * apart.x * _base_zoom.x), view.y / (2.0 * apart.y * _base_zoom.y))
+	return clampf(minf(fit, _cue_zoom), _cue_min_zoom, _cue_zoom)
 
 func _cue_curve(t: float) -> float:
 	t = clampf(t, 0.0, 1.0)
@@ -616,6 +659,7 @@ func _cue_curve(t: float) -> float:
 func _ready() -> void:
 	if camera != null:
 		_lead_offset = camera.offset
+		_base_zoom = camera.zoom
 	floor_snap_length = slope_snap_length
 	health = max_health
 	add_to_group("player")

@@ -138,6 +138,25 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - **Breakable barrier:** `size_tiles` 1x3, origin top-left on the grid, so `y = 1280 - 48` on the floor; `break_speed` is an export on the instance. A broken barrier frees itself, so `has_node()` is a cheap headless check.
 - **Headless surf driver** (not committed): teleport the player at frame ~5, hold `crouch` at 40, press `kick` 44-46, then set the tilt each frame and print `get_surf_speed()`. Needs `godot --import` once first (the `.godot` cache is not in the clone); delete the scratch scene afterwards. Don't clean up with `git checkout -- .`: it reverts doc edits too.
 
+## Barrier gauntlet and a pad launch (learned building 2-2)
+
+- **Surf tilt on the flat [verified headless]:** holding nose-down on flat ground costs the 400 mismatch drag (speed fell 12 px/s per frame instead of 5), so a driver (and a player) must release `move_right` once on the flat. A level board on the 45° drop stopped at the first 450 barrier; matched tilt breaks it.
+- **Measured numbers, mount at about 1.5 tiles before the lip:** a 10-row 45° drop (matched) reaches 487 px/s at the foot. A broken barrier costs no speed; the dry flat after it costs 320 px/s² (`v² = v0² - 640·d`). Barriers at 450 / 360 / 300 placed 2, 8 and 12 tiles past the foot see about 469 / 398 / 343 px/s, and the pad 4 tiles later sees about 276. Mounting 4 tiles early (700 px) ends the surf on the plateau; mounting right at the lip still clears all three. [verified]
+- **Return route is free:** barriers sit to the right of where a failed run stops, so walking back left to the 2:1 ramp (cols 22-41, pairs from row 79 up to row 70) is never blocked. A level whose ramp lies between barriers would be blocked, since a barrier stops a walker too.
+- **Jump pad while surfing [verified]:** vertical 500 replaces the vertical speed, the board's horizontal speed carries (about 275 px/s). Airtime about 1.1 s, apex about 139 px. To land on a ledge H px above the pad, the ledge face must be between `v·t_up` and `v·t_down` of the pad (for H = 128: 0.4 v to 0.71 v), so the face 9.5 tiles from the pad tolerates 215 to 375 px/s. A walker on the pad cannot make that ledge.
+- **Pad and finish coordinates:** the pad's origin is a tile centre (`(col*16+8, 1272)` on the floor); the finish stands on a ledge at its tile-top y (`row*16`).
+- **Only one direction built:** D3's mixed `break_from` sides need a leftward leg (a second descent facing left, via the `(0,7)` staircase), which needs a way up to its start that doesn't cross the barriers. 2-2 uses `EITHER` and `LEFT` only; `RIGHT` is untried.
+- **Full-route headless driver [verified]:** walk from spawn until x >= 770 and y < 1120, crouch, tap kick, hold `move_right` only on the slope, release on the flat; it collected all 14 gems and the finish danced. Teleporting skips the ramp gems, so a "remaining gems" list from a teleported run is not a bug.
+- 2-2 (*Break Points*): ramp up, 10-row drop, barriers 450 EITHER / 360 LEFT / 300 EITHER, pad onto a ledge with the finish; two bonus gems on the pad's arc.
+
+## Speed trap and a far door (learned building 2-3)
+
+- **Speed trap [verified headless]:** instance `speed_trap.tscn` in `Sources` at a tile centre on the floor (`(col*16+8, 1272)`), `threshold_speed` 450, `hold_time` 5. With the 2-2 drop (10 rows, mount about 1.5 tiles before the lip), a trap 1 tile past the foot (col 61) reads about 469 and passes; a level-tilt run reads about 417 at the foot and never trips it (door stays shut). Place the line within about 2 tiles of the foot; each tile of flat costs about 5 px/s more than you might expect near 470 px/s.
+- **Two-tile doorway [verified]:** a 2-wide wall (cols 100-101, rows 40-77) with the doors in the left column only, `DoorA` (rotation 3.1415927, row 78 centre y 1256) and `DoorB` (row 79 centre y 1272), both with a `PowerTarget` override (`node_paths`, `sources = [NodePath("../../../Sources/SpeedTrap")]`) plus `[editable path=...]` for each. Copied from 1-4.
+- **Clock numbers:** pass to door is 36 tiles (576 px). A surfer coasts about 20 tiles, then runs; a scripted walker reached the door 3.5 s after the pass, a 1.5 s margin on `hold_time` 5. Shorten `hold_time` or move the door out to tighten it.
+- **Camera cue for an off-screen result (owner's rule):** when a camera cue shows the result of a power change that happens off screen (a door opening far from the trigger), drive the door from the cue's power pass-through, not from the trigger directly. The pass-through holds the rising edge back until the camera is in position (`delay` plus `pan_time` seconds), so the door starts moving only once the player can see it. Wire the door's `PowerTarget` `sources` to the `CameraCue` node, and the cue's own `sources` to the trigger (here the speed trap). Use `frame_player` on the cue so the player stays on screen while it pans. The pass-through delay eats into a timed door: with `hold_time` 5 on the trap, a cue with `pan_time` 0.5 leaves the door about 4.5 s open from the moment it moves, so allow for it in the clock.
+- 2-3 (*Door on the Clock*, the owner has since wired the door through the cue's pass-through): same ramp, plateau and 10-row drop as 2-2, speed trap at col 61, door at col 100, finish at col 114, 16 gems.
+
 ## Level design conventions used so far
 
 - Difficulty is gentle in world 1: short spike patches (2 tiles) over flat landing space; the owner removed spikes from 1-1 for being too unforgiving [user].
@@ -164,3 +183,5 @@ Generate levels by decoding the template's `Ground` data, adding cells, re-encod
 - Added the buttons/doors/powered-layers section and the 1-4 summary after building level 1-4.
 - Added the zone sensor/door/camera cue section and the 1-7 summary after building level 1-7.
 - Added the slopes and surf section after building level 2-1.
+- Added the barrier gauntlet and pad launch section after building level 2-2.
+- Added the speed trap and far door section after building level 2-3.
