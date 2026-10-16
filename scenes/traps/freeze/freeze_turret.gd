@@ -7,7 +7,9 @@ extends Node2D
 ##
 ## Each physics frame it solves the beam with LaserBeam.trace() (so it reflects off mirrors, passes catwalks and glass, and is
 ## stopped by everything that stops a laser, a crust included), draws it, and dispatches:
-##   - whatever the beam finally hit, if it has on_freeze_hit(point, direction): told it is lit (the freeze receiver)
+##   - whatever the beam finally hit, if it has on_freeze_hit(point, direction): told it is lit (the freeze receiver). The
+##     receiver's physical body does not stop the beam at its edge: the beam runs on to the receiver's own target Area
+##     (see "Beam targets" in laser_beam.gd) and the receiver is lit only when it gets there.
 ##   - the player or an enemy (anything with apply_chill): chilled, every frame (chill scales speed and never removes
 ##     control, and turns the body blue; see Chill in player.md and the shared ChillState). The beam is NON-LETHAL: it
 ##     deals no damage to anyone.
@@ -102,7 +104,7 @@ func _physics_process(delta: float) -> void:
 	var direction := Vector2.RIGHT.rotated(global_rotation)
 	var exclude: Array[RID] = [_body.get_rid()]
 	var space := get_world_2d().direct_space_state
-	var result := LaserBeam.trace(space, get_tree(), origin, direction, exclude)
+	var result := LaserBeam.trace(space, get_tree(), origin, direction, exclude, LaserBeam.DEFAULT_MASK, LaserBeam.TARGET_FREEZE)
 
 	_points = result.points
 	_end_hit = result.end_collider != null
@@ -124,7 +126,7 @@ func _dispatch(result: LaserBeam.Result) -> void:
 	var target := result.end_collider
 	if target == null:
 		return
-	if target.has_method(&"on_freeze_hit"):
+	if target.has_method(&"on_freeze_hit") and LaserBeam.hit_counts(result):  # a receiver is lit only by a hit on its target
 		target.on_freeze_hit(result.end_point, result.end_direction)
 	if target.has_method(&"apply_chill"):  # the player and every enemy answer it; the beam is opaque to both
 		target.apply_chill(CHILL_STRENGTH)

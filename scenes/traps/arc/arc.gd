@@ -84,7 +84,7 @@ func _physics_process(delta: float) -> void:
 	var exclude: Array[RID] = []
 	if _traveled < OWN_BODY_GRACE and exclude_body.is_valid():
 		exclude.append(exclude_body)
-	var result := LaserBeam.trace(space, get_tree(), global_position, heading, exclude, WORLD_MASK)
+	var result := LaserBeam.trace(space, get_tree(), global_position, heading, exclude, WORLD_MASK, LaserBeam.TARGET_ARC)
 	var walked := _walk(result, budget)  # the path covered this frame, start to end
 	var reached_end: bool = walked["reached_end"]
 	var path: PackedVector2Array = walked["path"]
@@ -154,7 +154,7 @@ func _walk(result: LaserBeam.Result, budget: float) -> Dictionary:
 ## back or edge) is simply an obstacle.
 func _dispatch_hit(result: LaserBeam.Result) -> void:
 	var target := result.end_collider
-	if target != null and is_instance_valid(target) and target.has_method(&"on_arc_hit"):
+	if target != null and is_instance_valid(target) and target.has_method(&"on_arc_hit") and LaserBeam.hit_counts(result):
 		target.call(&"on_arc_hit", result.end_point, result.end_direction)
 
 ## Player and water at the sample points along `path`. True when the arc was spent (it frees itself or fades).

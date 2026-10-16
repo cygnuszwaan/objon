@@ -14,8 +14,7 @@
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
-[ext_resource type="PackedScene" uid="uid://43ka8hnrawjw" path="res://scenes/traps/freeze/freeze_turret.tscn" id="15_i403b"]
-[ext_resource type="PackedScene" uid="uid://danr7ihfd0vov" path="res://scenes/interactive/freeze_receiver.tscn" id="16_2l0hg"]
+[ext_resource type="PackedScene" uid="uid://cc8lsru56yplm" path="res://scenes/traps/laser/laser_turret.tscn" id="15_i403b"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_g1ai2")
@@ -96,12 +95,8 @@ position = Vector2(328, 1272)
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
-[node name="FreezeTurret" parent="." unique_id=221103290 instance=ExtResource("15_i403b")]
-position = Vector2(360, 1272)
-
-[node name="FreezeReceiver" parent="." unique_id=324846073 instance=ExtResource("16_2l0hg")]
-position = Vector2(464, 1272)
-scale = Vector2(-1, 1)
+[node name="LaserTurret" parent="." unique_id=81752479 instance=ExtResource("15_i403b")]
+position = Vector2(368, 1272)
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

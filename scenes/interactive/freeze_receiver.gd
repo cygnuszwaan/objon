@@ -16,8 +16,12 @@ extends StaticBody2D
 ## beam that flickers, as when a platform or a Stingbot crosses it). Holding a beam steady on it while mirrors turn is
 ## the puzzle.
 ##
-## Opaque like any wall: a layer-2 body (mask 0), so the beam stops on it and anything solid in front of it shields it.
-## It is hit on any face; nothing about it reflects. It joins "water_solid" so liquid rests on it, and not
+## Opaque like any wall: a layer-2 body (mask 0) that the player, blocks, liquid and every other beam treat as a solid.
+## The freeze beam is the exception: it is stopped by the `BeamTarget` child (an Area2D on layer 4 with its own shape,
+## typically a small one at the centre of the art), so the beam is drawn INTO the receiver and ends at the target.
+## Anything solid in front of the receiver still shields it, and a freeze beam that hits the body but misses the target
+## stops on the body and does not light the receiver. Size and move `BeamTarget`'s shape in the editor to tune where and
+## how precisely the beam has to land. Hit from any direction; nothing about it reflects. It joins "water_solid" so liquid rests on it, and not
 ## "ground"/"catwalk", so it can't be ledge-grabbed. Kicks do nothing to it (layer 1 is not set).
 ##
 ## AND gate of two receivers: wire both to one PowerTarget and set `all_required` on it; `invert` makes a NOT.
@@ -30,6 +34,8 @@ extends StaticBody2D
 ## Sounds `interactive/freeze_receiver_on` and `interactive/freeze_receiver_off` are in Audio.PLANNED.
 
 signal powered_changed(on: bool)
+
+@onready var _beam_target: Area2D = get_node_or_null("BeamTarget")
 
 ## Seconds of sustained beam before the receiver powers; 0 = powers the frame the beam reaches it.
 @export_range(0.0, 60.0, 0.05, "or_greater", "suffix:s") var dwell_time: float = 1.0
@@ -65,6 +71,10 @@ func _ready() -> void:
 ## Beam contract (FreezeTurret._dispatch): called every physics frame the beam ends on this body.
 func on_freeze_hit(_point: Vector2, _direction: Vector2) -> void:
 	_hit_frame = Engine.get_physics_frames()
+
+## The Area2D the freeze beam has to reach (see "Beam targets" in laser_beam.gd; the turret reads it through LaserBeam.hit_counts()). Null = the body itself is the target.
+func get_beam_target() -> Area2D:
+	return _beam_target
 
 func is_lit() -> bool:
 	return Engine.get_physics_frames() - _hit_frame <= LIT_FRAMES

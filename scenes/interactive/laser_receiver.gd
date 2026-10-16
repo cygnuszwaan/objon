@@ -45,6 +45,8 @@ var _hit_frame: int = -1000
 var _time_left: float = 0.0
 var _ready_frame: int = 0
 
+@onready var _beam_target: Area2D = get_node_or_null("BeamTarget")
+
 func _ready() -> void:
 	add_to_group(&"power_source")  # what ConductorLayer scans to attach sources to circuits by adjacency
 	queue_redraw()
@@ -54,6 +56,12 @@ func _ready() -> void:
 	add_to_group(&"water_solid")  # collision only; static, so carry is inert for it
 	add_to_group(&"saveable")
 	_ready_frame = Engine.get_physics_frames()
+
+## The Area2D the beam has to reach (see "Beam targets" in laser_beam.gd; the emitter reads this through LaserBeam.hit_counts()).
+## Null = the body itself is the target. The shape defaults to the whole 16x16 tile, so shrink it in the editor to make
+## the receiver pick a smaller spot.
+func get_beam_target() -> Area2D:
+	return _beam_target
 
 ## Beam contract (LaserTurret._dispatch): called every physics frame the beam ends on this body.
 func on_laser_hit(_point: Vector2, _direction: Vector2) -> void:

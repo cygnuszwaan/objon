@@ -58,6 +58,8 @@ var _time_left: float = 0.0
 var _flash_t: float = 0.0
 var _ready_frame: int = 0
 
+@onready var _beam_target: Area2D = get_node_or_null("BeamTarget")
+
 func _ready() -> void:
 	add_to_group(&"power_source")  # what ConductorLayer scans to attach sources to circuits by adjacency
 	queue_redraw()
@@ -74,6 +76,12 @@ func _validate_property(property: Dictionary) -> void:
 		property.usage = PROPERTY_USAGE_NO_EDITOR
 	elif property.name == "duration" and latch_mode != LatchMode.TIMED:
 		property.usage = PROPERTY_USAGE_NO_EDITOR
+
+## The Area2D the beam has to reach (see "Beam targets" in laser_beam.gd; the emitter reads this through LaserBeam.hit_counts()).
+## Null = the body itself is the target. The shape defaults to the whole 16x16 tile, so shrink it in the editor to make
+## the receiver pick a smaller spot.
+func get_beam_target() -> Area2D:
+	return _beam_target
 
 ## Arc contract (Arc._dispatch_hit()): called once, on the frame an arc ends on this body.
 func on_arc_hit(_point: Vector2, _direction: Vector2) -> void:

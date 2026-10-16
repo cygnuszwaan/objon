@@ -2,9 +2,13 @@
 
 [ext_resource type="Script" uid="uid://7sgcvuctg80l" path="res://scenes/interactive/freeze_receiver.gd" id="1_rx"]
 [ext_resource type="Texture2D" uid="uid://b0yqrcx8geo6d" path="res://sprites/interactive/freezer_receiver.png" id="2_rlvqp"]
+[ext_resource type="Script" uid="uid://bl0vw1xwvcjwo" path="res://scripts/beam_target.gd" id="9_bt"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rx"]
-size = Vector2(8, 8)
+size = Vector2(16, 16)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_rlvqp"]
+radius = 6.0
 
 [node name="FreezeReceiver" type="StaticBody2D" unique_id=1340035918]
 collision_layer = 2
@@ -16,4 +20,15 @@ draw_placeholder = false
 shape = SubResource("RectangleShape2D_rx")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=285412332]
+z_index = -1
 texture = ExtResource("2_rlvqp")
+
+[node name="BeamTarget" type="Area2D" parent="." unique_id=1865204417 groups=["beam_target_freeze"]]
+collision_layer = 8
+collision_mask = 0
+monitoring = false
+script = ExtResource("9_bt")
+stop_at_centre = true
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BeamTarget" unique_id=1865204418]
+shape = SubResource("CircleShape2D_rlvqp")

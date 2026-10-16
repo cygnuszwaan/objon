@@ -4,7 +4,8 @@ extends Node2D
 ## global_rotation), same facing convention as Cannon — rotate the instance in the editor to aim).
 ## Each physics frame it solves the beam with LaserBeam.trace(), draws it, and dispatches whatever
 ## the beam finally hit:
-##   - anything with on_laser_hit(point, direction) is told it's being lit (ice melts on this)
+##   - anything with on_laser_hit(point, direction) is told it's being lit (ice melts on this; a laser receiver only when
+##     the beam reaches its BeamTarget, see "Beam targets" in laser_beam.gd)
 ##   - the player (group "player" with take_hit) is hurt, polled every frame like Sawwheel so a
 ##     player standing in the beam is hit again the moment their grace period ends
 ##   - an enemy (group "enemy" with take_damage) is hurt by one hit per `enemy_damage_interval`, tracked per
@@ -115,7 +116,7 @@ func _physics_process(delta: float) -> void:
 	var direction := Vector2.RIGHT.rotated(global_rotation)
 	var exclude: Array[RID] = [_body.get_rid()]
 	var space := get_world_2d().direct_space_state
-	var result := LaserBeam.trace(space, get_tree(), origin, direction, exclude)
+	var result := LaserBeam.trace(space, get_tree(), origin, direction, exclude, LaserBeam.DEFAULT_MASK, LaserBeam.TARGET_LASER)
 
 	_points = result.points
 	_end_hit = result.end_collider != null
@@ -144,7 +145,7 @@ func _dispatch(result: LaserBeam.Result) -> void:
 	var target := result.end_collider
 	if target == null:
 		return
-	if target.has_method(&"on_laser_hit"):
+	if target.has_method(&"on_laser_hit") and LaserBeam.hit_counts(result):  # a receiver is lit only by a hit on its target
 		target.on_laser_hit(result.end_point, result.end_direction)
 	if target is Node and (target as Node).is_in_group(&"player") and target.has_method(&"take_hit"):
 		target.take_hit(damage, global_position)
