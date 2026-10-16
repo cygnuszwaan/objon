@@ -1,14 +1,19 @@
-[gd_scene load_steps=3 format=3]
+[gd_scene format=3 uid="uid://danr7ihfd0vov"]
 
-[ext_resource type="Script" path="res://scenes/interactive/freeze_receiver.gd" id="1_rx"]
+[ext_resource type="Script" uid="uid://7sgcvuctg80l" path="res://scenes/interactive/freeze_receiver.gd" id="1_rx"]
+[ext_resource type="Texture2D" uid="uid://b0yqrcx8geo6d" path="res://sprites/interactive/freezer_receiver.png" id="2_rlvqp"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_rx"]
-size = Vector2(16, 16)
+size = Vector2(8, 8)
 
-[node name="FreezeReceiver" type="StaticBody2D"]
+[node name="FreezeReceiver" type="StaticBody2D" unique_id=1340035918]
 collision_layer = 2
 collision_mask = 0
 script = ExtResource("1_rx")
+draw_placeholder = false
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1031271727]
 shape = SubResource("RectangleShape2D_rx")
+
+[node name="Sprite2D" type="Sprite2D" parent="." unique_id=285412332]
+texture = ExtResource("2_rlvqp")

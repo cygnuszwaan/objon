@@ -13,8 +13,9 @@
 [ext_resource type="PackedScene" path="res://scenes/traps/powered_spike_layer.tscn" id="10_yw11j"]
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
-[ext_resource type="PackedScene" uid="uid://cc8lsru56yplm" path="res://scenes/traps/laser/laser_turret.tscn" id="13_i403b"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
+[ext_resource type="PackedScene" uid="uid://43ka8hnrawjw" path="res://scenes/traps/freeze/freeze_turret.tscn" id="15_i403b"]
+[ext_resource type="PackedScene" uid="uid://danr7ihfd0vov" path="res://scenes/interactive/freeze_receiver.tscn" id="16_2l0hg"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_g1ai2")
@@ -53,7 +54,6 @@ tile_set = ExtResource("4_2l0hg")
 tile_set = ExtResource("5_7gsxw")
 
 [node name="Glass" type="TileMapLayer" parent="Tilemaps" unique_id=1349664587 groups=["ground", "world_tilemap"]]
-tile_map_data = PackedByteArray("AAAXAE8AAQAAAAAAAAA=")
 tile_set = ExtResource("6_fwulr")
 
 [node name="Ladders" type="TileMapLayer" parent="Tilemaps" unique_id=2114889966 groups=["ladder_tilemap"]]
@@ -88,9 +88,6 @@ position = Vector2(328, 1272)
 
 [node name="Traps" type="Node" parent="." unique_id=673943172]
 
-[node name="LaserTurret" parent="Traps" unique_id=81752479 instance=ExtResource("13_i403b")]
-position = Vector2(352, 1272)
-
 [node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
 
 [node name="Liquids" type="Node" parent="." unique_id=129700419]
@@ -98,6 +95,13 @@ position = Vector2(352, 1272)
 [node name="Dynamic" type="Node" parent="." unique_id=223122078]
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
+
+[node name="FreezeTurret" parent="." unique_id=221103290 instance=ExtResource("15_i403b")]
+position = Vector2(360, 1272)
+
+[node name="FreezeReceiver" parent="." unique_id=324846073 instance=ExtResource("16_2l0hg")]
+position = Vector2(464, 1272)
+scale = Vector2(-1, 1)
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]

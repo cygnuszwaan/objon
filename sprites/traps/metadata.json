@@ -1,0 +1,22 @@
+{
+  "group_id": "fcd75739-c2c8-498f-b116-ae7a8fc07a06",
+  "objects": [
+    {
+      "id": "fd19ca14-319b-4575-adb9-623a6d18584e",
+      "name": "base",
+      "prompt": "Freeze ray turret",
+      "size": {
+        "width": 16,
+        "height": 16
+      },
+      "directions": 1,
+      "view": "low top-down",
+      "rotations": {
+        "unknown": "rotations/Freeze_ray_turret.png"
+      },
+      "animations": {}
+    }
+  ],
+  "export_version": "1.1",
+  "export_date": "2026-10-15T23:36:57.115224"
+}
