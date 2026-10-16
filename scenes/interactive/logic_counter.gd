@@ -3,7 +3,7 @@ class_name LogicCounter
 extends LogicNode
 ## Counter: the output goes on after `count_to` rising edges of its sources. Every source counts on its own (a
 ## second source rising while the first is still held is a new edge), so three buttons pressed once each, or one
-## button pressed three times, both reach 3; `invert_input` counts falling edges instead and `all_required` does
+## button pressed three times, both reach 3; `invert_input` counts falling edges instead (and `invert_sources` does so for one source: a ticked source counts when it turns off) and `all_required` does
 ## not apply (it is hidden). Edges past `count_to` are ignored.
 ##
 ## Reset: while any `reset_sources` input is on, the count is held at 0, the output is off and edges are ignored
@@ -19,10 +19,18 @@ extends LogicNode
 @export var reset_sources: Array[Node] = []:
 	set(value):
 		reset_sources = value
+		if PowerTarget.fit_flags(invert_reset_sources, reset_sources.size()):
+			notify_property_list_changed()
 		if is_node_ready():
 			_reconnect()
 			queue_redraw()
 			update_configuration_warnings()
+## One checkbox per entry of `reset_sources`, in the same order: tick it to read that reset source as NOT.
+@export var invert_reset_sources: Array[bool] = []:
+	set(value):
+		invert_reset_sources = value
+		queue_redraw()
+		_refresh_inputs()
 ## Seconds after reaching `count_to` before the count and output clear by themselves (0 = never).
 @export_range(0.0, 60.0, 0.1, "or_greater") var auto_reset_time: float = 0.0
 
@@ -41,11 +49,11 @@ func _watched() -> Array[Node]:
 func _levels() -> Array[bool]:
 	var levels: Array[bool] = []
 	for source in sources:
-		levels.append(_is_valid_source(source) and (source.is_powered() != invert_input))
+		levels.append(_is_valid_source(source) and ((source.is_powered() != PowerTarget.flag_at(invert_sources, levels.size())) != invert_input))
 	return levels
 
 func _read_reset() -> bool:
-	return _has_valid(reset_sources) and _combine(reset_sources, false)
+	return _has_valid(reset_sources) and _combine(reset_sources, false, invert_reset_sources)
 
 func _snap_inputs() -> void:
 	_prev = _levels()
@@ -92,7 +100,7 @@ func _tag() -> String:
 	return "CNT"
 
 func _link_lists() -> Array:
-	return [[sources, LINK_COLOR], [reset_sources, LINK_COLOR_RESET]]
+	return [[sources, LINK_COLOR, invert_sources], [reset_sources, LINK_COLOR_RESET, invert_reset_sources]]
 
 func _save_extra(d: Dictionary) -> void:
 	d["count"] = count

@@ -19,6 +19,9 @@ extends Area2D
 			update_configuration_warnings()
 ## Inverts the power contract: present while unpowered, hidden while powered.
 @export var invert: bool = false
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 
 const POPUP_SCENE := "res://scenes/effects/points_popup.tscn"
 const RECHECK_FRAMES := 3  # physics frames after reappearing in which overlapping bodies are collected by polling

@@ -16,10 +16,18 @@ extends LogicNode
 @export var reset_sources: Array[Node] = []:
 	set(value):
 		reset_sources = value
+		if PowerTarget.fit_flags(invert_reset_sources, reset_sources.size()):
+			notify_property_list_changed()
 		if is_node_ready():
 			_reconnect()
 			queue_redraw()
 			update_configuration_warnings()
+## One checkbox per entry of `reset_sources`, in the same order: tick it to read that reset source as NOT.
+@export var invert_reset_sources: Array[bool] = []:
+	set(value):
+		invert_reset_sources = value
+		queue_redraw()
+		_refresh_inputs()
 ## The latch is on at load, until a reset.
 @export var start_on: bool = false
 
@@ -29,7 +37,7 @@ func _watched() -> Array[Node]:
 	return sources + reset_sources
 
 func _read_reset() -> bool:
-	return _has_valid(reset_sources) and _combine(reset_sources, false)
+	return _has_valid(reset_sources) and _combine(reset_sources, false, invert_reset_sources)
 
 func _snap_inputs() -> void:
 	super()
@@ -47,7 +55,7 @@ func _tag() -> String:
 	return "LATCH"
 
 func _link_lists() -> Array:
-	return [[sources, LINK_COLOR], [reset_sources, LINK_COLOR_RESET]]
+	return [[sources, LINK_COLOR, invert_sources], [reset_sources, LINK_COLOR_RESET, invert_reset_sources]]
 
 func _save_extra(d: Dictionary) -> void:
 	d["reset"] = _reset

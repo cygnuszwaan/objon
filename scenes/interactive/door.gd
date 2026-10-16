@@ -28,6 +28,9 @@ extends AnimatableBody2D
 ## in that direction (not while a blocked close is waiting).
 
 @export var invert: bool = false ## Open until powered instead of closed until powered (read by the PowerTarget child).
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export var open_fps: float = 16.0 ## Frames per second while opening or closing (8 steps, closed to open).
 
 const FRAME_COUNT := 9

@@ -91,9 +91,17 @@ enum CueEase { LINEAR, SINE, CUBIC }
 @export var sources: Array[Node] = []:
 	set(value):
 		sources = value
+		if PowerTarget.fit_flags(invert_sources, sources.size()):
+			notify_property_list_changed()
 		if is_node_ready():
 			_forward_sources(true)
 			update_configuration_warnings()
+## One checkbox per entry of `sources`, in the same order: tick it to read that source as NOT. Forwarded with `sources`.
+@export var invert_sources: Array[bool] = []:
+	set(value):
+		invert_sources = value
+		if is_node_ready():
+			_forward_sources(true)
 ## Inverts the power: the cue plays when the source turns off.
 @export var invert: bool = false
 ## Authoring overlay: the view rectangle centred on this node.
@@ -322,7 +330,7 @@ func load_state(d: Dictionary) -> void:
 	_pass_left = -1.0  # nor holds an edge back: the pass-through is re-derived by the first apply
 	_pass_stop_wait = false
 
-## Copies `sources` onto the `PowerTarget` child (a copy, so a conductor's `add_source()` never writes this export).
+## Copies `sources` onto the `PowerTarget` child (a copy, with its `invert_sources`, so a conductor's `add_source()` never writes this export).
 ## `replace` also forwards an empty list, so clearing `sources` in the Inspector clears the child; at load an empty
 ## list leaves the child's own sources alone.
 func _forward_sources(replace: bool) -> void:
@@ -330,7 +338,12 @@ func _forward_sources(replace: bool) -> void:
 		return
 	var target := _power_target()
 	if target != null:
-		target.sources = sources.duplicate()
+		target.set_sources(sources.duplicate(), invert_sources.duplicate())
+
+## Tells the PowerTarget child not to apply its own `delay` timing to this device: the cue's `delay` is the wait
+## before the pan, and the pass-through shifts a rising edge by it (see TIMING and PASS-THROUGH above).
+func has_own_power_delay() -> bool:
+	return true
 
 func _power_target() -> PowerTarget:
 	for child in get_children():

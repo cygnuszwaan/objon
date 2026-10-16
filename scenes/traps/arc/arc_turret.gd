@@ -43,6 +43,9 @@ const GLOW := Color(0.35, 0.8, 1.0)
 @export var start_enabled: bool = true
 ## Flips the power state (read by the PowerTarget child).
 @export var invert: bool = false
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export_group("Arc")
 ## Damage an arc does to the player, passed to `take_hit()`.
 @export var damage: int = 1

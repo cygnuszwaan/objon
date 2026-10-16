@@ -69,6 +69,9 @@ const TILE_SIZE: float = 16.0
 			_update_visuals()
 
 @export var invert: bool = false ## Flips the power state (read by the PowerTarget child).
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export var enabled: bool = true:
 	set(value):
 		enabled = value

@@ -43,6 +43,9 @@ extends Node2D
 		if is_inside_tree() and not Engine.is_editor_hint():
 			_apply_enabled()
 @export var invert: bool = false ## Flips the power state (read by the PowerTarget child).
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export var damage: int = 1 ## Passed to the player's take_hit().
 @export_range(0.1, 5.0, 0.05, "suffix:s") var enemy_damage_interval: float = 0.5 ## Seconds between hits on the same enemy (each hit is one point of damage).
 ## Opt-in laser boiling (roadmap 5.4): the beam boils WATER in any WaterBasin it crosses that has `boilable` on too (both

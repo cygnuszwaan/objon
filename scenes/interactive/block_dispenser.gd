@@ -45,6 +45,9 @@ const DEFAULT_SPAWN_OFFSET := Vector2(0.0, TILE) ## local spawn point when the s
 @export_range(0, 16) var max_alive: int = 1 ## Most blocks of this dispenser alive at once; the oldest is dissolved to make room. 0 = unlimited.
 @export_range(0.0, 10.0, 0.05, "or_greater") var cooldown: float = 0.5 ## Seconds after a spawn during which further rising edges are ignored. 0 = none.
 @export var invert: bool = false ## Read by the PowerTarget child: spawns on the falling edge of the wired source instead.
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export var show_spawn_area: bool = true: ## Editor-only overlay: the block's footprint at the spawn point.
 	set(value):
 		show_spawn_area = value

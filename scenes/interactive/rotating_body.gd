@@ -127,6 +127,9 @@ extends AnimatableBody2D
 @export_group("Power")
 ## Flips the power input: wired power ON = free see-saw, OFF = motorized. Read by the PowerTarget child. Unwired, the motor is just on (and with motor_torque 0, there is nothing to switch).
 @export var invert: bool = false
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export_group("Audio")
 ## Looping creak while the body turns (Audio id; empty = none). Volume and pitch follow the angular speed.
 @export var creak_sound: StringName = &"interactive/seesaw_creak"

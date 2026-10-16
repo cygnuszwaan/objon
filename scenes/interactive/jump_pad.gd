@@ -20,6 +20,9 @@ extends AnimatedSprite2D
 
 @export var launch_speed: float = 500.0
 @export var invert: bool = false ## Flips the power state (read by the PowerTarget child).
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 
 const DIM_TINT := Color(0.5, 0.5, 0.55)
 var _live: bool = true

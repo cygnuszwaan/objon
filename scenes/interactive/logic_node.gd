@@ -14,7 +14,10 @@ extends Node2D
 ## (the editor draws a small tag and the links; nothing reads the position).
 ##
 ## INPUT: `sources` combine like a PowerTarget's (any one lights it; `all_required` needs every one), then
-## `invert_input` flips the level. No valid source reads as off, never as "inverted on".
+## `invert_input` flips the level. `invert_sources` is a checkbox per source (same size as `sources`, kept in step by
+## the `sources` setter) that reads that one source as NOT before they combine; the Latch's and Counter's
+## `reset_sources` have `invert_reset_sources` the same way. A source with no entry is not inverted. No valid source
+## reads as off, never as "inverted on".
 ##
 ## STARTUP: the first state is derived from the inputs at once and is not an edge: nothing counts, pulses or waits.
 ## `is_powered()` derives it on demand, so a device whose own startup apply runs first still reads the right
@@ -38,6 +41,7 @@ signal powered_changed(on: bool)
 const MAX_DEPTH := 16 ## Signal recursion cut-off across all logic nodes.
 const LINK_COLOR := Color(0.4, 0.85, 1.0, 0.8)
 const LINK_COLOR_RESET := Color(1.0, 0.6, 0.2, 0.8)
+const LINK_COLOR_INVERTED := Color(1.0, 0.35, 0.65, 0.9) ## A source ticked in an invert list.
 const TAG_COLOR := Color(0.75, 0.55, 1.0, 0.9)
 
 static var _depth: int = 0
@@ -47,10 +51,18 @@ static var _depth_warned: bool = false
 @export var sources: Array[Node] = []:
 	set(value):
 		sources = value
+		if PowerTarget.fit_flags(invert_sources, sources.size()):
+			notify_property_list_changed()
 		if is_node_ready():
 			_reconnect()
 			queue_redraw()
 			update_configuration_warnings()
+## One checkbox per entry of `sources`, in the same order: tick it to read that source as NOT.
+@export var invert_sources: Array[bool] = []:
+	set(value):
+		invert_sources = value
+		queue_redraw()
+		_refresh_inputs()
 ## The input needs every source on, not any one.
 @export var all_required: bool = false:
 	set(value):
@@ -123,9 +135,9 @@ func _save_extra(_d: Dictionary) -> void:
 func _load_extra(_d: Dictionary) -> void:
 	pass
 
-## Lists drawn as links in the editor: [[nodes, colour], ...].
+## Lists drawn as links in the editor: [[nodes, colour, invert flags], ...] (the flags are optional; a ticked source is drawn pink).
 func _link_lists() -> Array:
-	return [[sources, LINK_COLOR]]
+	return [[sources, LINK_COLOR, invert_sources]]
 
 func _tag() -> String:
 	return "LOGIC"
@@ -190,16 +202,17 @@ func _reconnect() -> void:
 func _read_input() -> bool:
 	if not _has_valid(sources):
 		return false
-	return _combine(sources, all_required) != invert_input
+	return _combine(sources, all_required, invert_sources) != invert_input
 
-## Any one lit (or all lit with `all`) among the valid entries of `list`.
-func _combine(list: Array[Node], all: bool) -> bool:
+## Any one lit (or all lit with `all`) among the valid entries of `list`; entry i is read as NOT if `flags[i]` is ticked.
+func _combine(list: Array[Node], all: bool, flags: Array[bool] = []) -> bool:
 	var seen_any := false
-	for source in list:
+	for i in list.size():
+		var source := list[i]
 		if not _is_valid_source(source):
 			continue
 		seen_any = true
-		var lit: bool = source.is_powered()
+		var lit: bool = source.is_powered() != PowerTarget.flag_at(flags, i)
 		if all and not lit:
 			return false
 		if not all and lit:
@@ -274,9 +287,14 @@ func _draw() -> void:
 	if not draw_links:
 		return
 	for list in _link_lists():
-		for source in list[0]:
+		var flags: Array[bool] = []
+		if list.size() > 2:
+			flags = list[2]
+		for i in list[0].size():
+			var source: Node = list[0][i]
 			if source == null or not is_instance_valid(source) or not source is Node2D:
 				continue
+			var color: Color = LINK_COLOR_INVERTED if PowerTarget.flag_at(flags, i) else list[1]
 			var end := to_local((source as Node2D).global_position)
-			draw_line(Vector2.ZERO, end, list[1], 1.0)
-			draw_circle(end, 2.5, list[1])
+			draw_line(Vector2.ZERO, end, color, 1.0)
+			draw_circle(end, 2.5, color)

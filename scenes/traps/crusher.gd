@@ -20,6 +20,9 @@ extends Area2D
 @export var dwell_retracted: float = 0.2                 # seconds held fully retracted before extending again
 @export var damage: int = 1
 @export var invert: bool = false                          # flips the power state (read by the PowerTarget child)
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export var travel_px: float = 20.0                      # total vertical travel; matches the 21-frame sprite (20 gaps × 1px)
 @export var arm_height_extended: float = 28.0            # blocking arm's height at full extension; retracted height is this minus travel_px (28-20=8), so the arm's bottom edge always meets the spike's top edge with no gap or overlap
 

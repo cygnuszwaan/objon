@@ -14,7 +14,8 @@
 [ext_resource type="PackedScene" path="res://scenes/levels/conductor_layers.tscn" id="11_icp1j"]
 [ext_resource type="Script" uid="uid://bfrg0144j3s3d" path="res://scenes/levels/water_manager.gd" id="12_4gpp4"]
 [ext_resource type="PackedScene" uid="uid://dgii53fryk4gh" path="res://scenes/player/player.tscn" id="13_rdr40"]
-[ext_resource type="PackedScene" uid="uid://cc8lsru56yplm" path="res://scenes/traps/laser/laser_turret.tscn" id="15_i403b"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/button.tscn" id="15_2l0hg"]
+[ext_resource type="PackedScene" path="res://scenes/interactive/door.tscn" id="16_7gsxw"]
 
 [node name="TestLevel" type="Node2D" unique_id=1261410649]
 script = ExtResource("1_g1ai2")
@@ -63,11 +64,17 @@ tile_set = ExtResource("6_quo62")
 tile_set = ExtResource("7_j5y0x")
 
 [node name="PoweredLadderLayer" parent="Tilemaps" unique_id=1944668761 instance=ExtResource("8_mvorh")]
+invert_sources = null
+delay = null
 
 [node name="PoweredCatwalkLayer" parent="Tilemaps" unique_id=1013901616 instance=ExtResource("9_hulh5")]
 tile_set = ExtResource("7_j5y0x")
+invert_sources = null
+delay = null
 
 [node name="PoweredSpikeLayer" parent="Tilemaps" unique_id=1205680104 instance=ExtResource("10_yw11j")]
+invert_sources = null
+delay = null
 
 [node name="ConductorLayers" parent="Tilemaps" unique_id=1050737449 instance=ExtResource("11_icp1j")]
 
@@ -85,6 +92,15 @@ position = Vector2(328, 1272)
 
 [node name="Sources" type="Node" parent="." unique_id=486040387]
 
+[node name="Button" parent="Sources" unique_id=1966755046 instance=ExtResource("15_2l0hg")]
+position = Vector2(360, 1272)
+color = 1
+latch_mode = 1
+
+[node name="Button2" parent="Sources" unique_id=788573502 instance=ExtResource("15_2l0hg")]
+position = Vector2(376, 1272)
+latch_mode = 1
+
 [node name="Traps" type="Node" parent="." unique_id=673943172]
 
 [node name="Checkpoints" type="Node" parent="." unique_id=1948021330]
@@ -95,8 +111,22 @@ position = Vector2(328, 1272)
 
 [node name="Blocks" type="Node" parent="." unique_id=1681336233]
 
-[node name="LaserTurret" parent="." unique_id=81752479 instance=ExtResource("15_i403b")]
-position = Vector2(368, 1272)
+[node name="Door" parent="." unique_id=382568987 instance=ExtResource("16_7gsxw")]
+position = Vector2(392, 1272)
+
+[node name="PowerTarget" parent="Door" index="2" node_paths=PackedStringArray("sources")]
+sources = [NodePath("../../Sources/Button"), NodePath("../../Sources/Button2")]
+invert_sources = Array[bool]([false, true])
+all_required = true
+
+[node name="Door2" parent="." unique_id=1845610079 instance=ExtResource("16_7gsxw")]
+position = Vector2(408, 1272)
+delay = 0.2
+
+[node name="Door3" parent="." unique_id=737889876 instance=ExtResource("16_7gsxw")]
+position = Vector2(424, 1272)
+delay = 0.4
 
 [editable path="Backdrop"]
 [editable path="Tilemaps/ConductorLayers"]
+[editable path="Door"]

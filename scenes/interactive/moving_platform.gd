@@ -22,6 +22,9 @@ extends AnimatableBody2D
 # it). set_powered() -> _tween.pause()/play(). With nothing wired to its PowerTarget child it runs forever.
 # `invert` flips that (read by the PowerTarget child).
 @export var invert: bool = false
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 
 ## Where the far end is, RELATIVE TO WHERE THE PLATFORM IS PLACED in the editor: direction and
 ## distance in one vector. (96, 0) = 96px (6 tiles) right; (0, -64) = 64px up.

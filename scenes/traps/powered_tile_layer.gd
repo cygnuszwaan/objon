@@ -33,11 +33,22 @@ extends TileMapLayer
 @export var sources: Array[Node] = []:
 	set(value):
 		sources = value
+		if PowerTarget.fit_flags(invert_sources, sources.size()):
+			notify_property_list_changed()
 		if is_node_ready():
 			_forward_sources(true)
 			update_configuration_warnings()
+## One checkbox per entry of `sources`, in the same order: tick it to read that source as NOT. Forwarded with `sources`.
+@export var invert_sources: Array[bool] = []:
+	set(value):
+		invert_sources = value
+		if is_node_ready():
+			_forward_sources(true)
 ## Inverts the power: the layer is out while the source is off.
 @export var invert: bool = false
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 ## Seconds the layer blinks, still solid, between the power falling and the layer retracting. 0 = retract at once.
 ## The retract is this much later than the source: a TIMED button's `duration` is the time before the blink starts.
 @export_range(0.0, 10.0, 0.05, "or_greater") var warn_time: float = 1.0
@@ -183,7 +194,7 @@ func _sound_position() -> Vector2:
 		return Vector2.INF
 	return to_global(map_to_local(used.position + used.size / 2))
 
-## Copies `sources` onto the `PowerTarget` child (a copy, so a conductor's `add_source()` never writes the export).
+## Copies `sources` onto the `PowerTarget` child (a copy, with its `invert_sources`, so a conductor's `add_source()` never writes the export).
 ## `replace` also forwards an empty list, so clearing `sources` in the Inspector clears the child; at load an empty
 ## list leaves the child's own sources alone.
 func _forward_sources(replace: bool) -> void:
@@ -191,7 +202,7 @@ func _forward_sources(replace: bool) -> void:
 		return
 	var target := _power_target()
 	if target != null:
-		target.sources = sources.duplicate()
+		target.set_sources(sources.duplicate(), invert_sources.duplicate())
 
 func _power_target() -> PowerTarget:
 	for child in get_children():

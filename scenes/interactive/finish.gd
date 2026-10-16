@@ -54,6 +54,9 @@ const OPEN_FRAMES := 13
 @export_range(0.0, 100.0, 1.0) var required_gem_percent: float = 100.0 ## Share of the level's gems needed to unlock.
 @export var require_all: bool = false ## With a wired button: true = gems AND button, false = gems OR button.
 @export var invert: bool = false ## Flips the button state (read by the PowerTarget child).
+## Seconds between the wired power changing and this device following it (read by the PowerTarget child). Every change
+## waits the same time, so a short pulse stays a short pulse; the startup state is never delayed. 0 = at once.
+@export_range(0.0, 30.0, 0.05, "or_greater") var delay: float = 0.0
 @export_file("*.tscn") var next_level: String = "" ## Optional override: the scene the overlay continues to. Empty = the next level in `LevelCatalog` order (none after the last = offer a replay).
 @export var idle_fps: float = 4.0 ## Light blink rate of the locked/unlocked art.
 @export var open_fps: float = 12.0

@@ -17,6 +17,7 @@ collision_mask = 0
 script = ExtResource("1_rx")
 
 [node name="Sprite2D" type="Sprite2D" parent="." unique_id=2076723293]
+z_index = -1
 texture = ExtResource("2_8fte2")
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1585036857]
@@ -27,6 +28,7 @@ collision_layer = 8
 collision_mask = 0
 monitoring = false
 script = ExtResource("9_bt")
+stop_at_centre = true
 
 [node name="CollisionShape2D" type="CollisionShape2D" parent="BeamTarget" unique_id=941550010]
 shape = SubResource("CircleShape2D_0w3yt")
